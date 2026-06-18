@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"] =
-    "Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n]"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n]"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -85,3 +85,10 @@ L["You have %d minute(s) left to trade %s to %s."] =
 L["Trade window for %s (%s) has expired."]  = "Trade window for %s (%s) has expired."
 L["Test session: broadcasting %d sample item(s)."] =
     "Test session: broadcasting %d sample item(s)."
+
+-- Phase 3 — session UI (candidate response loop).
+L["LootCouncil EX — Respond"]              = "LootCouncil EX — Respond"
+L["Note (sent with your response):"]       = "Note (sent with your response):"
+L["Responded %s to %s."]                   = "Responded %s to %s."
+L["%s responded %s to %s."]                = "%s responded %s to %s."
+L["No active loot session to respond to."] = "No active loot session to respond to."
