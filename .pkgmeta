@@ -12,6 +12,7 @@ enable-nolib-creation: no
 # development tooling / docs and is excluded from the packaged addon.
 ignore:
   - .github
+  - Tests
   - docs
   - PROJECT.md
   - CLAUDE.md

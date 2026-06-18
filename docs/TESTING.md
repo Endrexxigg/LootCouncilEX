@@ -1,8 +1,15 @@
 # LootCouncil EX — Test Checklist
 
-Consolidated in-game test pass for everything built up to **v0.6.0** (Phase 2 trade/loot
-hardening, comms/roster hardening, Phase 3 MVP: respond → vote → award → trade). Work through
-it in one batch. Tick items as they pass; note failures with the exact error text.
+> **Most logic is auto-tested — you don't have to.** The pure logic (sync LWW/union merge,
+> digests + directional pull, council resolution, name normalization, command parsing, award
+> logging, self-report caching) runs headlessly in `Tests/run.lua` — `lua Tests/run.lua` from
+> the repo root, and on every push in CI. So this manual checklist is only for what genuinely
+> needs the game: **no Lua errors on load, comms delivery, frame rendering, the trade API, and
+> live multi-client convergence.** If a logic bug is suspected, add a case to `Tests/run.lua`
+> first — it's seconds, not a raid night.
+
+In-game pass for the WoW-dependent behavior. Work through it in one batch; tick items as they
+pass; note failures with the exact error text.
 
 ## Setup
 - [ ] Folder symlinked into `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX`.

@@ -15,6 +15,7 @@ ignore = { "212/self" }
 exclude_files = {
     "Libs/",
     "References/",
+    "Tests/", -- headless test harness: mocks WoW + sets globals, lints under its own rules
 }
 
 -- Addon globals we define and read across files.

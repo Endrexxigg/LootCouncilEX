@@ -1,0 +1,31 @@
+# Lint + headless tests on every push / PR — catches logic regressions without the game.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Lua 5.1 (matches the WoW client)
+        uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
+
+      - name: Set up LuaRocks
+        uses: leafo/gh-actions-luarocks@v4
+
+      - name: Install luacheck
+        run: luarocks install luacheck
+
+      - name: Lint
+        run: luacheck .
+
+      - name: Headless unit tests
+        run: lua Tests/run.lua
