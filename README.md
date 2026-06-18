@@ -27,7 +27,7 @@ and phased build map.
   Console).
 - **Native `CreateFrame` UI only — no AceGUI.**
 - No build step: the repo folder *is* the addon. Symlink it into
-  `World of Warcraft\_classic_era_\Interface\AddOns\LootCouncilEX` and `/reload`.
+  `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX` and `/reload`.
 
 ## Working in this repo
 

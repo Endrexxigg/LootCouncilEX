@@ -11,7 +11,7 @@ testing, and the TBC gotchas that have bitten these addons before.
 LootCouncil EX is a loot council addon for **World of Warcraft: The Burning Crusade
 Classic (Anniversary realms)** — a TBC-native replacement for RCLootCouncil. Pure
 Lua 5.1 + embedded Ace3, **no build step**: the repo folder *is* the addon. Symlink
-it into `World of Warcraft\_classic_era_\Interface\AddOns\LootCouncilEX` and `/reload`
+it into `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX` and `/reload`
 in-game to test.
 
 - **Addon / folder:** `LootCouncilEX`  ·  **Comms prefix:** `LCEX`  ·  **Slash:** `/lcex`
@@ -25,7 +25,8 @@ in-game to test.
 - Interface version: copy the `## Interface:` number from a known-good installed TBC
   addon's `.toc` (e.g. ArenaSmartStats uses `20505` for patch 2.5.x) rather than
   guessing.
-- The client lives under `_classic_era_` (Anniversary runs on the Classic Era client).
+- The client lives under `_anniversary_` (Anniversary runs on the Classic Era client, but
+  installs into its own `_anniversary_` folder — not `_classic_era_`).
 
 ## API source of truth
 
