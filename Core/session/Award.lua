@@ -19,6 +19,14 @@
 
 local LCEX = LootCouncilEX
 
+-- Container/bag APIs moved to the C_Container namespace; on the Anniversary client the
+-- old globals are nil. Prefer the namespace, fall back to the global so we work on any
+-- client. (We only use these three; their return shapes match between the two forms.)
+local Container = C_Container or {}
+local GetContainerNumSlots = Container.GetContainerNumSlots or _G.GetContainerNumSlots
+local GetContainerItemLink = Container.GetContainerItemLink or _G.GetContainerItemLink
+local PickupContainerItem  = Container.PickupContainerItem  or _G.PickupContainerItem
+
 -- Localized "You receive loot: " prefix, derived from the client's own global string so
 -- it tracks the locale (falls back to enUS). CHAT_MSG_LOOT for our own item loot.
 local SELF_LOOT_PREFIX = (LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(.-)%%s")) or "You receive loot: "

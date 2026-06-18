@@ -41,6 +41,7 @@ read_globals = {
     "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems", "GetLootMethod",
     "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem", "LOOT_ITEM_SELF",
     -- Bags / trade
+    "C_Container",
     "GetContainerNumSlots", "GetContainerItemLink", "GetContainerItemInfo",
     "PickupContainerItem", "ClickTradeButton", "GetTradePlayerItemLink",
     "CursorHasItem", "ClearCursor",

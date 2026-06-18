@@ -42,6 +42,7 @@
             "GetLootSlotInfo",
             "LootSlotHasItem",
             "LOOT_ITEM_SELF",
+            "C_Container",
             "GetContainerNumSlots",
             "GetContainerItemLink",
             "GetContainerItemInfo",
