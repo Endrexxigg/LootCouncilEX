@@ -54,13 +54,20 @@ function LCEX:BroadcastVCheck()
     return true
 end
 
--- /lcex ping — manual version check, with feedback so the user can see it fired.
+-- /lcex ping — manual version check. Prints confirmation now, then the resulting roster
+-- a beat later (replies arrive by whisper). RecordVersion only announces NEW/changed
+-- versions to avoid spamming the automatic broadcasts, so this delayed summary is what
+-- gives a manual ping visible feedback even when nothing changed.
 function LCEX:CmdPing()
-    if self:BroadcastVCheck() then
-        self:Msg(string.format(self.L["Version check sent (v%s) — watch for replies."], self:GetVersion()))
-    else
+    if not self:BroadcastVCheck() then
         self:Msg(self.L["Not in a group — nothing to broadcast."])
+        return
     end
+    self:Msg(string.format(self.L["Version check sent (v%s) — watch for replies."], self:GetVersion()))
+    if self.pingSummaryTimer then
+        self:CancelTimer(self.pingSummaryTimer)
+    end
+    self.pingSummaryTimer = self:ScheduleTimer("PrintKnownVersions", 1.5)
 end
 
 -- /lcex version — list every known addon user, sorted, with their version.
