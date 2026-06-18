@@ -54,7 +54,7 @@ Player notes, item/gear marks, shared award history, and cached gear/professions
 
 - **Addon/folder:** `LootCouncilEX`. **Comms prefix:** `LCEX`. **Slash command:** `/lcex`.
 - **Libraries:** LibStub + ACE3 (AceAddon, AceEvent, AceComm, AceSerializer, AceConsole, AceDB, AceTimer). **All networking via AceComm — never raw `SendAddonMessage`.**
-- **Comms envelope:** every message is one AceSerializer-encoded table `{ v, cmd, sid, ... }`. `v` = `PROTOCOL_VERSION`; drop messages with an unreadable higher major `v`. `cmd` routes through a dispatch table. `sid` identifies the session (nil for Plane B / roster messages).
+- **Comms envelope:** every message is one AceSerializer-encoded table `{ v, cmd, sid, ver, ... }`. `v` = `PROTOCOL_VERSION`; drop messages with an unreadable higher major `v`. `cmd` routes through a dispatch table. `sid` identifies the session (nil for Plane B / roster messages). `ver` = the sender's human-facing addon version, stamped on **every** message so peers learn each other's version passively from any traffic (not just the vCheck handshake); the receiver records it silently before dispatch.
 - **Plane B record format:** every record carries `mod` (unixtime last modified) and `by` (author char name). **Merge rule:** per key keep the greatest `mod`; ties broken by `by` alphabetically. Immutable datasets (history) merge by union of keys.
 - **UI is data-driven:** response buttons, columns, etc. build from the `RESPONSES` table, not hardcoded.
 - **Modules are small and single-purpose** per the file layout below.
@@ -104,12 +104,12 @@ LootCouncilEX/
 ## 6. Canonical reference
 
 ### 6.1 Plane A messages
-Envelope `{ v, cmd, sid, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`.
+Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`; `ver` is stamped on every message (see §4).
 
 | cmd | Direction | Channel | Payload |
 |---|---|---|---|
-| `vCheck` | any → raid | RAID | `{ ver }` |
-| `vReply` | client → asker | WHISPER | `{ ver }` |
+| `vCheck` | any → raid | RAID | `{}` (ver rides on the envelope) |
+| `vReply` | client → asker | WHISPER | `{}` (ver rides on the envelope) |
 | `sStart` | ML → raid | RAID | `{ items={[i]={link,quality}}, council={names} }` |
 | `sEnd` | ML → raid | RAID | `{}` |
 | `cResp` | candidate → ML | WHISPER | `{ item, resp, note, ilvl, gear={link,link} }` |
@@ -178,8 +178,8 @@ TierTokens = { [30243]={ name="Helm of the Fallen Hero", pieces={ ["WARRIOR"]=it
 
 ### 6.7 Key TBC APIs (verify signatures)
 - **ESC close:** `tinsert(UISpecialFrames, "LCEX_FrameName")`.
-- **Loot detect (bags flow):** passively track the ML's own loot via `CHAT_MSG_LOOT` ("You receive loot:" — derive the prefix from `LOOT_ITEM_SELF` for locale) to capture the source boss (`UnitName("target")`) + a looted-at `time()` stamp; plus a bag scan over bags 0-4 with the **global** `GetContainerNumSlots`/`GetContainerItemLink` (NOT `C_Container`, which is Dragonflight+). Quality from `GetItemInfo(link)` (3rd return); itemID via `link:match("item:(%d+)")`.
-- **Award handoff (trade):** the ML trades the item to the winner within the BoP 2-hour window. Do NOT auto-open (`InitiateTrade` is hardware-gated); on `TRADE_SHOW` auto-fill via `PickupContainerItem(bag,slot)` + `ClickTradeButton(slot)` (slots 1-6 tradeable, 7 = will-not-be-traded), with a manual-drag fallback. Track the 2h window from the looted-at `time()` and warn before it lapses. (`GetMasterLootCandidate`/`GiveMasterLoot` are **not used** — the guild auto-loots to bags, see §3 / DL-7.)
+- **Loot detect (bags flow):** passively track the ML's own loot via `CHAT_MSG_LOOT` ("You receive loot:" — derive the prefix from `LOOT_ITEM_SELF` for locale) to capture the source boss (`UnitName("target")`) + a looted-at `time()` stamp; plus a bag scan over bags 0-4 via **`C_Container`** (`GetContainerNumSlots` / `GetContainerItemLink` / `GetContainerItemInfo`), falling back to the same-named globals when absent (the globals are nil on Anniversary). Read quality from `GetContainerItemInfo` (cache-independent) for bag items; for a freshly-looted item `GetItemInfo` returns nil on first sight, so resolve quality async via `Item:CreateFromItemLink(link):ContinueOnItemLoad` with an `IsItemDataCached` fast-path and a ~0.5s `AceTimer` timeout. itemID via `link:match("item:(%d+)")`.
+- **Award handoff (trade):** the ML trades the item to the winner within the BoP 2-hour window. Do NOT auto-open (`InitiateTrade` is hardware-gated); on `TRADE_SHOW` auto-fill via a single **`UseContainerItem(bag,slot)`** guarded by `TradeFrame:IsShown()` (it drops the item into the first free trade slot; slots 1-6 are tradeable, slot 7 = will-not-be-traded), with a manual-drag fallback and a short bag-locked retry. Confirm delivery on `UI_INFO_MESSAGE == ERR_TRADE_COMPLETE` (snapshot the given items at `TRADE_ACCEPT_UPDATE`, warn on a wrong-winner hand-off) — NOT `TRADE_CLOSED`, which also fires on cancel. Track the 2h window from the looted-at `time()` and warn before it lapses. (`GetMasterLootCandidate`/`GiveMasterLoot` are **not used** — the guild auto-loots to bags, see §3 / DL-7.)
 - **Own gear:** `GetInventoryItemLink("player", slotID)`; snapshot on `PLAYER_REGEN_DISABLED` (anti-swap).
 - **Own professions:** scan `GetNumSkillLines()`/`GetSkillLineInfo(i)` for the two professions + level. (No reliable cross-player profession inspect — self-report only.)
 - **Equipped ilvl:** `GetAverageItemLevel` unreliable in Classic; show the competing-slot item from the snapshot instead.
@@ -224,7 +224,9 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 - **DL-6 (open, Phase 7):** ML disconnect mid-session recovery behavior is undefined.
 - **DL-7 (accepted v1):** loot flow is auto-loot-to-ML-bags + later sessions + handoff by **trade** within the BoP 2h window. This supersedes the original master-loot-from-corpse assumption; `GetMasterLootCandidate`/`GiveMasterLoot` are not used.
 - **DL-8 (open, Phase 3):** response buttons are user-configurable (add/remove/rename); only the DEFAULT set (BiS/Major/Minor/Greed + built-in Pass) exists until the settings UI lands. The set used in a session will need to be consistent across participants (likely carried in `sStart` or a synced config).
-- **DL-9 (accepted v1):** the 2h trade window is tracked from the looted-at `time()`; reliable only for items looted while the addon was loaded. Items already in bags before login show "no timer" rather than a false countdown; a tooltip-scan refinement is deferred.
+- **DL-9 (accepted v1):** the 2h trade window is tracked from the looted-at `time()`; reliable only for items looted while the addon was loaded. Items already in bags before login show "no timer" rather than a false countdown; a tooltip-scan refinement is deferred. (Refinement = tooltip-scan `GetContainerItemTradeTimeRemaining` / `BIND_TRADE_TIME_REMAINING` with a `measuredAt` anchor — approach confirmed against RCLC + Gargul; gate on `C_Item.GetItemGUID` existing on Anniversary.)
+- **DL-10 (open, Phase 4):** the §6.2 sync digest (`{n, maxMod}` + `since=maxMod` delta) can silently miss an edit whose `mod` is older than my high-water mark but newer for *its* key. Mitigation: also trigger a request on a record **count `n` mismatch** (not just `maxMod`), and on a count mismatch request `since=0` (full dataset). The deflate/`BULK` transport makes a full resync affordable.
+- **DL-11 (accepted, Phase 3):** Plane-A session authority is bound to the **`sStart` sender**, per `sid` — candidates/council record the ML as whoever opened the session and accept subsequent `cUpdate`/`sEnd`/`award` only from that same sender carrying that `sid`. The WoW master-looter API is **not** the authority source: under DL-7 the group need not be using master loot during a council session, so `GetRaidRosterInfo`-derived ML (RCLC's model) doesn't apply here. The trusted guild model (§2) makes initial trust of the `sStart` sender acceptable for v1; `sid` stays an identifier, not a credential. On the ML's own client the session ML is simply whoever runs `/lcex start` (it broadcasts `sStart`); `PlayerIsML` governs only passive loot-tracking, a separate concern.
 
 ---
 
