@@ -199,6 +199,21 @@ test("BiS: _CycleNext + BuildBiSDisplay", function()
     eq(d2[2].slot, "head", "slot order -> head first")
 end)
 
+-- Regression: a player whose class has NO stub BiS data must still resolve to THEIR class
+-- (not fall back to whichever class has data), and the class cycler walks all 9 classes.
+test("BiS: own class without data resolves; class cycler walks all classes", function()
+    H.class = "WARRIOR" -- live UnitClass for self; WARRIOR has no BiS stub data
+    local d = L:BuildBiSDisplay("Tester")
+    eq(L.bisClass, "WARRIOR", "resolves to the live class even with no data")
+    eq(L.bisSpec, "Arms", "spec defaults to the class's first talent tree")
+    eq(d[#d].text, L.L["No BiS data for this class/spec/phase."], "and shows the no-data line")
+
+    eq(#L.CLASSES, 9, "all 9 TBC classes are browsable")
+    eq(L:_CycleNext(L.CLASSES, "WARRIOR"), "PALADIN", "class cycler advances past a data-less class")
+    eq(table.concat(L:SpecsForClass("WARRIOR"), ","), "Arms,Fury,Protection", "static specs for the cycler")
+    ok(L:IsKnownClass("DRUID") and not L:IsKnownClass("NOPE"), "IsKnownClass validates tokens")
+end)
+
 -- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
 test("LootBrowser BuildBrowserDisplay", function()
     local d = L:BuildBrowserDisplay("P2")

@@ -86,25 +86,22 @@ function LCEX:ClassOf(name)
     return nil
 end
 
--- Classes that have BiS data (sorted) — the browse set for the class cycler.
-function LCEX:BiSClassesWithData()
-    local out = {}
-    for class in pairs(self.BiS) do out[#out + 1] = class end
-    table.sort(out)
-    return out
-end
-
 -- Resolve the current BiS class/spec/phase. Class defaults to the player's LIVE class on first
--- view (when unset/invalid), else the first class with data; spec/phase default to the first
--- available. Manual cycling sticks until a different player is opened (OpenPlayerDetail resets).
+-- view (when unset/invalid) — ANY TBC class, even one without BiS data yet, so own-character /
+-- grouped views show the right class rather than falling back to whichever class happens to have
+-- stub data. Spec defaults to the first spec that actually has data (so items show immediately),
+-- else the class's first talent tree; phase to the first. Manual cycling sticks until a different
+-- player is opened (OpenPlayerDetail resets).
 function LCEX:ResolveBiSContext(player)
-    if not self.bisClass or not self.BiS[self.bisClass] then
+    if not self.bisClass or not self:IsKnownClass(self.bisClass) then
         local live = self:ClassOf(player)
-        self.bisClass = (live and self.BiS[live] and live) or self:BiSClassesWithData()[1]
+        self.bisClass = (live and self:IsKnownClass(live) and live) or self.CLASSES[1]
     end
-    local c = self.bisClass and self.BiS[self.bisClass]
-    if not self.bisSpec or not (c and c[self.bisSpec]) then
-        self.bisSpec = (self.bisClass and self:GetBiSSpecs(self.bisClass)[1]) or nil
+    local specs = self:SpecsForClass(self.bisClass)
+    local valid = false
+    for _, s in ipairs(specs) do if s == self.bisSpec then valid = true; break end end
+    if not valid then
+        self.bisSpec = self:GetBiSSpecs(self.bisClass)[1] or specs[1]
     end
     if not self.bisPhase then self.bisPhase = self.PHASES[1] end
 end
@@ -199,14 +196,14 @@ function LCEX:EnsurePlayerDetail()
     bisBar.classBtn = self:CreateButton(bisBar, "", 120, 20)
     bisBar.classBtn:SetPoint("LEFT", 0, 0)
     bisBar.classBtn:SetScript("OnClick", function()
-        self.bisClass = self:_CycleNext(self:BiSClassesWithData(), self.bisClass)
-        self.bisSpec = nil
+        self.bisClass = self:_CycleNext(self.CLASSES, self.bisClass)
+        self.bisSpec = nil -- re-resolve to the new class's first spec
         self:RenderDetailTab("bis")
     end)
-    bisBar.specBtn = self:CreateButton(bisBar, "", 100, 20)
+    bisBar.specBtn = self:CreateButton(bisBar, "", 150, 20)
     bisBar.specBtn:SetPoint("LEFT", bisBar.classBtn, "RIGHT", 4, 0)
     bisBar.specBtn:SetScript("OnClick", function()
-        self.bisSpec = self:_CycleNext(self:GetBiSSpecs(self.bisClass), self.bisSpec)
+        self.bisSpec = self:_CycleNext(self:SpecsForClass(self.bisClass), self.bisSpec)
         self:RenderDetailTab("bis")
     end)
     bisBar.phaseBtn = self:CreateButton(bisBar, "", 56, 20)

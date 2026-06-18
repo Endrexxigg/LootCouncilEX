@@ -15,6 +15,33 @@ LCEX.BIS_SLOT_ORDER = {
     "waist", "legs", "feet", "finger", "trinket", "mainhand", "offhand", "ranged",
 }
 
+-- TBC class taxonomy — the browse sets for the BiS class/spec cyclers. These are FIXED game
+-- facts (the 9 classes and their 3 talent trees), independent of which class/spec actually has
+-- BiS *data* yet: the browser must be able to navigate to any class (a data-less one just renders
+-- "No BiS data…") and, crucially, default to the viewed player's real class. CLASS tokens match
+-- UnitClass's 2nd return; spec names match the BiS dataset keys and the in-game talent-tab order.
+LCEX.CLASSES = {
+    "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID",
+}
+LCEX.CLASS_SPECS = {
+    WARRIOR = { "Arms", "Fury", "Protection" },
+    PALADIN = { "Holy", "Protection", "Retribution" },
+    HUNTER  = { "Beast Mastery", "Marksmanship", "Survival" },
+    ROGUE   = { "Assassination", "Combat", "Subtlety" },
+    PRIEST  = { "Discipline", "Holy", "Shadow" },
+    SHAMAN  = { "Elemental", "Enhancement", "Restoration" },
+    MAGE    = { "Arcane", "Fire", "Frost" },
+    WARLOCK = { "Affliction", "Demonology", "Destruction" },
+    DRUID   = { "Balance", "Feral", "Restoration" },
+}
+
+-- Static spec list for a class (the spec cycler's browse set), or {} for an unknown class token.
+-- Distinct from GetBiSSpecs, which returns only the specs that currently have BiS *data*.
+function LCEX:SpecsForClass(class) return self.CLASS_SPECS[class] or {} end
+
+-- Is `class` one of the 9 TBC class tokens? (Validity check for an adopted/cycled class.)
+function LCEX:IsKnownClass(class) return self.CLASS_SPECS[class] ~= nil end
+
 -- ── Loot ─────────────────────────────────────────────────────────────────────
 -- Phase keys that actually have loot data, in PHASES order.
 function LCEX:GetLootPhases()
