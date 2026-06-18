@@ -1,85 +1,104 @@
 # LootCouncil EX — Test Checklist
 
-> **Most logic is auto-tested — you don't have to.** The pure logic (sync LWW/union merge,
-> digests + directional pull, council resolution, name normalization, command parsing, award
-> logging, self-report caching) runs headlessly in `Tests/run.lua` — `lua Tests/run.lua` from
-> the repo root, and on every push in CI. So this manual checklist is only for what genuinely
-> needs the game: **no Lua errors on load, comms delivery, frame rendering, the trade API, and
-> live multi-client convergence.** If a logic bug is suspected, add a case to `Tests/run.lua`
-> first — it's seconds, not a raid night.
+> **How this file works.** The **▶ Test next** block at the very top is the *only* thing that
+> needs your attention — it lists what changed since the last in-game pass, newest first. When
+> you tell me an item passed, I tick it (`[x]`) or move it down into **Passed ✓** (the regression
+> reference). Everything under **Passed ✓** is already verified in-game; re-run a section only if
+> related code changes.
+>
+> **Most logic is auto-tested — you don't have to.** Sync merge, digests + directional pull,
+> council resolution, name normalization, command parsing, award logging, self-report caching,
+> the display builders, and the BiS class/spec resolution all run headlessly in `Tests/run.lua`
+> (`lua Tests/run.lua`, and on every push in CI). So this manual list is only for what genuinely
+> needs the game: no Lua errors on load, comms delivery, frame rendering, the trade API, and live
+> multi-client convergence. If a *logic* bug is suspected, add a case to `Tests/run.lua` first —
+> seconds, not a raid night.
 
-In-game pass for the WoW-dependent behavior. Work through it in one batch; tick items as they
-pass; note failures with the exact error text.
+---
 
-## Setup
-- [ ] Folder symlinked into `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX`.
-- [ ] `/console scriptErrors 1` (or BugSack loaded) so Lua errors surface.
-- [ ] `/reload`. **Expected:** chat prints `LootCouncil EX: v0.6.0 loaded.` and **no Lua errors on load**.
+## ▶ Test next  (newest first)
+Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-## A. Smoke (solo, no group)
-- [ ] `/lcex` (bare) opens the **session panel**; `/lcex` again closes it. Drag it, `/reload`, reopen → position remembered.
-- [ ] `/lcex ping` → prints `Version check sent…` then `Known addon users:` listing you.
-- [ ] `/lcex test 3` → prints a session line, **and** the candidate **Respond** frame + the **Council** frame open with 3 items.
-- [ ] In Respond: click a response on a row → it stays highlighted, chat shows `Responded <resp> to <item>` and `<You> responded <resp> to <item>`. The Council frame's row for you shows that response.
-- [ ] In Council: `+` on your row → tally shows `1` (green), `+` button highlighted. Click `+` again → back to `0`. `−` → `-1` (red).
-- [ ] In Council: click **Award** on your row → chat shows `Recorded: <item> → <you>…`.
-- [ ] Council `<` / `>` step between the 3 items (item 2/3 show "No responses yet").
-- [ ] `/lcex end` (or the panel's **End session**) closes both frames; panel shows "No active session".
-- [ ] Close the Respond frame with Esc, then `/lcex respond` reopens it (while a session is active).
+### v0.9.8 — BiS tab class fix
+- [ ] Open your **own** character (`/lcex player`, or click your name in the voting frame) → **BiS** tab.
+  **Class auto-resolves to your real class** (no longer always "Mage").
+- [ ] The **Class** button cycles through **all 9 classes**; **Spec** cycles that class's 3 talent
+  trees; **Phase** cycles P1–P5. A class/spec/phase with no data shows
+  *"No BiS data for this class/spec/phase."* (only Mage/Fire/P2 has stub data for now).
+- [ ] Open a **grouped** non-Mage player → BiS class still auto-resolves to *their* class.
 
-## B. The live loop (2 clients, A = ML, B = candidate)
-- [ ] Both in a party/raid. `/lcex ping` on A → B appears in A's `/lcex version`, and vice-versa.
-- [ ] A loots (or `/lcex test 2`) and runs **Start session** (panel) or `/lcex start`.
-- [ ] **B's Respond frame opens** with the item(s). B clicks responses.
-- [ ] A's chat shows `<B> responded <resp> to <item>`, and **A's Council frame fills** with B's row (response + competing-gear icon if applicable + note).
-- [ ] If B is on the council (same guild rank ≤ configured, or add B via profile.council.extra): **B's Council frame opens** and shows the table; B votes with `+`/`−`; **A sees the tally update**.
-- [ ] A clicks **Award** on B's row → A's chat `Recorded: <item> → B`. B's frames behave (no error).
-- [ ] A `End session` → B's frames close.
+### v0.9.7 — Session frame overflow
+- [ ] With **10+** councilable items in your bags, `/lcex` (bare) → the bag preview **scrolls
+  inside the frame** (mouse-wheel / scrollbar); **nothing spills past the bottom edge or the
+  Start/End buttons**. Switch between a long and short bag list → the list never renders empty
+  (FauxScrollFrame offset reset).
 
-## C. Trade handoff (2 clients, the BoP flow)
-- [ ] After awarding an item to B, A opens a **trade** with B. **Expected:** the awarded item auto-loads into the trade window (or, if it can't, chat says to drag it in manually — never a stuck cursor).
-- [ ] Complete the trade. **Expected:** A's pending-trade for that item clears (no false "expired" later). Wrong-winner: if A instead trades the item to someone else, chat warns `Note: <item> was awarded to B but traded to <other>`.
-- [ ] Cancel a trade instead of completing → the item stays owed (no false delivery).
-- [ ] Loot a fresh epic you've **never seen this session** and confirm it's tracked (`/lcex scan` lists it) — verifies the uncached-item async fix.
+---
 
-## D. Comms / roster hardening
-- [ ] Version shows on every interaction (responses/awards from a peer fill `/lcex version` without an explicit ping).
-- [ ] Pull a mob (enter combat) while the group roster changes — no `vCheck` spam mid-combat.
-- [ ] Same-realm vs cross-realm names don't cause "my vote/award didn't register" (name normalization).
+## Passed ✓  (regression reference)
+Verified in-game. Bullets document *what* was checked; re-run a section only if its code changes.
 
-## E. Plane B council sync (Phase 4 proof — 2 council clients, same guild)
-Both A and B must be **council**: in the guild at rank ≤ 1 (default `byRank`), or run `/lcex council add <name>` for each other. Verify with `/lcex council` → lists members and shows `you: member`.
-- [ ] **Live edit:** both online. A: `/lcex dummy foo hello`. **Expected:** B's chat shows `A updated dummy[foo]`, and B's `/lcex dummy` lists `foo = hello`.
-- [ ] **Offline catch-up (the exit criterion):** B logs out. A: `/lcex dummy bar world` (and optionally change foo: `/lcex dummy foo hi2`). B logs back in. Within ~6s **B's chat shows `Synced … dummy record(s) from A`**, and B's `/lcex dummy` now shows both `foo` and `bar` (with `foo = hi2` if changed). No manual step.
-- [ ] **Manual trigger:** `/lcex sync` rebroadcasts the digest (use if the 6s login window was missed).
-- [ ] **LWW:** A sets `foo=x`, then B sets `foo=y` a moment later → both converge to `y` (the later `mod` wins). Set `foo` on both within the same second → tie breaks by author name alphabetically (deterministic, both agree).
-- [ ] **Gating:** a non-council guildie running the addon neither receives nor injects dummy records (their `/lcex dummy` stays empty; `/lcex council` shows `you: not a member`).
+### Setup
+- [x] Folder symlinked into `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX`.
+- [x] `/console scriptErrors 1` (or BugSack) on; `/reload` prints `LootCouncil EX: v… loaded.` and **no Lua errors on load**.
 
-## F. Council datasets (Phase 5 — notes / marks / history / self-report)
-Both clients council (`/lcex council` → `you: member`), `/lcex debug` on, same guild.
+### A. Smoke (solo, no group)
+- [x] `/lcex` opens/closes the session panel; drag + `/reload` remembers position.
+- [x] `/lcex ping` → `Version check sent…` then `Known addon users:` listing you.
+- [x] `/lcex test 3` → session line + the candidate **Respond** and **Council** frames open with 3 items.
+- [x] Respond: click a response → stays highlighted, chat echoes it, Council row reflects it.
+- [x] Council: `+`/`−` adjust the tally (green/red); re-click returns to 0.
+- [x] Council: **Award** → `Recorded: <item> → <you>…`. `<`/`>` step between items.
+- [x] `/lcex end` (or **End session**) closes both frames; panel shows "No active session".
+- [x] Esc-close Respond, then `/lcex respond` reopens it during an active session.
 
-**Solo (one client):**
-- [ ] `/lcex note Bob top priority` → `/lcex note Bob` echoes it with `(by <you>)`. `/reload` → still there (SavedVariables).
-- [ ] `/lcex mark 30055 give to a mage`, and `/lcex mark <shift-click an item> some text` → `/lcex mark 30055` reads back (link form parses the id even when the item name has spaces).
-- [ ] `/lcex test 2` → `/lcex award 1 Bob` → chat shows `Recorded…` **and** debug shows `history += <sid>:1`. `/lcex history` lists it; `/lcex history Bob` filters; re-`/lcex award 1 Bob` → no second history row (union idempotent).
-- [ ] `/lcex gear` → dumps your live equipped slots + professions. `/lcex report` → "broadcast" (in guild) or "not sent" (no guild).
+### B. The live loop (2 clients, A = ML, B = candidate)
+- [x] Both grouped; `/lcex ping` cross-populates `/lcex version` both ways.
+- [x] A `/lcex start` (or **Start session**) → **B's Respond frame opens**; B responds.
+- [x] A's chat shows B's response; **A's Council frame fills** (response + competing-gear icon + note).
+- [x] Council member B votes `+`/`−`; **A sees the tally update**.
+- [x] A **Award** on B's row → `Recorded: <item> → B`; no errors on B. A **End** → B's frames close.
 
-**Two clients A+B (grouped, same guild, both council):**
-- [ ] **History auto-log:** A `/lcex award 1 <B>` → B's `/lcex history` shows the **same** record (B logged it from the `award` broadcast). Take B offline, A awards another, B back → within ~6s B's `/lcex history` gains the missed row (union sync).
-- [ ] **Notes/marks LWW:** A `/lcex note X from A` → B `/lcex note X` shows it. B `/lcex note X from B` a moment later → A's copy updates (greater `mod` wins). Edit while the other is offline → catch-up on login.
-- [ ] **pReport group-gate (the key test):** bring in a **non-council** addon user C (in the group). A `/lcex gear <C>` → shows C's cached gear/profs (proves `pReport` is group-gated, not council-gated). Debug on A shows `cached pReport from <C>`.
-- [ ] **Negative gating:** C `/lcex note Y blah` → B does **not** pick it up (`/lcex note Y` empty on B) — C's `pSet` is council-gated out. But C's `pReport` **was** accepted (previous step). That asymmetry is the point.
-- [ ] **Anti-swap:** C swaps a ring/trinket while in combat → A's cached gear for C still reflects combat-entry gear; an out-of-combat swap on C refreshes it.
+### C. Trade handoff (2 clients, the BoP flow)
+- [x] After awarding to B, A opens a trade with B → item **auto-loads** (or clear "drag it in" message; never a stuck cursor).
+- [x] Complete → A's pending-trade clears (no false "expired"). Wrong-winner warns `… awarded to B but traded to <other>`.
+- [x] Cancel a trade → item stays owed (no false delivery).
+- [x] Loot a never-seen-this-session epic → it's tracked (`/lcex scan`) — the uncached-item async fix.
 
-## G. Viewer UIs (Phase 6 — the parts that need the game; the logic is auto-tested)
-- [ ] `/reload` → `v0.9.5 loaded`, no Lua errors.
-- [ ] **Loot browser:** `/lcex loot` opens it; the phase tab (P2) shows raid/boss headers and item rows with **icons + names** (and a `(token)`-style note on tier tokens). Edit an item's mark, press Enter → it persists (`/lcex mark <id>` shows it) and, with a 2nd client, broadcasts (debug `cached pReport`/`pSet`). ESC closes.
-- [ ] **Scroll/offset (the canonical FauxScrollFrame bug):** if a phase ever has more rows than fit, scroll to the bottom, then switch to a shorter phase — the list must **never render empty**. (Stub data is short; this matters once Phase 7 fills real tables, but eyeball it.)
-- [ ] **Player detail:** click a **candidate's name** in the council voting frame (or `/lcex player <name>`) → the panel opens. The name click must NOT trigger a vote. Switch tabs (Gear/History/Professions/BiS/Notes) — each renders from the cached data; switching tabs resets the scroll.
-- [ ] **Notes tab:** edit the note, Enter → persists + (2-client) syncs; the "by … , date" line updates on reopen.
-- [ ] **BiS tab:** for a grouped player the **Class auto-resolves** to their class; the Class/Spec/Phase buttons cycle and re-render; on P2 a Mage/Fire shows BiS item rows with icons. (Real BiS/loot content is Phase 7.)
+### D. Comms / roster hardening
+- [x] Version shows on every interaction (responses/awards fill `/lcex version` without a ping).
+- [x] Enter combat while the roster changes → no `vCheck` spam mid-combat.
+- [x] Same-realm vs cross-realm names don't break vote/award (name normalization).
+
+### E. Plane B council sync (2 council clients, same guild)
+- [x] **Live edit:** A `/lcex dummy foo hello` → B's chat `A updated dummy[foo]`; B's `/lcex dummy` lists it.
+- [x] **Offline catch-up:** B logs out, A edits, B logs in → within ~6s `Synced … dummy record(s) from A`; both keys present.
+- [x] **Manual trigger:** `/lcex sync` rebroadcasts the digest.
+- [x] **LWW:** later `mod` wins; same-second tie breaks by author name (both converge).
+- [x] **Gating:** a non-council guildie neither receives nor injects dummy records (`you: not a member`).
+
+### F. Council datasets (notes / marks / history / self-report)
+- [x] `/lcex note <p> …` round-trips with `(by <you>)` and survives `/reload`.
+- [x] `/lcex mark <id|shift-click> …` round-trips (link form parses the id through spaces).
+- [x] `/lcex award` logs history (debug `history += …`); `/lcex history [player]` lists/filters; re-award is idempotent (union).
+- [x] `/lcex gear` dumps live slots + professions; `/lcex report` → "broadcast"/"not sent".
+- [x] **History auto-log** to B from the `award` broadcast; missed rows catch up on login (union sync).
+- [x] **Notes/marks LWW** converge across A/B incl. offline edits.
+- [x] **pReport group-gate:** A `/lcex gear <C>` shows a non-council group member C's gear (group-gated, not council-gated).
+- [x] **Negative gating:** C's `pSet` (note) is council-gated out on B, but C's `pReport` was accepted — the asymmetry is the point.
+- [x] **Anti-swap:** combat-entry gear snapshot defeats a pre-pull swap; out-of-combat swap refreshes it.
+
+### G. Viewer UIs (Phase 6)
+- [x] `/reload` → loads with no Lua errors.
+- [x] **Loot browser** (`/lcex loot`): phase tab shows raid/boss headers + item rows (icons + names, `(token)` note); edit a mark + Enter persists (`/lcex mark <id>`) and broadcasts; Esc closes.
+- [x] **Scroll/offset:** long → short phase never renders empty (FauxScrollFrame reset).
+- [x] **Player detail:** candidate-name click (does **not** trigger a vote) / `/lcex player <name>` opens the panel; tabs render from cached data; switching tabs resets the scroll.
+- [x] **Notes tab:** edit + Enter persists + (2-client) syncs; "by …, date" updates on reopen.
+- [x] BiS tab class auto-resolve — **superseded by the v0.9.8 retest above** (see ▶ Test next).
+
+---
 
 ## Known rough edges (expected, not bugs)
-- `/lcex test` on the *first* `/reload` may show `item:NNNNN` instead of a name for the **pad** items (uncached); real bag items and a second run render correctly.
-- The Respond and Council windows both open centered (overlap) until you drag them apart once.
-- Council names aren't class-colored yet; "open player detail" is Phase 6.
+- `/lcex test` on the *first* `/reload` may show `item:NNNNN` for the **pad** items (uncached); real bag items and a second run render correctly.
+- The Respond and Council windows both open centered (overlap) until dragged apart once.
+- Council names aren't class-colored yet.
