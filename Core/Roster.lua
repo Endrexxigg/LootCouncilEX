@@ -42,14 +42,25 @@ function LCEX:RosterInit()
     self.versions[UnitName("player")] = self:GetVersion()
 end
 
--- Announce our version to the current group. No-op (with feedback) when solo.
+-- Announce our version to the current group. Silent (returns true/false) so the
+-- automatic zone-in / roster-change broadcasts don't spam chat; the manual /lcex ping
+-- (CmdPing) prints its own feedback.
 function LCEX:BroadcastVCheck()
     local channel = self:GroupChannel()
     if not channel then
-        self:Msg(self.L["Not in a group — nothing to broadcast."])
-        return
+        return false
     end
     self:Send("vCheck", nil, { ver = self:GetVersion() }, channel)
+    return true
+end
+
+-- /lcex ping — manual version check, with feedback so the user can see it fired.
+function LCEX:CmdPing()
+    if self:BroadcastVCheck() then
+        self:Msg(string.format(self.L["Version check sent (v%s) — watch for replies."], self:GetVersion()))
+    else
+        self:Msg(self.L["Not in a group — nothing to broadcast."])
+    end
 end
 
 -- /lcex version — list every known addon user, sorted, with their version.

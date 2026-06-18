@@ -48,6 +48,8 @@ L["%s is running v%s"]                = "%s is running v%s"
 L["Known addon users:"]               = "Known addon users:"
 L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
+L["Version check sent (v%s) — watch for replies."] =
+    "Version check sent (v%s) — watch for replies."
 L["Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"] =
     "Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"
 

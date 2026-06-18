@@ -106,7 +106,7 @@ function LCEX:HandleSlash(input)
     local cmd = (input:match("^(%S*)") or ""):lower()
     local rest = strtrim(input:match("^%S*%s*(.*)$") or "")
     if cmd == "ping" then
-        self:BroadcastVCheck()
+        self:CmdPing()
     elseif cmd == "version" or cmd == "ver" then
         self:PrintKnownVersions()
     elseif cmd == "scan" then
