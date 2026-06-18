@@ -1,0 +1,18 @@
+## Interface: 20505
+## Title: LootCouncil EX
+## Notes: TBC-native loot council — broadcast, vote, award via master loot.
+## Author: Endrexxigg
+## Version: 0.1
+## SavedVariables: LootCouncilEXDB
+## X-Category: Raid
+
+# Embedded libraries (LibStub + Ace3), loaded in dependency order.
+embeds.xml
+
+# Core. Init.lua MUST come first: its file body creates the LootCouncilEX global
+# that every other Core file binds to via `local LCEX = LootCouncilEX`. Comms.lua
+# creates LCEX.dispatch; Roster.lua fills it — so Comms precedes Roster.
+Core\Init.lua
+Core\Const.lua
+Core\Comms.lua
+Core\Roster.lua

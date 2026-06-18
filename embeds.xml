@@ -1,0 +1,21 @@
+<!-- ── LootCouncil EX — embedded library loader ────────────────────────────────
+     Loads LibStub + the Ace3 surface this addon uses, in strict dependency order:
+     LibStub must come first, then CallbackHandler-1.0 (every Ace-3.0 lib below
+     depends on it), then AceAddon-3.0, then the rest. Out-of-order entries leave a
+     lib nil at load with no obvious error.
+
+     LibStub ships only a .lua (no .xml), so it is pulled in with <Script>. Every
+     other lib ships its own .xml that loads its .lua — including AceComm-3.0.xml,
+     which loads ChatThrottleLib.lua before AceComm itself, so ChatThrottleLib is
+     NOT listed here separately. Referenced from LootCouncilEX.toc. -->
+<Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
+    <Script  file="Libs\LibStub\LibStub.lua"/>
+    <Include file="Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
+    <Include file="Libs\AceAddon-3.0\AceAddon-3.0.xml"/>
+    <Include file="Libs\AceEvent-3.0\AceEvent-3.0.xml"/>
+    <Include file="Libs\AceComm-3.0\AceComm-3.0.xml"/>
+    <Include file="Libs\AceSerializer-3.0\AceSerializer-3.0.xml"/>
+    <Include file="Libs\AceConsole-3.0\AceConsole-3.0.xml"/>
+    <Include file="Libs\AceDB-3.0\AceDB-3.0.xml"/>
+    <Include file="Libs\AceTimer-3.0\AceTimer-3.0.xml"/>
+</Ui>

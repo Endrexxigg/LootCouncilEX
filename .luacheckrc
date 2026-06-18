@@ -8,6 +8,10 @@ std = "lua51"
 max_line_length = false
 codes = true
 
+-- Methods declared with `:` always receive `self`; don't warn when a method doesn't
+-- read it (common for Ace3-style methods). Other unused args still flag real mistakes.
+ignore = { "212/self" }
+
 exclude_files = {
     "Libs/",
     "References/",
@@ -28,10 +32,11 @@ read_globals = {
     "FauxScrollFrame_GetOffset", "FauxScrollFrame_Update",
     "FauxScrollFrame_OnVerticalScroll", "FauxScrollFrame_SetOffset",
     -- Addon metadata
-    "GetAddOnMetadata",
+    "GetAddOnMetadata", "C_AddOns",
     -- Units / roster
     "UnitName", "UnitClass", "UnitExists", "UnitGUID", "UnitFullName", "UnitInRaid",
     "GetNumGroupMembers", "GetNumRaidMembers", "GetRaidRosterInfo", "IsInRaid", "IsInGroup",
+    "LE_PARTY_CATEGORY_INSTANCE",
     -- Loot / master loot
     "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems",
     "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem",
