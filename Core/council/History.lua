@@ -58,19 +58,23 @@ LCEX.dispatch.award = function(self, msg, sender)
     })
 end
 
--- /lcex history [player] — dump award history (optionally filtered to one winner), newest
--- first. The headless verifier; Phase 6 builds the real PlayerDetail/History UI.
-function LCEX:CmdHistory(rest)
-    rest = strtrim(rest or "")
-    local filter = rest ~= "" and self:NormalizeName(rest) or nil
-
+-- Award-history records for a player (normalized key), or ALL when key is nil — newest first.
+-- Shared by /lcex history and the PlayerDetail History tab.
+function LCEX:HistoryForPlayer(key)
     local rows = {}
     for _, rec in pairs(self.db.global.history) do
-        if not filter or self:NormalizeName(rec.player) == filter then
+        if not key or self:NormalizeName(rec.player) == key then
             rows[#rows + 1] = rec
         end
     end
     table.sort(rows, function(a, b) return (a.ts or 0) > (b.ts or 0) end)
+    return rows
+end
+
+-- /lcex history [player] — dump award history (optionally filtered to one winner), newest first.
+function LCEX:CmdHistory(rest)
+    rest = strtrim(rest or "")
+    local rows = self:HistoryForPlayer(rest ~= "" and self:NormalizeName(rest) or nil)
 
     self:Msg(string.format(self.L["Award history — %d record(s):"], #rows))
     for i = 1, math.min(#rows, 30) do

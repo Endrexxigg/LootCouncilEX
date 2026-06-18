@@ -71,6 +71,16 @@ function LCEX:BuildCandRow(parent)
     row.name:SetPoint("LEFT", 2, 0)
     row.name:SetWidth(96); row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
 
+    -- Clicking the name opens the player detail panel (§7). A transparent button over JUST the
+    -- name region, so it never steals clicks from the +/-/Award buttons (separate children).
+    row.nameBtn = CreateFrame("Button", nil, row)
+    row.nameBtn:SetPoint("LEFT", 2, 0)
+    row.nameBtn:SetSize(96, 22)
+    row.nameBtn:SetScript("OnClick", function()
+        local n = row.name:GetText()
+        if n and n ~= "" then self:OpenPlayerDetail(n) end
+    end)
+
     row.resp = self:CreateLabel(row, nil, "GameFontNormalSmall")
     row.resp:SetPoint("LEFT", row.name, "RIGHT", 4, 0)
     row.resp:SetWidth(52); row.resp:SetJustifyH("LEFT"); row.resp:SetWordWrap(false)

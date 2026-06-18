@@ -140,6 +140,8 @@ function LCEX:HandleSlash(input)
         self:CmdGear(rest)
     elseif cmd == "loot" or cmd == "browser" then
         self:ToggleLootBrowser()
+    elseif cmd == "player" or cmd == "detail" then
+        self:CmdPlayerDetail(rest)
     elseif cmd == "council" then
         self:CmdCouncil(rest)
     elseif cmd == "sync" then
@@ -158,6 +160,6 @@ function LCEX:HandleSlash(input)
     elseif cmd == "test" then
         self:CmdTest(rest)
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, council [add|remove <name>], sync"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"])
     end
 end

@@ -153,6 +153,33 @@ test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     ok(sawHello, "we're ahead -> hello back so they pull")
 end)
 
+-- ── PlayerDetail builders (Phase 6) ──────────────────────────────────────────
+test("HistoryForPlayer filter + sort", function()
+    L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
+    L.db.global.history["s:2"] = { player = "Bob",   ts = 300 }
+    L.db.global.history["s:3"] = { player = "Carol", ts = 200 }
+    local bob = L:HistoryForPlayer(L:NormalizeName("Bob"))
+    eq(#bob, 2, "two records for Bob")
+    eq(bob[1].ts, 300, "newest first")
+    eq(bob[2].ts, 100, "then older")
+    eq(#L:HistoryForPlayer(nil), 3, "nil key -> all records")
+    eq(#L:HistoryForPlayer(L:NormalizeName("Nobody")), 0, "unknown player -> none")
+end)
+
+test("PlayerDetail display builders", function()
+    L.db.global.gearCache["bob"] = { items = { [1] = "headlink", [5] = "chestlink" }, mod = 1 }
+    local g = L:BuildGearDisplay("Bob")
+    eq(#g, 2, "two equipped slots")
+    eq(g[1].kind, "gearitem", "gear rows")
+    eq(g[1].slot, 1, "slot 1 first")
+    eq(L:BuildGearDisplay("Ghost")[1].kind, "info", "no cache -> info row")
+
+    L.db.global.profCache["bob"] = { profs = { Tailoring = 375, Enchanting = 300 }, mod = 1 }
+    local p = L:BuildProfsDisplay("Bob")
+    eq(#p, 2, "two professions")
+    ok(p[1].text:find("Enchanting"), "professions sorted (Enchanting before Tailoring)")
+end)
+
 -- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
 test("LootBrowser BuildBrowserDisplay", function()
     local d = L:BuildBrowserDisplay("P2")

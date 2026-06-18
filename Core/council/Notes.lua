@@ -9,6 +9,15 @@ local LCEX = LootCouncilEX
 
 LCEX:RegisterDataset("notes", "lww", function() return LCEX.db.global.notes end)
 
+-- Set a player's note and sync it (council-gated warning, then SetRecord broadcasts pSet).
+-- Shared by /lcex note and the PlayerDetail Notes tab. Key is the normalized player name.
+function LCEX:SetNote(player, text)
+    if not self:AmCouncil() then
+        self:Msg(self.L["Heads-up: you're not on the council — this won't sync to others."])
+    end
+    self:SetRecord("notes", self:NormalizeName(player), { text = text })
+end
+
 -- /lcex note <player> [text] — set a note (with text) or read it (without).
 function LCEX:CmdNote(rest)
     rest = strtrim(rest or "")
@@ -21,10 +30,7 @@ function LCEX:CmdNote(rest)
 
     local key = self:NormalizeName(player)
     if text then
-        if not self:AmCouncil() then
-            self:Msg(self.L["Heads-up: you're not on the council — this won't sync to others."])
-        end
-        self:SetRecord("notes", key, { text = text })
+        self:SetNote(player, text)
         self:Msg(string.format(self.L["Note on %s set."], player))
     else
         local rec = key and self.db.global.notes[key]
