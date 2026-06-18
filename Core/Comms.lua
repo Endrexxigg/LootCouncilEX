@@ -27,6 +27,13 @@ function LCEX:Msg(text)
     print(PREFIX .. tostring(text))
 end
 
+-- Developer trace — prints only while `/lcex debug` is on. Not localized (dev output). Used to
+-- diagnose comms/sync without a second player guessing where a message was dropped.
+function LCEX:Debug(fmt, ...)
+    if not self.debug then return end
+    self:Msg("|cff888888[dbg]|r " .. string.format(fmt, ...))
+end
+
 -- ── Send path ──────────────────────────────────────────────────────────────--
 -- Build the flat envelope for a command + optional session id + payload table.
 function LCEX:BuildEnvelope(cmd, sid, payload)
@@ -91,6 +98,8 @@ function LCEX:OnCommReceived(prefix, message, distribution, sender)
     local ok, msg = self:Deserialize(message)
     if not ok or type(msg) ~= "table" then return end
     if type(msg.v) ~= "number" or msg.v > self.PROTOCOL_VERSION then return end
+
+    self:Debug("recv '%s' from %s via %s", tostring(msg.cmd), tostring(sender), tostring(distribution))
 
     local handler = self.dispatch[msg.cmd]
     if handler then

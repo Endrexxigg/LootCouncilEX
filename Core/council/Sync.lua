@@ -104,7 +104,10 @@ function LCEX:SetRecord(dataset, key, payload)
 
     local channel = self.db.profile.syncChannel or "GUILD"
     if channel ~= "GUILD" or IsInGuild() then
+        self:Debug("send pSet %s[%s] via %s", dataset, tostring(key), channel)
         self:Send("pSet", nil, { dataset = dataset, key = key, record = rec }, channel)
+    else
+        self:Debug("pSet NOT sent: syncChannel is GUILD but you're not in a guild")
     end
 end
 
@@ -134,7 +137,16 @@ end
 
 -- ── Dispatch handlers (all gated: ignore self-echo + non-council either direction) ──────────
 local function syncGateBad(self, sender)
-    return self:IsSelf(sender) or not self:AmCouncil() or not self:SyncSenderOk(sender)
+    if self:IsSelf(sender) then return true end -- our own echo (silent)
+    if not self:AmCouncil() then
+        self:Debug("sync drop: I am not council (check /lcex council)")
+        return true
+    end
+    if not self:SyncSenderOk(sender) then
+        self:Debug("sync drop: %s is not in MY council list", tostring(sender))
+        return true
+    end
+    return false
 end
 
 -- A peer advertised its digest. For each dataset, pull a delta if they have more; and if WE

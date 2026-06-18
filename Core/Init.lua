@@ -127,6 +127,9 @@ function LCEX:HandleSlash(input)
         self:CmdSync()
     elseif cmd == "dummy" then
         self:CmdDummy(rest)
+    elseif cmd == "debug" then
+        self.debug = not self.debug
+        self:Msg("Debug tracing " .. (self.debug and "ON" or "OFF"))
     elseif cmd == "award" then
         self:CmdAward(rest)
     elseif cmd == "end" then
