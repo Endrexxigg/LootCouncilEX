@@ -80,6 +80,10 @@ function LCEX:OnEnable()
     -- Seed ourselves into the known-versions table (Roster.lua).
     self:RosterInit()
 
+    -- Loot detection / master-loot events (Award.lua). Registered here, after the DB
+    -- exists, so the handler can read db.profile.minQuality.
+    self:SetupLootEvents()
+
     self:Msg(string.format(self.L["v%s loaded."], self:GetVersion()))
 end
 
@@ -93,15 +97,29 @@ function LCEX:OnRosterUpdate()
     self:DebouncedSend("vCheck", function() self:BroadcastVCheck() end)
 end
 
--- /lcex <subcommand>. A manual `ping` sends immediately (no debounce) so the
--- acceptance test is deterministic; event-driven broadcasts go through the debounce.
+-- /lcex <subcommand> [args]. The first token is the command (lowercased); the
+-- remainder is preserved as-is (player names are case-sensitive). A manual `ping` sends
+-- immediately (no debounce) so the acceptance test is deterministic; event-driven
+-- broadcasts go through the debounce.
 function LCEX:HandleSlash(input)
-    local cmd = strtrim((input or ""):lower()):match("^(%S*)")
+    input = strtrim(input or "")
+    local cmd = (input:match("^(%S*)") or ""):lower()
+    local rest = strtrim(input:match("^%S*%s*(.*)$") or "")
     if cmd == "ping" then
         self:BroadcastVCheck()
     elseif cmd == "version" or cmd == "ver" then
         self:PrintKnownVersions()
+    elseif cmd == "scan" then
+        self:CmdScan()
+    elseif cmd == "start" then
+        self:CmdStartFromScan()
+    elseif cmd == "award" then
+        self:CmdAward(rest)
+    elseif cmd == "end" then
+        self:EndSession()
+    elseif cmd == "session" then
+        self:CmdSession()
     else
-        self:Msg(self.L["Commands: /lcex ping, /lcex version"])
+        self:Msg(self.L["Commands: ping, version, scan, start, award <n> <name>, end, session"])
     end
 end

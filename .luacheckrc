@@ -34,11 +34,11 @@ read_globals = {
     -- Addon metadata
     "GetAddOnMetadata", "C_AddOns",
     -- Units / roster
-    "UnitName", "UnitClass", "UnitExists", "UnitGUID", "UnitFullName", "UnitInRaid",
+    "UnitName", "UnitClass", "UnitExists", "UnitGUID", "UnitFullName", "UnitInRaid", "UnitIsUnit",
     "GetNumGroupMembers", "GetNumRaidMembers", "GetRaidRosterInfo", "IsInRaid", "IsInGroup",
-    "LE_PARTY_CATEGORY_INSTANCE",
+    "LE_PARTY_CATEGORY_INSTANCE", "GetInstanceInfo",
     -- Loot / master loot
-    "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems",
+    "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems", "GetLootMethod",
     "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem",
     -- Items / gear / professions
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",

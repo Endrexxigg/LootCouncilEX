@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via master loot.
 ## Author: Endrexxigg
-## Version: 0.1
+## Version: 0.2
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -16,3 +16,8 @@ Core\Init.lua
 Core\Const.lua
 Core\Comms.lua
 Core\Roster.lua
+
+# Plane A — live loot session (ML authority). Session holds state + sStart/sEnd;
+# Award scans loot and assigns via master loot, so Session precedes Award.
+Core\session\Session.lua
+Core\session\Award.lua
