@@ -69,6 +69,7 @@ function LCEX:SetupLootEvents()
     self:RegisterEvent("TRADE_ACCEPT_UPDATE", "OnTradeAcceptUpdate")
     self:RegisterEvent("UI_INFO_MESSAGE", "OnUiInfoMessage")
     self:RegisterEvent("TRADE_CLOSED", "OnTradeClosed")
+    self:RestoreOwedTrades() -- rehydrate owed items left over from before a /reload (DL-6)
 end
 
 -- True only when the player themselves is the master looter (PROJECT.md §3 authority).
@@ -304,6 +305,7 @@ function LCEX:AwardItem(itemIndex, name)
         warned   = false,
     }
     self:EnsureTradeTicker()
+    self:SaveOwedTrades() -- persist the new debt immediately (DL-6)
 
     local ts = time()
     local channel = self:GroupChannel()
@@ -484,10 +486,63 @@ function LCEX:ForgetAward(uid)
             if list[i].uid == uid then
                 table.remove(list, i)
                 if #list == 0 then self.pendingTrades[key] = nil end
+                self:SaveOwedTrades() -- a delivered/re-awarded item clears from the DB too
                 return
             end
         end
     end
+end
+
+-- ── Owed-trade persistence (survive /reload; DL-6 part 1) ─────────────────────
+-- self.pendingTrades is the live working copy; it also mirrors into the account-wide DB under
+-- the OWNER character's key so a /reload or crash never loses the "who do I still owe" ledger.
+-- Keyed by owner so an account's alts keep separate ledgers. The transient `filled` flag
+-- (per-trade-window UI state) is intentionally NOT persisted.
+local OWED_FIELDS = { "uid", "link", "itemID", "winner", "boss", "instance",
+                      "lootedAt", "expireAt", "warned" }
+
+function LCEX:OwnerKey()
+    return self:NormalizeName(UnitName("player"))
+end
+
+-- Mirror the live pendingTrades into db.global.pendingTrades[owner] (durable fields only).
+function LCEX:SaveOwedTrades()
+    local owner = self:OwnerKey()
+    if not owner or not self.db then return end
+    local out = {}
+    for shortKey, list in pairs(self.pendingTrades) do
+        local copy = {}
+        for _, rec in ipairs(list) do
+            local r = {}
+            for _, f in ipairs(OWED_FIELDS) do r[f] = rec[f] end
+            copy[#copy + 1] = r
+        end
+        if #copy > 0 then out[shortKey] = copy end
+    end
+    self.db.global.pendingTrades[owner] = next(out) and out or nil
+end
+
+-- Rebuild pendingTrades from the DB on login. Drops records whose 2h window already lapsed
+-- (no point auto-filling a now-untradeable item); keeps no-timer debts. Resumes the ticker if
+-- anything survives, and writes the pruned set back.
+function LCEX:RestoreOwedTrades()
+    local owner = self:OwnerKey()
+    local saved = owner and self.db and self.db.global.pendingTrades[owner]
+    if not saved then return end
+    local now = time()
+    local restored = {}
+    for shortKey, list in pairs(saved) do
+        local keep = {}
+        for _, rec in ipairs(list) do
+            if not (rec.expireAt and rec.expireAt <= now) then
+                keep[#keep + 1] = rec
+            end
+        end
+        if #keep > 0 then restored[shortKey] = keep end
+    end
+    self.pendingTrades = restored
+    if next(self.pendingTrades) then self:EnsureTradeTicker() end
+    self:SaveOwedTrades()
 end
 
 -- ── 2-hour trade-window timer ─────────────────────────────────────────────────
@@ -523,6 +578,7 @@ function LCEX:CheckTradeTimers()
         end
         if #list == 0 then self.pendingTrades[key] = nil end
     end
+    self:SaveOwedTrades() -- persist expirations/warn-flag updates
     self:StopTradeTickerIfIdle()
 end
 

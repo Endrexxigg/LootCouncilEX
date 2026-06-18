@@ -176,6 +176,9 @@ function H.reset()
     H.class = "MAGE"
     LCEX._councilSet = nil
     LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil
+    LCEX.pendingTrades = {}
+    LCEX.pendingLoot = {}
+    if LCEX.db.global.pendingTrades then wipe(LCEX.db.global.pendingTrades) end
     LCEX.db.profile.council = { byRank = true, rank = 1, extra = {} }
     LCEX.db.profile.syncChannel = "GUILD"
     LCEX.db.profile.selfReport = true

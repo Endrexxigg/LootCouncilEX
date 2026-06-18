@@ -19,19 +19,16 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.9.8 — BiS tab class fix
-- [ ] Open your **own** character (`/lcex player`, or click your name in the voting frame) → **BiS** tab.
-  **Class auto-resolves to your real class** (no longer always "Mage").
-- [ ] The **Class** button cycles through **all 9 classes**; **Spec** cycles that class's 3 talent
-  trees; **Phase** cycles P1–P5. A class/spec/phase with no data shows
-  *"No BiS data for this class/spec/phase."* (only Mage/Fire/P2 has stub data for now).
-- [ ] Open a **grouped** non-Mage player → BiS class still auto-resolves to *their* class.
+### v0.11.0 — Owed-trade persistence (DL-6)
+- [ ] Award an item to someone (`/lcex test 1` → `/lcex award 1 <name>`), then **`/reload`**. Open
+  a trade with that player → the awarded item **still auto-fills** (the owed list survived the
+  reload). A second never-awarded item does not.
+- [ ] Owed item still in its 2h window after reload → the "N minutes left" warning still fires; an
+  item whose window already lapsed during the reload is silently dropped (no false auto-fill).
 
-### v0.9.7 — Session frame overflow
-- [ ] With **10+** councilable items in your bags, `/lcex` (bare) → the bag preview **scrolls
-  inside the frame** (mouse-wheel / scrollbar); **nothing spills past the bottom edge or the
-  Start/End buttons**. Switch between a long and short bag list → the list never renders empty
-  (FauxScrollFrame offset reset).
+### v0.10.0 — DB versioning (invisible)
+- [ ] Pure smoke: `/reload` with an existing `LootCouncilEXDB` → no Lua errors, all prior data
+  (notes/marks/history) intact. (Migration is a no-op stamp; just confirm nothing breaks.)
 
 ---
 
@@ -94,7 +91,7 @@ Verified in-game. Bullets document *what* was checked; re-run a section only if 
 - [x] **Scroll/offset:** long → short phase never renders empty (FauxScrollFrame reset).
 - [x] **Player detail:** candidate-name click (does **not** trigger a vote) / `/lcex player <name>` opens the panel; tabs render from cached data; switching tabs resets the scroll.
 - [x] **Notes tab:** edit + Enter persists + (2-client) syncs; "by …, date" updates on reopen.
-- [x] BiS tab class auto-resolve — **superseded by the v0.9.8 retest above** (see ▶ Test next).
+- [x] **BiS tab:** class auto-resolves to the viewed player's real class; Class button cycles all 9 classes, Spec cycles the class's 3 trees, data-less combos show "No BiS data" (v0.9.8 fix verified).
 
 ---
 

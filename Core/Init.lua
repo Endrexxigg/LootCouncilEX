@@ -52,6 +52,10 @@ local DB_DEFAULTS = {
         gearCache = {},
         profCache = {},
         dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
+        -- Owed loot the ML still has to trade out, mirrored here so it survives /reload (DL-6).
+        -- Account-wide, keyed by OWNER character name → the in-memory pendingTrades shape. Local
+        -- only (NOT a sync dataset). See Award.lua SaveOwedTrades/RestoreOwedTrades.
+        pendingTrades = {},
         -- NOTE: `dbVersion` is deliberately NOT defaulted here. An AceDB default would mask the
         -- difference between a fresh DB and a pre-versioning one (both would read the default),
         -- breaking migration detection — so MigrateDB reads it raw (nil ⇒ unversioned) and stamps

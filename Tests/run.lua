@@ -126,6 +126,30 @@ test("LogAward -> history", function()
     ok(not L:LogAward("Tester-100-1:3", { winner = "Bob", itemID = 30055 }), "re-log idempotent")
 end)
 
+-- ── Owed-trade persistence across /reload (A1, DL-6) ──────────────────────────
+test("Owed-trade save/restore round-trips and prunes expired", function()
+    H.now = 10000
+    L.pendingTrades = {
+        bob = { { uid = "S:1", link = "[Axe]", itemID = 1, winner = "Bob",
+                  expireAt = 10000 + 3600, warned = false, filled = true } },
+        amy = { { uid = "S:2", link = "[Bow]", itemID = 2, winner = "Amy",
+                  expireAt = 10000 - 1, warned = false } }, -- already lapsed
+    }
+    L:SaveOwedTrades()
+    ok(L.db.global.pendingTrades["tester"], "persisted under the owner key")
+    ok(L.db.global.pendingTrades["tester"].bob[1].filled == nil, "transient `filled` not persisted")
+
+    L.pendingTrades = {} -- simulate a /reload wiping the in-memory copy
+    L:RestoreOwedTrades()
+    ok(L.pendingTrades.bob and #L.pendingTrades.bob == 1, "live debt rebuilt from the DB")
+    eq(L.pendingTrades.bob[1].winner, "Bob", "owed record restored")
+    ok(not L.pendingTrades.amy, "an already-expired window is pruned on restore")
+
+    L:ForgetAward("S:1")
+    ok(not L.pendingTrades.bob, "ForgetAward clears the live copy")
+    ok(not L.db.global.pendingTrades["tester"], "and the persisted copy (owner pruned to nil)")
+end)
+
 -- ── pReport caching: group-gated, NOT council-gated (§6.2) ────────────────────
 test("pReport caches gear from a group member (group-gated)", function()
     H.group = { "Carol" }
