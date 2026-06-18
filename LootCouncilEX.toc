@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.9.9
+## Version: 0.10.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 

@@ -52,8 +52,17 @@ local DB_DEFAULTS = {
         gearCache = {},
         profCache = {},
         dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
+        -- NOTE: `dbVersion` is deliberately NOT defaulted here. An AceDB default would mask the
+        -- difference between a fresh DB and a pre-versioning one (both would read the default),
+        -- breaking migration detection — so MigrateDB reads it raw (nil ⇒ unversioned) and stamps
+        -- a real stored value. See LCEX.DB_VERSION / LCEX:MigrateDB below.
     },
 }
+
+-- Current `global` schema version. Bump by one whenever a migration step is added below; the
+-- step upgrades a DB written by the previous version in place. v1 is the schema that shipped
+-- through Phase 6 (notes/marks/history/gear+prof caches), so nil/0 → 1 is a no-op stamp.
+LCEX.DB_VERSION = 1
 
 -- The addon's displayed version (the `## Version` line), e.g. "0.1". Distinct from the
 -- comms PROTOCOL_VERSION in Const.lua. Anniversary clients moved GetAddOnMetadata under
@@ -63,8 +72,27 @@ function LCEX:GetVersion()
     return (getMeta and getMeta(ADDON_NAME, "Version")) or "dev"
 end
 
+-- One-shot schema migration, run in OnInitialize BEFORE anything reads db.global (datasets
+-- register/read in OnEnable, later). Walks the migration chain from the stored version up to
+-- LCEX.DB_VERSION, then stamps the current version as a real value. A DB written by a NEWER
+-- build (version ahead of ours) is left untouched — never downgrade or discard a peer's data.
+function LCEX:MigrateDB()
+    local g = self.db.global
+    local from = g.dbVersion or 0
+    if from == self.DB_VERSION then return end
+    if from > self.DB_VERSION then
+        self:Debug("DB is newer (v%s > v%s) — leaving as-is", tostring(from), tostring(self.DB_VERSION))
+        return
+    end
+    -- Migration chain: each `if from < N` block upgrades a (N-1)-era DB to N. None yet — the
+    -- current schema is what shipped through Phase 6, so an unversioned DB is already v1-shaped.
+    -- if from < 2 then ...transform g...; from = 2 end
+    g.dbVersion = self.DB_VERSION
+end
+
 function LCEX:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("LootCouncilEXDB", DB_DEFAULTS, true)
+    self:MigrateDB() -- normalize the schema before any reader touches db.global
 
     -- Inbound comms route to LCEX:OnCommReceived (Comms.lua), the default handler name.
     self:RegisterComm("LCEX")

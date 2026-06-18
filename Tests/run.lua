@@ -27,6 +27,18 @@ test("NormalizeName", function()
     eq(L:NormalizeName(nil), nil, "nil -> nil")
 end)
 
+-- ── DB schema migration (A0) ─────────────────────────────────────────────────
+test("MigrateDB stamps version, never downgrades", function()
+    L.db.global.dbVersion = nil          -- a pre-versioning / fresh DB
+    L:MigrateDB()
+    eq(L.db.global.dbVersion, L.DB_VERSION, "unversioned DB stamped to current")
+    L:MigrateDB()
+    eq(L.db.global.dbVersion, L.DB_VERSION, "already-current DB unchanged")
+    L.db.global.dbVersion = L.DB_VERSION + 1 -- written by a newer build
+    L:MigrateDB()
+    eq(L.db.global.dbVersion, L.DB_VERSION + 1, "newer DB left as-is (no downgrade)")
+end)
+
 -- ── LWW merge (the core sync correctness) ────────────────────────────────────
 test("MergeRecord lww", function()
     ok(L:MergeRecord("notes", "k", { text = "a", mod = 5, by = "X" }), "first insert changes")
