@@ -9,8 +9,9 @@
 local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
--- The session we are currently responding to (candidate view), distinct from LCEX.session
--- (the ML-authority state on the ML's own client): { sid, ml, items, responses }.
+-- The session we are currently in (candidate/council view), distinct from LCEX.session (the
+-- ML-authority state on the ML's own client):
+--   { sid, ml, items, responses, council=<set normName->true>, amCouncil, myVotes }.
 -- LCEX.activeSession is nil when no session is open for us.
 
 -- GetItemInfoInstant: synchronous, never-nil; on Anniversary it may live under C_Item.
@@ -86,43 +87,55 @@ function LCEX:CmdRespond()
     self:ShowLootFrame(a.items, a.responses)
 end
 
--- Open OUR OWN candidate view for a session we just started as the ML (called from
--- StartSession), so the ML sees the response frame solo or grouped without depending on the
--- comms echo — and can respond to their own session.
-function LCEX:OpenOwnCandidateView(sid, items, responses)
-    self.activeSession = { sid = sid, ml = UnitName("player"), items = items, responses = responses }
-    self:ShowLootFrame(items, responses)
+-- Enter a session — as the receiver of sStart, or locally as the ML that opened it. Records
+-- the session, resolves whether WE are on the council, opens the candidate LootFrame (everyone
+-- responds) and, if we vote, the council VotingFrame. Centralizes the comms path and the ML's
+-- own local path (solo or grouped), so the frames appear without depending on the echo.
+function LCEX:EnterSession(sid, ml, items, responses, council)
+    local set = {}
+    for _, n in ipairs(council or {}) do
+        local nn = self:NormalizeName(n)
+        if nn then set[nn] = true end
+    end
+    local amCouncil = set[self:NormalizeName(UnitName("player"))] == true
+    self.activeSession = {
+        sid = sid, ml = ml, items = items,
+        responses = responses or self.RESPONSES,
+        council = set, amCouncil = amCouncil, myVotes = {},
+    }
+    self.voteRows = {}
+    self:ShowLootFrame(items, self.activeSession.responses)
+    if amCouncil then
+        self:ShowVotingFrame(items)
+    end
 end
 
--- Close our own candidate view when WE end the session (the solo path has no sEnd echo).
--- Guarded by sid so it won't close some other ML's session frame we might be viewing.
-function LCEX:CloseOwnCandidateView(sid)
+-- Leave the session: close both frames and drop the view. Guarded by sid so it won't close a
+-- different ML's session we might be viewing. Called from sEnd and (locally) from EndSession.
+function LCEX:LeaveSession(sid)
     local a = self.activeSession
     if a and (not sid or a.sid == sid) then
         self.activeSession = nil
+        self.voteRows = nil
         self:HideLootFrame()
+        self:HideVotingFrame()
     end
 end
 
 -- ── Dispatch handlers ────────────────────────────────────────────────────────
--- The ML opened a session: record it (binding the ML to this sender) and open the frame.
--- A new sStart supersedes any session we were already showing.
+-- The ML opened a session: enter it (binding the ML to this sender, DL-11). A new sStart
+-- supersedes any session we were showing. We ignore our OWN echo if StartSession already
+-- entered us locally, so the local view (rows/votes) isn't wiped by the round-trip.
 LCEX.dispatch.sStart = function(self, msg, sender)
     if type(msg.items) ~= "table" or #msg.items == 0 then return end
-    self.activeSession = {
-        sid       = msg.sid,
-        ml        = sender,
-        items     = msg.items,
-        responses = msg.responses or self.RESPONSES,
-    }
-    self:ShowLootFrame(msg.items, self.activeSession.responses)
+    if self.activeSession and self.activeSession.sid == msg.sid and self:IsSelf(sender) then return end
+    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council)
 end
 
 -- The session ended: only the ML that opened THIS sid can close it (DL-11).
 LCEX.dispatch.sEnd = function(self, msg, sender)
     local a = self.activeSession
     if a and msg.sid == a.sid and self:NormalizeName(sender) == self:NormalizeName(a.ml) then
-        self.activeSession = nil
-        self:HideLootFrame()
+        self:LeaveSession(a.sid)
     end
 end

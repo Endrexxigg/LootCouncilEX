@@ -19,11 +19,39 @@ local counter = 0
 -- the ML's bags, not a loot window, so there is no loot slot — the ML resolves the live
 -- bag/slot at trade time in Award.lua.) `rows` is the per-item response aggregate (see below).
 
--- The voting council for a session. Phase-3 stand-in: empty (voting lands in slice 2 with
--- Council.lua/VotingFrame). The sStart schema carries a `council` key; real rank-based
--- resolution lands with the council toolkit.
+-- The voting council for a session, as a list of normalized names carried in sStart. Resolved
+-- from profile.council: explicit `extra` names, the session runner (always), and — when
+-- byRank — guild members at or above the configured rank. Degrades to just the runner solo /
+-- outside a guild (so solo testing still has a council of one).
 function LCEX:GetCouncil()
-    return {}
+    local set = {}
+    local p = self.db.profile.council or {}
+    for _, name in ipairs(p.extra or {}) do
+        local n = self:NormalizeName(name)
+        if n then set[n] = true end
+    end
+    set[self:NormalizeName(UnitName("player"))] = true
+    if p.byRank and IsInGuild() then
+        if GuildRoster then GuildRoster() end -- nudge a roster refresh (may be stale this frame)
+        for i = 1, (GetNumGuildMembers() or 0) do
+            local gname, _, rankIndex = GetGuildRosterInfo(i)
+            if gname and rankIndex and rankIndex <= (p.rank or 1) then
+                local n = self:NormalizeName(gname)
+                if n then set[n] = true end
+            end
+        end
+    end
+    local list = {}
+    for n in pairs(set) do list[#list + 1] = n end
+    return list
+end
+
+-- True if `name` is on the current session's council (the set resolved at start). The ML uses
+-- this to gate inbound vVote.
+function LCEX:IsCouncil(name)
+    local n = self:NormalizeName(name)
+    if not n or not self.session then return false end
+    return self.session.councilSet ~= nil and self.session.councilSet[n] == true
 end
 
 -- The response set carried in sStart so every candidate renders the same buttons (DL-8).
@@ -74,17 +102,21 @@ function LCEX:StartSession(items)
     end
 
     local sid = self:NewSessionID()
+    local council = self:GetCouncil()
+    local councilSet = {}
+    for _, n in ipairs(council) do councilSet[n] = true end
     -- `rows` accumulates candidate responses per item index (the ML-authority aggregate that
     -- gets rebroadcast as cUpdate): rows[itemIndex][normName] = { name, resp, note, gear, votes }.
+    -- `voters` tracks each council member's vote per candidate so the tally recomputes on change.
     self.session = {
-        sid = sid, items = items, council = self:GetCouncil(),
-        rows = {}, startedAt = time(),
+        sid = sid, items = items, council = council, councilSet = councilSet,
+        rows = {}, voters = {}, startedAt = time(),
     }
 
     local channel = self:GroupChannel()
     if channel then
         self:Send("sStart", sid, {
-            items = items, council = self.session.council, responses = self:ResponseSet(),
+            items = items, council = council, responses = self:ResponseSet(),
         }, channel)
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
     else
@@ -92,9 +124,9 @@ function LCEX:StartSession(items)
             sid, #items))
     end
 
-    -- Show our own candidate view too (solo or grouped) so the ML can respond and can preview
-    -- the frame without a second client.
-    self:OpenOwnCandidateView(sid, items, self:ResponseSet())
+    -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
+    -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
+    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council)
 end
 
 -- Close the active session and broadcast sEnd.
@@ -110,7 +142,7 @@ function LCEX:EndSession()
     end
     self.session = nil
     self.sessionItems = nil -- the ML-side full records (Award.lua); pendingTrades outlive the session
-    self:CloseOwnCandidateView(sid)
+    self:LeaveSession(sid)
     self:Msg(self.L["Session ended."])
 end
 
@@ -165,5 +197,6 @@ LCEX.dispatch.cResp = function(self, msg, sender)
 
     self:Msg(string.format(self.L["%s responded %s to %s."],
         sender, self:ResponseText(msg.resp), s.items[index].link))
+    self:ApplyCUpdate(s.sid, index, s.rows[index]) -- refresh the ML's own voting frame now
     self:BroadcastCUpdate(index)
 end
