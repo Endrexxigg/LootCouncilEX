@@ -28,7 +28,7 @@ read_globals = {
     -- Core / libs
     "LibStub", "UISpecialFrames",
     -- Frames / UI
-    "CreateFrame", "UIParent", "GameTooltip", "DEFAULT_CHAT_FRAME", "RAID_CLASS_COLORS",
+    "CreateFrame", "UIParent", "GameTooltip", "DEFAULT_CHAT_FRAME", "RAID_CLASS_COLORS", "TradeFrame",
     "FauxScrollFrame_GetOffset", "FauxScrollFrame_Update",
     "FauxScrollFrame_OnVerticalScroll", "FauxScrollFrame_SetOffset",
     -- Addon metadata
@@ -46,6 +46,7 @@ read_globals = {
     "PickupContainerItem", "ClickTradeButton", "GetTradePlayerItemLink",
     "CursorHasItem", "ClearCursor",
     -- Items / gear / professions
+    "Item",
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",
     "GetNumSkillLines", "GetSkillLineInfo",
     -- Misc WoW

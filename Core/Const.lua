@@ -78,6 +78,8 @@ L["Recorded: %s → %s. Trade it to them within the window to hand it off."] =
 L["Auto-filled %s into the trade with %s."] = "Auto-filled %s into the trade with %s."
 L["Could not auto-fill %s — drag it into the trade window yourself."] =
     "Could not auto-fill %s — drag it into the trade window yourself."
+L["Note: %s was awarded to %s but traded to %s."] =
+    "Note: %s was awarded to %s but traded to %s."
 L["You have %d minute(s) left to trade %s to %s."] =
     "You have %d minute(s) left to trade %s to %s."
 L["Trade window for %s (%s) has expired."]  = "Trade window for %s (%s) has expired."

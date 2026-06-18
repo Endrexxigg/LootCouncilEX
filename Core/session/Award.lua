@@ -14,18 +14,18 @@
 -- with a manual-drag fallback). A ticking timer warns before the 2h window lapses.
 --
 -- Loads after Session.lua (uses LCEX.session / LCEX:Send / LCEX:GroupChannel / Msg).
---
--- Bag/trade APIs are the GLOBAL forms (C_Container is Dragonflight+, absent here).
 
 local LCEX = LootCouncilEX
 
--- Container/bag APIs moved to the C_Container namespace; on the Anniversary client the
--- old globals are nil. Prefer the namespace, fall back to the global so we work on any
--- client. (We only use these three; their return shapes match between the two forms.)
+-- Container/bag/trade APIs moved to the C_Container namespace; on the Anniversary client
+-- the old globals are nil. Prefer the namespace, fall back to the global so we work on any
+-- client. GetContainerItemInfo's return SHAPE differs (a table under C_Container, a flat
+-- multi-return as the old global) — SlotInfo below normalises that.
 local Container = C_Container or {}
 local GetContainerNumSlots = Container.GetContainerNumSlots or _G.GetContainerNumSlots
 local GetContainerItemLink = Container.GetContainerItemLink or _G.GetContainerItemLink
-local PickupContainerItem  = Container.PickupContainerItem  or _G.PickupContainerItem
+local GetContainerItemInfo = Container.GetContainerItemInfo or _G.GetContainerItemInfo
+local UseContainerItem     = Container.UseContainerItem     or _G.UseContainerItem
 
 -- Localized "You receive loot: " prefix, derived from the client's own global string so
 -- it tracks the locale (falls back to enUS). CHAT_MSG_LOOT for our own item loot.
@@ -34,10 +34,17 @@ local SELF_LOOT_PREFIX = (LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(.-)%%s")) o
 local TRADE_WINDOW = 7200 -- BoP trade window, seconds (2 hours)
 local WARN_AT = 900       -- warn when <= 15 min left
 
+-- "Trade complete" signal. UI_INFO_MESSAGE fires (errorType, message); newer clients pass
+-- the LE_GAME_ERR_* enum as the first arg, older ones the localized string — match either.
+local ERR_TRADE_COMPLETE = _G.ERR_TRADE_COMPLETE
+local LE_TRADE_COMPLETE  = _G.LE_GAME_ERR_TRADE_COMPLETE
+
 -- State:
 --   LCEX.pendingLoot  = { { link, itemID, quality, boss, instance, lootedAt } }  (raid log)
 --   LCEX.sessionItems = index -> { link, itemID, quality, bag, slot, boss, instance, lootedAt }
---   LCEX.pendingTrades = shortKey -> { link, itemID, winner, boss, instance, lootedAt, expireAt, warned }
+--   LCEX.pendingTrades = shortKey -> { {uid, link, itemID, winner, boss, instance, lootedAt,
+--                        expireAt, warned}, ... }  (owed items — a LIST, so one winner can be
+--                        owed several items at once)
 LCEX.pendingLoot   = LCEX.pendingLoot or {}
 LCEX.pendingTrades = LCEX.pendingTrades or {}
 
@@ -59,6 +66,8 @@ end
 function LCEX:SetupLootEvents()
     self:RegisterEvent("CHAT_MSG_LOOT", "OnChatMsgLoot")
     self:RegisterEvent("TRADE_SHOW", "OnTradeShow")
+    self:RegisterEvent("TRADE_ACCEPT_UPDATE", "OnTradeAcceptUpdate")
+    self:RegisterEvent("UI_INFO_MESSAGE", "OnUiInfoMessage")
     self:RegisterEvent("TRADE_CLOSED", "OnTradeClosed")
 end
 
@@ -74,14 +83,32 @@ function LCEX:PlayerIsML()
     return mlPartyID == 0 -- party context: 0 == us
 end
 
--- Quality of `link` if it meets the council threshold, else nil.
-function LCEX:CouncilableQuality(link)
-    if not link then return nil end
-    local _, _, quality = GetItemInfo(link)
-    if quality and quality >= (self.db.profile.minQuality or 4) then
-        return quality
+-- True if an item of this quality meets the council threshold.
+function LCEX:IsCouncilable(quality)
+    return quality ~= nil and quality >= (self.db.profile.minQuality or 4)
+end
+
+-- Resolve `link`'s quality, loading it from the server when the client hasn't cached the
+-- item yet — GetItemInfo returns nil on the FIRST sight of an item (e.g. a fresh boss drop),
+-- which previously made such items silently un-councilable. cb(quality|nil) runs exactly
+-- once: synchronously if cached, on load otherwise, or cb(nil) after a short timeout so an
+-- item whose data never arrives can't wedge the caller. (Pattern: Gargul Utils/Items.lua
+-- onItemLoadDo; ContinueOnItemLoad is NOT guaranteed to fire.)
+function LCEX:WithItemQuality(link, cb)
+    if not link then return cb(nil) end
+    local item = Item:CreateFromItemLink(link)
+    if item:IsItemEmpty() then return cb(nil) end
+    if item:IsItemDataCached() then
+        return cb(select(3, GetItemInfo(link)))
     end
-    return nil
+    local fired = false
+    local function finish()
+        if fired then return end
+        fired = true
+        cb(select(3, GetItemInfo(link)))
+    end
+    item:ContinueOnItemLoad(finish)
+    self:ScheduleTimer(finish, 0.5)
 end
 
 -- ── Passive detection: track what the ML loots ───────────────────────────────
@@ -89,29 +116,48 @@ function LCEX:OnChatMsgLoot(_, text)
     if not self:PlayerIsML() then return end
     if not text or text:sub(1, #SELF_LOOT_PREFIX) ~= SELF_LOOT_PREFIX then return end
     local link = text:match("(|c%x+|Hitem:.-|h|r)")
-    local quality = self:CouncilableQuality(link)
-    if not quality then return end
-    local boss = UnitName("target")
-    self.pendingLoot[#self.pendingLoot + 1] = {
-        link     = link,
-        itemID   = tonumber(link:match("item:(%d+)")),
-        quality  = quality,
-        boss     = boss,
-        instance = GetInstanceInfo(),
-        lootedAt = time(),
-    }
-    self:Msg(string.format(self.L["Tracking %s for council (from %s)."], link, boss or "?"))
+    if not link then return end
+    -- Capture the source context NOW — target/zone/time are only correct at loot time. The
+    -- item may be uncached on a fresh kill, so resolve quality asynchronously and only track
+    -- it once we know it clears the threshold.
+    local boss     = UnitName("target")
+    local instance = GetInstanceInfo()
+    local lootedAt = time()
+    self:WithItemQuality(link, function(quality)
+        if not self:IsCouncilable(quality) then return end
+        self.pendingLoot[#self.pendingLoot + 1] = {
+            link     = link,
+            itemID   = tonumber(link:match("item:(%d+)")),
+            quality  = quality,
+            boss     = boss,
+            instance = instance,
+            lootedAt = lootedAt,
+        }
+        self:Msg(string.format(self.L["Tracking %s for council (from %s)."], link, boss or "?"))
+    end)
 end
 
 -- ── Bag scan + reconcile ──────────────────────────────────────────────────────
+-- Quality + link for a bag slot, read from the container API — which knows an item's
+-- quality even when GetItemInfo hasn't cached it yet (so a just-looted item isn't dropped
+-- from a scan). Normalises both return shapes: a table under C_Container (Anniversary), a
+-- flat multi-return as the old global.
+local function SlotInfo(bag, slot)
+    local info = GetContainerItemInfo(bag, slot)
+    if type(info) == "table" then
+        return info.quality, info.hyperlink
+    end
+    local _, _, _, quality, _, _, link = GetContainerItemInfo(bag, slot)
+    return quality, link
+end
+
 -- Every councilable item currently in bags 0-4, with its live { bag, slot }.
 function LCEX:ScanBags()
     local found = {}
     for bag = 0, 4 do
         for slot = 1, (GetContainerNumSlots(bag) or 0) do
-            local link = GetContainerItemLink(bag, slot)
-            local quality = self:CouncilableQuality(link)
-            if quality then
+            local quality, link = SlotInfo(bag, slot)
+            if link and self:IsCouncilable(quality) then
                 found[#found + 1] = {
                     link    = link,
                     itemID  = tonumber(link:match("item:(%d+)")),
@@ -208,7 +254,19 @@ function LCEX:CmdAward(rest)
         return
     end
 
-    self.pendingTrades[ShortKey(name)] = {
+    -- Owed items are keyed per-partner as a LIST (a winner can be owed several), each tagged
+    -- with a uid (§6.3 history uid). Re-awarding this same item first drops any prior record
+    -- of it — even from a different winner — so it never auto-fills to the wrong person.
+    local uid = (self.session and self.session.sid or "nosession") .. ":" .. itemIndex
+    self:ForgetAward(uid)
+    local key  = ShortKey(name)
+    local list = self.pendingTrades[key]
+    if not list then
+        list = {}
+        self.pendingTrades[key] = list
+    end
+    list[#list + 1] = {
+        uid      = uid,
         link     = entry.link,
         itemID   = entry.itemID,
         winner   = name,
@@ -237,64 +295,151 @@ function LCEX:CmdAward(rest)
         entry.link, name))
 end
 
--- First empty player trade slot (1-6); slot 7 is the will-not-be-traded slot.
-function LCEX:FirstFreeTradeSlot()
+-- Is `link` already sitting in one of the player's six trade slots? (Slot 7 is the
+-- will-not-be-traded slot and is never used for hand-offs.)
+function LCEX:TradeHasItem(link)
     for i = 1, 6 do
-        if not GetTradePlayerItemLink(i) then
-            return i
+        if GetTradePlayerItemLink(i) == link then
+            return true
         end
     end
-    return nil
+    return false
 end
 
--- Best-effort: place the won item into the open trade window. Any failure degrades to a
--- "drag it yourself" prompt and never strands the cursor.
-function LCEX:TryFillTrade(entry)
-    local function bail()
-        if CursorHasItem() then ClearCursor() end
-        self:Msg(string.format(
-            self.L["Could not auto-fill %s — drag it into the trade window yourself."], entry.link))
+-- Try ONCE to drop a single owed item into the open trade window. UseContainerItem places a
+-- bag item into the first free trade slot — but ONLY while a trade is open; with no trade it
+-- would equip/consume the item, hence the IsShown guard. Returns true once the item shows in
+-- a trade slot. No user message: FillOwedTrades decides when to report success/failure.
+function LCEX:PlaceItemInTrade(rec)
+    if self:TradeHasItem(rec.link) then return true end
+    if not (TradeFrame and TradeFrame:IsShown()) then return false end
+    if CursorHasItem() then ClearCursor() end
+    local bag, slot = self:FindItemInBags(rec.link)
+    if not bag then return false end
+    UseContainerItem(bag, slot)
+    if CursorHasItem() then ClearCursor() end -- never strand the cursor on a failed add
+    return self:TradeHasItem(rec.link)
+end
+
+-- Load every item owed to the current trade partner into the window. UseContainerItem can
+-- silently no-op while a just-looted item is still bag-locked, so retry a few times a beat
+-- apart before falling back to a manual-drag prompt. Stops if the trade window closes.
+function LCEX:FillOwedTrades(attempt)
+    local list = self.tradePartnerKey and self.pendingTrades[self.tradePartnerKey]
+    if not list or #list == 0 then return end
+    if not (TradeFrame and TradeFrame:IsShown()) then return end
+
+    local stuck = {}
+    for _, rec in ipairs(list) do
+        if self:PlaceItemInTrade(rec) then
+            if not rec.filled then
+                rec.filled = true
+                self:Msg(string.format(self.L["Auto-filled %s into the trade with %s."],
+                    rec.link, rec.winner))
+            end
+        else
+            stuck[#stuck + 1] = rec
+        end
     end
 
-    if CursorHasItem() then return bail() end
-    local bag, slot = self:FindItemInBags(entry.link)
-    if not bag then return bail() end
-    -- Re-validate the slot still holds the exact item before picking it up.
-    if GetContainerItemLink(bag, slot) ~= entry.link then return bail() end
-    local freeSlot = self:FirstFreeTradeSlot()
-    if not freeSlot then return bail() end
-
-    PickupContainerItem(bag, slot)
-    ClickTradeButton(freeSlot)
-    if GetTradePlayerItemLink(freeSlot) then
-        self:Msg(string.format(self.L["Auto-filled %s into the trade with %s."], entry.link, entry.winner))
-    else
-        bail()
+    if #stuck > 0 then
+        if attempt < 3 then
+            self:ScheduleTimer(function() self:FillOwedTrades(attempt + 1) end, 0.5)
+        else
+            for _, rec in ipairs(stuck) do
+                self:Msg(string.format(
+                    self.L["Could not auto-fill %s — drag it into the trade window yourself."],
+                    rec.link))
+            end
+        end
     end
 end
 
 function LCEX:OnTradeShow()
-    local partner = TradePartner()
-    self.tradePartnerKey = ShortKey(partner)
-    local entry = self.tradePartnerKey and self.pendingTrades[self.tradePartnerKey]
-    if entry then
-        self:TryFillTrade(entry)
+    self.tradePartnerKey = ShortKey(TradePartner())
+    -- Fresh window: clear stale "announced" flags so a re-opened trade re-announces fills.
+    local list = self.tradePartnerKey and self.pendingTrades[self.tradePartnerKey]
+    if list then
+        for _, rec in ipairs(list) do rec.filled = nil end
+    end
+    self:FillOwedTrades(0)
+end
+
+-- Snapshot what WE are offering whenever the trade contents settle, so completion can tell
+-- exactly which owed items left our bags. (A bag diff can't distinguish a hand-off from
+-- banking/mailing the item, and TRADE_CLOSED can't distinguish completion from cancel.)
+function LCEX:OnTradeAcceptUpdate()
+    local given = {}
+    for i = 1, 6 do
+        local link = GetTradePlayerItemLink(i)
+        if link then
+            given[#given + 1] = link
+        end
+    end
+    self.tradeGiven = given
+end
+
+function LCEX:OnUiInfoMessage(_, arg1, arg2)
+    local complete = (LE_TRADE_COMPLETE and arg1 == LE_TRADE_COMPLETE)
+        or arg1 == ERR_TRADE_COMPLETE or arg2 == ERR_TRADE_COMPLETE
+    if complete then
+        self:OnTradeCompleted()
     end
 end
 
--- A completed trade removes the item from bags; clear that pending award. Re-check after
--- a short delay so bag state has settled (a cancelled trade keeps the entry).
-function LCEX:OnTradeClosed()
-    local key = self.tradePartnerKey
-    self.tradePartnerKey = nil
-    if not key then return end
-    self:ScheduleTimer(function()
-        local entry = self.pendingTrades[key]
-        if entry and not self:FindItemInBags(entry.link) then
-            self.pendingTrades[key] = nil
-            self:StopTradeTickerIfIdle()
+-- An owed record matching `link`, preferring one owed to `preferKey`. Returns rec, ownerKey.
+function LCEX:FindOwedByLink(link, preferKey)
+    local rec, ownerKey
+    for key, list in pairs(self.pendingTrades) do
+        for _, r in ipairs(list) do
+            if r.link == link then
+                if key == preferKey then return r, key end
+                rec, ownerKey = rec or r, ownerKey or key
+            end
         end
-    end, 1)
+    end
+    return rec, ownerKey
+end
+
+-- A trade actually completed: clear the owed records for the items we handed over (from the
+-- accept-time snapshot), and warn if one went to someone other than its recorded winner. We
+-- match against the partner key captured at TRADE_SHOW (reliable) — UnitName("npc") can read
+-- nil mid-completion, which would otherwise spuriously trip the wrong-winner warning.
+function LCEX:OnTradeCompleted()
+    local key = self.tradePartnerKey
+    for _, link in ipairs(self.tradeGiven or {}) do
+        local rec, owner = self:FindOwedByLink(link, key)
+        if rec then
+            if owner ~= key then
+                self:Msg(string.format(self.L["Note: %s was awarded to %s but traded to %s."],
+                    rec.link, rec.winner, TradePartner() or key or "?"))
+            end
+            self:ForgetAward(rec.uid)
+        end
+    end
+    self.tradeGiven = nil
+    self:StopTradeTickerIfIdle()
+end
+
+-- TRADE_CLOSED only clears transient state — delivery is reconciled on ERR_TRADE_COMPLETE
+-- (a cancelled trade must keep the owed records intact for the next attempt).
+function LCEX:OnTradeClosed()
+    self.tradePartnerKey = nil
+    self.tradeGiven = nil
+end
+
+-- Drop the owed record with this uid from wherever it lives (re-award or delivery). Prunes
+-- the partner's list to nil when it empties, so StopTradeTickerIfIdle/next() see no owner.
+function LCEX:ForgetAward(uid)
+    for key, list in pairs(self.pendingTrades) do
+        for i = #list, 1, -1 do
+            if list[i].uid == uid then
+                table.remove(list, i)
+                if #list == 0 then self.pendingTrades[key] = nil end
+                return
+            end
+        end
+    end
 end
 
 -- ── 2-hour trade-window timer ─────────────────────────────────────────────────
@@ -313,18 +458,22 @@ end
 
 function LCEX:CheckTradeTimers()
     local now = time()
-    for key, e in pairs(self.pendingTrades) do
-        if e.expireAt then
-            local left = e.expireAt - now
-            if left <= 0 then
-                self:Msg(string.format(self.L["Trade window for %s (%s) has expired."], e.winner, e.link))
-                self.pendingTrades[key] = nil
-            elseif left <= WARN_AT and not e.warned then
-                e.warned = true
-                self:Msg(string.format(self.L["You have %d minute(s) left to trade %s to %s."],
-                    math.ceil(left / 60), e.link, e.winner))
+    for key, list in pairs(self.pendingTrades) do
+        for i = #list, 1, -1 do
+            local e = list[i]
+            if e.expireAt then
+                local left = e.expireAt - now
+                if left <= 0 then
+                    self:Msg(string.format(self.L["Trade window for %s (%s) has expired."], e.winner, e.link))
+                    table.remove(list, i)
+                elseif left <= WARN_AT and not e.warned then
+                    e.warned = true
+                    self:Msg(string.format(self.L["You have %d minute(s) left to trade %s to %s."],
+                        math.ceil(left / 60), e.link, e.winner))
+                end
             end
         end
+        if #list == 0 then self.pendingTrades[key] = nil end
     end
     self:StopTradeTickerIfIdle()
 end
