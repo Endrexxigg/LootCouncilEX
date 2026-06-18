@@ -102,6 +102,10 @@ end
 
 function LCEX:OnRosterUpdate()
     self:DebouncedSend("vCheck", function() self:AutoBroadcastVCheck() end)
+    -- Group membership changed: re-broadcast our gear/professions so members we weren't grouped
+    -- with at our last report (e.g. our login report) now receive it. pReport is only cached by
+    -- current group members, so a login-time report is dropped by people who join us later.
+    self:DebouncedSend("pReport", function() self:SendSelfReport() end)
 end
 
 -- /lcex <subcommand> [args]. The first token is the command (lowercased); the
