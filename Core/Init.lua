@@ -132,6 +132,8 @@ function LCEX:HandleSlash(input)
         self:CmdHistory(rest)
     elseif cmd == "report" then
         self:CmdReport()
+    elseif cmd == "gear" then
+        self:CmdGear(rest)
     elseif cmd == "council" then
         self:CmdCouncil(rest)
     elseif cmd == "sync" then
@@ -150,6 +152,6 @@ function LCEX:HandleSlash(input)
     elseif cmd == "test" then
         self:CmdTest(rest)
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, council [add|remove <name>], sync"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], council [add|remove <name>], sync"])
     end
 end

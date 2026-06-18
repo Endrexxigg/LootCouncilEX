@@ -119,3 +119,35 @@ function LCEX:CmdReport()
         self:Msg(self.L["Self-report not sent (disabled, or not in a guild)."])
     end
 end
+
+-- /lcex gear [player] — dump a CACHED gear/profession report for a player (a live snapshot of
+-- our own if no name). Headless inspector for the caches; Phase 6 builds the real PlayerDetail.
+function LCEX:CmdGear(rest)
+    rest = strtrim(rest or "")
+    local who, gear, profs, note
+    if rest == "" then
+        who, gear, profs, note = UnitName("player"), self:SnapshotGear(), self:SnapshotProfs(),
+            self.L["(your live snapshot)"]
+    else
+        who = rest
+        local key = self:NormalizeName(rest)
+        local g = key and self.db.global.gearCache[key]
+        local p = key and self.db.global.profCache[key]
+        gear, profs = (g and g.items) or {}, (p and p.profs) or {}
+        note = (g or p) and "" or self.L["(no cached report)"]
+    end
+
+    self:Msg(string.format(self.L["Gear/profs — %s %s"], who, note))
+    local slots = {}
+    for slot in pairs(gear) do slots[#slots + 1] = slot end
+    table.sort(slots)
+    for _, slot in ipairs(slots) do
+        self:Msg(string.format(self.L["  slot %d: %s"], slot, tostring(gear[slot])))
+    end
+    local names = {}
+    for name in pairs(profs) do names[#names + 1] = name end
+    table.sort(names)
+    for _, name in ipairs(names) do
+        self:Msg(string.format(self.L["  %s: %d"], name, profs[name]))
+    end
+end

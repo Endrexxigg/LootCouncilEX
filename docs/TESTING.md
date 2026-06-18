@@ -48,6 +48,22 @@ Both A and B must be **council**: in the guild at rank ≤ 1 (default `byRank`),
 - [ ] **LWW:** A sets `foo=x`, then B sets `foo=y` a moment later → both converge to `y` (the later `mod` wins). Set `foo` on both within the same second → tie breaks by author name alphabetically (deterministic, both agree).
 - [ ] **Gating:** a non-council guildie running the addon neither receives nor injects dummy records (their `/lcex dummy` stays empty; `/lcex council` shows `you: not a member`).
 
+## F. Council datasets (Phase 5 — notes / marks / history / self-report)
+Both clients council (`/lcex council` → `you: member`), `/lcex debug` on, same guild.
+
+**Solo (one client):**
+- [ ] `/lcex note Bob top priority` → `/lcex note Bob` echoes it with `(by <you>)`. `/reload` → still there (SavedVariables).
+- [ ] `/lcex mark 30055 give to a mage`, and `/lcex mark <shift-click an item> some text` → `/lcex mark 30055` reads back (link form parses the id even when the item name has spaces).
+- [ ] `/lcex test 2` → `/lcex award 1 Bob` → chat shows `Recorded…` **and** debug shows `history += <sid>:1`. `/lcex history` lists it; `/lcex history Bob` filters; re-`/lcex award 1 Bob` → no second history row (union idempotent).
+- [ ] `/lcex gear` → dumps your live equipped slots + professions. `/lcex report` → "broadcast" (in guild) or "not sent" (no guild).
+
+**Two clients A+B (grouped, same guild, both council):**
+- [ ] **History auto-log:** A `/lcex award 1 <B>` → B's `/lcex history` shows the **same** record (B logged it from the `award` broadcast). Take B offline, A awards another, B back → within ~6s B's `/lcex history` gains the missed row (union sync).
+- [ ] **Notes/marks LWW:** A `/lcex note X from A` → B `/lcex note X` shows it. B `/lcex note X from B` a moment later → A's copy updates (greater `mod` wins). Edit while the other is offline → catch-up on login.
+- [ ] **pReport group-gate (the key test):** bring in a **non-council** addon user C (in the group). A `/lcex gear <C>` → shows C's cached gear/profs (proves `pReport` is group-gated, not council-gated). Debug on A shows `cached pReport from <C>`.
+- [ ] **Negative gating:** C `/lcex note Y blah` → B does **not** pick it up (`/lcex note Y` empty on B) — C's `pSet` is council-gated out. But C's `pReport` **was** accepted (previous step). That asymmetry is the point.
+- [ ] **Anti-swap:** C swaps a ring/trinket while in combat → A's cached gear for C still reflects combat-entry gear; an out-of-combat swap on C refreshes it.
+
 ## Known rough edges (expected, not bugs)
 - `/lcex test` on the *first* `/reload` may show `item:NNNNN` instead of a name for the **pad** items (uncached); real bag items and a second run render correctly.
 - The Respond and Council windows both open centered (overlap) until you drag them apart once.
