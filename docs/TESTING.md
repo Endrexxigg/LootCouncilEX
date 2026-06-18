@@ -71,6 +71,14 @@ Both clients council (`/lcex council` → `you: member`), `/lcex debug` on, same
 - [ ] **Negative gating:** C `/lcex note Y blah` → B does **not** pick it up (`/lcex note Y` empty on B) — C's `pSet` is council-gated out. But C's `pReport` **was** accepted (previous step). That asymmetry is the point.
 - [ ] **Anti-swap:** C swaps a ring/trinket while in combat → A's cached gear for C still reflects combat-entry gear; an out-of-combat swap on C refreshes it.
 
+## G. Viewer UIs (Phase 6 — the parts that need the game; the logic is auto-tested)
+- [ ] `/reload` → `v0.9.5 loaded`, no Lua errors.
+- [ ] **Loot browser:** `/lcex loot` opens it; the phase tab (P2) shows raid/boss headers and item rows with **icons + names** (and a `(token)`-style note on tier tokens). Edit an item's mark, press Enter → it persists (`/lcex mark <id>` shows it) and, with a 2nd client, broadcasts (debug `cached pReport`/`pSet`). ESC closes.
+- [ ] **Scroll/offset (the canonical FauxScrollFrame bug):** if a phase ever has more rows than fit, scroll to the bottom, then switch to a shorter phase — the list must **never render empty**. (Stub data is short; this matters once Phase 7 fills real tables, but eyeball it.)
+- [ ] **Player detail:** click a **candidate's name** in the council voting frame (or `/lcex player <name>`) → the panel opens. The name click must NOT trigger a vote. Switch tabs (Gear/History/Professions/BiS/Notes) — each renders from the cached data; switching tabs resets the scroll.
+- [ ] **Notes tab:** edit the note, Enter → persists + (2-client) syncs; the "by … , date" line updates on reopen.
+- [ ] **BiS tab:** for a grouped player the **Class auto-resolves** to their class; the Class/Spec/Phase buttons cycle and re-render; on P2 a Mage/Fire shows BiS item rows with icons. (Real BiS/loot content is Phase 7.)
+
 ## Known rough edges (expected, not bugs)
 - `/lcex test` on the *first* `/reload` may show `item:NNNNN` instead of a name for the **pad** items (uncached); real bag items and a second run render correctly.
 - The Respond and Council windows both open centered (overlap) until you drag them apart once.
