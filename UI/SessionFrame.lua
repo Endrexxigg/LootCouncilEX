@@ -20,10 +20,18 @@ function LCEX:EnsureSessionFrame()
         title = self.L["LootCouncil EX"],
         savedKey = "sessionFrame",
     })
-    f.rows = {}
-
     f.status = self:CreateLabel(f, nil, "GameFontNormal")
     f.status:SetPoint("TOP", 0, -38)
+
+    -- Bag preview as a virtualized scroll list so a raid's worth of drops scrolls inside the
+    -- frame instead of spilling past the bottom edge / the buttons. 9 rows fit between the
+    -- status line (-62) and the button row.
+    f.list = self:CreateScrollList(f, {
+        rowHeight = 22, visibleRows = 9, width = 348,
+        buildRow = function(parent) return self:BuildSessionRow(parent) end,
+        fillRow  = function(row, it) self:FillSessionRow(row, it) end,
+    })
+    f.list:SetPoint("TOPLEFT", 16, -62)
 
     f.refresh = self:CreateButton(f, self.L["Refresh"], 80, 22)
     f.refresh:SetPoint("BOTTOMLEFT", 16, 14)
@@ -47,16 +55,23 @@ function LCEX:EnsureSessionFrame()
     return f
 end
 
--- One councilable-item preview row: icon + colored link.
+-- One councilable-item preview row: icon + colored link. The scroll list anchors the row's
+-- left/right edges, so the name pins to the row's right rather than a fixed width.
 function LCEX:BuildSessionRow(parent)
     local row = CreateFrame("Frame", nil, parent)
-    row:SetHeight(22)
     row.icon = self:CreateItemIcon(row, 18)
     row.icon:SetPoint("LEFT", 0, 0)
     row.name = self:CreateLabel(row, nil, "GameFontHighlightSmall")
     row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-    row.name:SetWidth(300); row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
+    row.name:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
     return row
+end
+
+function LCEX:FillSessionRow(row, it)
+    local icon = GetItemInfoInstant and select(5, GetItemInfoInstant(it.link))
+    row.icon:SetItem(it.link, icon)
+    row.name:SetText(it.link)
 end
 
 -- Re-read state + the bag preview and repaint.
@@ -64,34 +79,17 @@ function LCEX:RefreshSessionFrame()
     local f = self.sessionFrame
     if not f then return end
 
-    if self.session then
-        f.status:SetText(string.format(self.L["Session active — %d item(s)."], #self.session.items))
-    end
-
-    for _, row in ipairs(f.rows) do row:Hide() end
     local list = self:BuildCouncilableList()
 
-    if not self.session then
-        if #list == 0 then
-            f.status:SetText(self.L["Nothing councilable in your bags."])
-        else
-            f.status:SetText(string.format(self.L["%d councilable item(s) in your bags."], #list))
-        end
+    if self.session then
+        f.status:SetText(string.format(self.L["Session active — %d item(s)."], #self.session.items))
+    elseif #list == 0 then
+        f.status:SetText(self.L["Nothing councilable in your bags."])
+    else
+        f.status:SetText(string.format(self.L["%d councilable item(s) in your bags."], #list))
     end
 
-    local y = -62
-    for i, it in ipairs(list) do
-        local row = f.rows[i] or self:BuildSessionRow(f)
-        f.rows[i] = row
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", f, "TOPLEFT", 16, y)
-        row:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, y)
-        local icon = GetItemInfoInstant and select(5, GetItemInfoInstant(it.link))
-        row.icon:SetItem(it.link, icon)
-        row.name:SetText(it.link)
-        row:Show()
-        y = y - 24
-    end
+    f.list:SetData(list) -- resets the scroll offset (CreateScrollList) and repaints
 
     -- Start only makes sense with items and no open session; End only with one.
     if self.session then f.startBtn:Disable() else f.startBtn:Enable() end
