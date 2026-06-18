@@ -1,0 +1,23 @@
+# ── LootCouncil EX — packager metadata (BigWigsMods/packager) ─────────────────
+# Controls how the GitHub Action packages a release zip. The repo root IS the addon, so
+# there's little to do beyond naming the package and keeping dev-only files out of the zip.
+
+package-as: LootCouncilEX
+
+# Ace3 and friends are committed under Libs/ and loaded via embeds.xml — there are no
+# externals to fetch, and we don't ship a separate "nolib" variant.
+enable-nolib-creation: no
+
+# Ship only the runtime (Core/, UI/, Libs/, the .toc, embeds.xml, README). Everything below is
+# development tooling / docs and is excluded from the packaged addon.
+ignore:
+  - .github
+  - docs
+  - PROJECT.md
+  - CLAUDE.md
+  - AGENTS.md
+  - .luacheckrc
+  - .luarc.json
+  - .editorconfig
+  - .gitattributes
+  - .gitignore

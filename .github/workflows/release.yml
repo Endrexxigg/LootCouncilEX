@@ -1,0 +1,32 @@
+# Package the addon and publish a GitHub Release whenever a version tag is pushed.
+#
+#   git tag v0.7.1        # tag must match the ## Version in LootCouncilEX.toc
+#   git push origin v0.7.1
+#
+# The BigWigs packager builds LootCouncilEX-<version>.zip (top folder = LootCouncilEX, so it
+# extracts straight into Interface/AddOns), sets the .toc Version to the tag, and attaches it
+# to a GitHub Release. WowUp tracks that release for one-click updates.
+name: Package and release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {} # allow a manual run from the Actions tab
+
+permissions:
+  contents: write # the packager needs this to create the Release and upload the zip
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so the packager can build the changelog
+
+      - name: Package and create release
+        uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
