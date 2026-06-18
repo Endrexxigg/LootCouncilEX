@@ -28,6 +28,7 @@
             "UnitGUID",
             "UnitFullName",
             "UnitIsUnit",
+            "UnitAffectingCombat",
             "GetLootMethod",
             "GetInstanceInfo",
             "GetNumGroupMembers",

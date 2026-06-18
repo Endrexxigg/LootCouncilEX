@@ -30,7 +30,9 @@ end
 -- ── Send path ──────────────────────────────────────────────────────────────--
 -- Build the flat envelope for a command + optional session id + payload table.
 function LCEX:BuildEnvelope(cmd, sid, payload)
-    local msg = { v = self.PROTOCOL_VERSION, cmd = cmd, sid = sid }
+    -- `ver` (the human-facing addon version) rides on EVERY envelope so peers learn each
+    -- other's version from any traffic, not only the explicit vCheck/vReply handshake.
+    local msg = { v = self.PROTOCOL_VERSION, cmd = cmd, sid = sid, ver = self:GetVersion() }
     if payload then
         for k, val in pairs(payload) do
             msg[k] = val
@@ -60,10 +62,29 @@ function LCEX:GroupChannel()
     return nil
 end
 
+-- ── Sender identity ──────────────────────────────────────────────────────────
+-- Canonical comparison form for a character name: strip a "-Realm" suffix and a trailing
+-- cross-realm "(*)" marker, then lowercase. Roster/comms APIs hand back names in mixed
+-- forms ("Name", "Name-Realm", occasionally decorated), so comparing raw strings silently
+-- false-rejects the same player. Route ALL name-equality checks through this.
+function LCEX:NormalizeName(name)
+    if type(name) ~= "string" or name == "" then return nil end
+    name = name:gsub("%s*%(%*%)$", "")    -- trailing cross-realm "(*)" marker
+    name = name:match("^[^%-]+") or name   -- drop "-Realm"
+    return name:lower()
+end
+
+-- True if `name` is the local player. AceComm echoes our own RAID/PARTY broadcasts back to
+-- us (and Ambiguates same-realm senders to a bare name), so handlers use this to skip self.
+function LCEX:IsSelf(name)
+    local n = self:NormalizeName(name)
+    return n ~= nil and n == self:NormalizeName(UnitName("player"))
+end
+
 -- ── Receive path ─────────────────────────────────────────────────────────────
--- AceComm default handler. Decodes, applies the protocol-version gate, and routes to
--- the registered handler for the command. Silently drops anything malformed or from a
--- future protocol major — Phase 1 has no ACK (PROJECT.md DL-3).
+-- AceComm default handler. Decodes, applies the protocol-version gate, routes to the
+-- registered handler, then backfills the version roster. Silently drops anything malformed
+-- or from a future protocol major — Phase 1 has no ACK (PROJECT.md DL-3).
 function LCEX:OnCommReceived(prefix, message, distribution, sender)
     if prefix ~= COMM_PREFIX then return end
 
@@ -73,7 +94,19 @@ function LCEX:OnCommReceived(prefix, message, distribution, sender)
 
     local handler = self.dispatch[msg.cmd]
     if handler then
-        handler(self, msg, sender, distribution)
+        -- Network input is untrusted: a malformed payload that makes one handler throw must
+        -- not take down AceComm's receive path for every later message. Isolate each dispatch.
+        local okHandler, err = pcall(handler, self, msg, sender, distribution)
+        if not okHandler then
+            self:Msg(string.format("comms error in '%s': %s", tostring(msg.cmd), tostring(err)))
+        end
+    end
+
+    -- Backfill the version roster from ANY envelope (every Send stamps `ver`). Silent: the
+    -- explicit vCheck/vReply handshake is what announces; this just learns peers we haven't
+    -- pinged. Runs after dispatch so the handshake's announce still fires on first contact.
+    if msg.ver and not self:IsSelf(sender) then
+        self:RecordVersion(sender, msg.ver, true)
     end
 end
 

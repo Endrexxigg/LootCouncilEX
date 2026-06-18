@@ -90,11 +90,11 @@ end
 -- Both triggers coalesce through the same debounce key so a burst of events
 -- (e.g. several loading screens) results in a single vCheck broadcast.
 function LCEX:OnEnterWorld()
-    self:DebouncedSend("vCheck", function() self:BroadcastVCheck() end)
+    self:DebouncedSend("vCheck", function() self:AutoBroadcastVCheck() end)
 end
 
 function LCEX:OnRosterUpdate()
-    self:DebouncedSend("vCheck", function() self:BroadcastVCheck() end)
+    self:DebouncedSend("vCheck", function() self:AutoBroadcastVCheck() end)
 end
 
 -- /lcex <subcommand> [args]. The first token is the command (lowercased); the

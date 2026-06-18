@@ -18,21 +18,14 @@ local LCEX = LootCouncilEX
 LCEX.versions = LCEX.versions or {}
 LCEX.dispatch = LCEX.dispatch or {}
 
--- True if `sender` is us. AceComm echoes our own RAID/PARTY broadcasts back to us, and
--- it runs Ambiguate(sender, "none") so a same-realm sender arrives bare ("Name"); we
--- compare against the bare player name and also tolerate a "Name-Realm" form.
-local function IsMe(sender)
-    if not sender then return false end
-    local me = UnitName("player")
-    return sender == me or sender:match("^([^%-]+)") == me
-end
-
--- Record (or update) a peer's version and announce it once per change.
-function LCEX:RecordVersion(name, ver)
+-- Record (or update) a peer's version. Announces once per change unless `silent` — the
+-- passive backfill from ordinary traffic (Comms.OnCommReceived) stays quiet; only the
+-- explicit vCheck/vReply handshake announces. (Self-skip lives in the callers via IsSelf.)
+function LCEX:RecordVersion(name, ver, silent)
     ver = tostring(ver or "?")
     local prev = self.versions[name]
     self.versions[name] = ver
-    if prev ~= ver then
+    if prev ~= ver and not silent then
         self:Msg(string.format(self.L["%s is running v%s"], name, ver))
     end
 end
@@ -42,16 +35,23 @@ function LCEX:RosterInit()
     self.versions[UnitName("player")] = self:GetVersion()
 end
 
--- Announce our version to the current group. Silent (returns true/false) so the
--- automatic zone-in / roster-change broadcasts don't spam chat; the manual /lcex ping
--- (CmdPing) prints its own feedback.
+-- Announce our version to the current group (the envelope carries `ver`). Silent (returns
+-- true/false) so the automatic zone-in / roster-change broadcasts don't spam chat; the
+-- manual /lcex ping (CmdPing) prints its own feedback.
 function LCEX:BroadcastVCheck()
     local channel = self:GroupChannel()
     if not channel then
         return false
     end
-    self:Send("vCheck", nil, { ver = self:GetVersion() }, channel)
+    self:Send("vCheck", nil, nil, channel)
     return true
+end
+
+-- Automatic (event-driven) re-announce, suppressed in combat so a roster-churn burst can't
+-- fire mid-pull. The manual /lcex ping path (CmdPing → BroadcastVCheck) is unaffected.
+function LCEX:AutoBroadcastVCheck()
+    if UnitAffectingCombat("player") then return end
+    self:BroadcastVCheck()
 end
 
 -- /lcex ping — manual version check. Prints confirmation now, then the resulting roster
@@ -86,14 +86,14 @@ end
 -- ── Dispatch handlers (registered into Comms' table) ─────────────────────────
 -- Someone announced themselves: record them and reply privately with our version.
 LCEX.dispatch.vCheck = function(self, msg, sender)
-    if IsMe(sender) then return end
+    if self:IsSelf(sender) then return end
     self:RecordVersion(sender, msg.ver)
-    self:Send("vReply", nil, { ver = self:GetVersion() }, "WHISPER", sender)
+    self:Send("vReply", nil, nil, "WHISPER", sender)
 end
 
 -- A private reply to our vCheck: record only — do not reply, or the two clients would
 -- bounce vReplies forever.
 LCEX.dispatch.vReply = function(self, msg, sender)
-    if IsMe(sender) then return end
+    if self:IsSelf(sender) then return end
     self:RecordVersion(sender, msg.ver)
 end
