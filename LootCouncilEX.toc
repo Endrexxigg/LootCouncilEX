@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.7.3
+## Version: 0.8.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -38,3 +38,10 @@ Core\session\Council.lua
 # Plane B — persistent council sync over GUILD (digest/delta, LWW merge). Loads after Session
 # (ResolveCouncil) and Comms (dispatch).
 Core\council\Sync.lua
+
+# Plane B — the real council datasets riding the sync engine (Phase 5). Order among them
+# doesn't matter; each self-registers its dataset at load.
+Core\council\Notes.lua
+Core\council\Marks.lua
+Core\council\History.lua
+Core\council\SelfReport.lua

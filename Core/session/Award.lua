@@ -284,18 +284,27 @@ function LCEX:AwardItem(itemIndex, name)
     }
     self:EnsureTradeTicker()
 
+    local ts = time()
     local channel = self:GroupChannel()
     if channel then
         self:Send("award", self.session and self.session.sid or nil, {
-            item     = entry.link,
-            itemID   = entry.itemID,
-            winner   = name,
-            resp     = resp,
-            boss     = entry.boss,
-            instance = entry.instance,
-            ts       = time(),
+            item      = entry.link,
+            itemID    = entry.itemID,
+            itemIndex = itemIndex, -- so receivers can build the history uid (sid:itemIndex)
+            winner    = name,
+            resp      = resp,
+            boss      = entry.boss,
+            instance  = entry.instance,
+            ts        = ts,
         }, channel)
     end
+    -- Log to persistent history locally. Every present client logs from the `award` broadcast;
+    -- the ML logs here directly (same ts) so it doesn't depend on its own group echo — the
+    -- union history dataset then propagates to council who were absent (council/History.lua).
+    self:LogAward(uid, {
+        winner = name, itemID = entry.itemID, itemLink = entry.link, ts = ts,
+        resp = resp, boss = entry.boss, instance = entry.instance, by = UnitName("player"),
+    })
     self:Msg(string.format(
         self.L["Recorded: %s → %s. Trade it to them within the window to hand it off."],
         entry.link, name))

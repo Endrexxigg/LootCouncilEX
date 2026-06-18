@@ -88,6 +88,9 @@ function LCEX:OnEnable()
     -- Plane B — council sync (council/Sync.lua): roster-change invalidation + a login digest.
     self:SetupSync()
 
+    -- Plane B — gear/profession self-report (council/SelfReport.lua): snapshot + login report.
+    self:SetupSelfReport()
+
     self:Msg(string.format(self.L["v%s loaded."], self:GetVersion()))
 end
 
@@ -121,6 +124,14 @@ function LCEX:HandleSlash(input)
         self:CmdStartFromBags()
     elseif cmd == "respond" then
         self:CmdRespond()
+    elseif cmd == "note" then
+        self:CmdNote(rest)
+    elseif cmd == "mark" then
+        self:CmdMark(rest)
+    elseif cmd == "history" then
+        self:CmdHistory(rest)
+    elseif cmd == "report" then
+        self:CmdReport()
     elseif cmd == "council" then
         self:CmdCouncil(rest)
     elseif cmd == "sync" then
@@ -139,6 +150,6 @@ function LCEX:HandleSlash(input)
     elseif cmd == "test" then
         self:CmdTest(rest)
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n]"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, council [add|remove <name>], sync"])
     end
 end

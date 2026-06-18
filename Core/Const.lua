@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n]"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n]"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, council [add|remove <name>], sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, council [add|remove <name>], sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -115,3 +115,21 @@ L["Council — %d member(s) (you: %s):"]      = "Council — %d member(s) (you: 
 L["member"]                                 = "member"
 L["not a member"]                           = "not a member"
 L["  %s"]                                    = "  %s"
+
+-- Phase 5 — council datasets (notes / marks / history / self-report).
+L["Heads-up: you're not on the council — this won't sync to others."] =
+    "Heads-up: you're not on the council — this won't sync to others."
+L["Usage: /lcex note <player> [text]"]      = "Usage: /lcex note <player> [text]"
+L["Note on %s set."]                        = "Note on %s set."
+L["Note on %s: %s  (by %s)"]                = "Note on %s: %s  (by %s)"
+L["No note on %s."]                         = "No note on %s."
+L["Usage: /lcex mark <itemID|link> [text]"] = "Usage: /lcex mark <itemID|link> [text]"
+L["Mark on item %d set."]                   = "Mark on item %d set."
+L["Mark on item %d: %s  (by %s)"]           = "Mark on item %d: %s  (by %s)"
+L["No mark on item %d."]                    = "No mark on item %d."
+L["Award history — %d record(s):"]          = "Award history — %d record(s):"
+L["  %s → %s  (%s, %s)"]                     = "  %s → %s  (%s, %s)"
+L["  …and %d more."]                         = "  …and %d more."
+L["Self-report broadcast."]                 = "Self-report broadcast."
+L["Self-report not sent (disabled, or not in a guild)."] =
+    "Self-report not sent (disabled, or not in a guild)."

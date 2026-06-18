@@ -115,7 +115,7 @@ Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`;
 | `cResp` | candidate → ML | WHISPER | `{ item, resp, note, ilvl, gear={link,link} }` |
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,note,ilvl,gear,votes}} }` |
 | `vVote` | council → ML | WHISPER | `{ item, candidate, vote=±1|0 }` |
-| `award` | ML → raid | RAID | `{ item, itemID, winner, resp, boss, instance, ts }` |
+| `award` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, resp, boss, instance, ts }` |
 
 Reliability: ML holds the authoritative table; drop inbound `cResp`/`vVote` with a stale `sid` or non-member/non-council sender. Debounce `cUpdate` (~0.2s). Idempotent — re-sends overwrite last value. No ACK in v1. `award` carries enough to build a complete local history record on every present client.
 
@@ -137,7 +137,7 @@ Sync flow: on login/load broadcast `pHello`; a peer that's behind sends `pSyncRe
 ### 6.3 Datasets (Plane B, in SavedVariables `global`)
 - `notes`: name → `{text, mod, by}`
 - `marks`: itemID → `{text, mod, by}`
-- `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (immutable; union merge). uid = `sid..":"..itemIndex`
+- `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (immutable; union merge). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts for display; union ignores both for merge. Logged locally on every present client from the `award` broadcast (§6.1).
 - `gearCache`: name → `{items={slot→link}, mod}` (self-reported)
 - `profCache`: name → `{profs={name→level}, mod}` (self-reported)
 

@@ -111,6 +111,17 @@ function LCEX:SetRecord(dataset, key, payload)
     end
 end
 
+-- Merge ONE record into a dataset locally, WITHOUT broadcasting and WITHOUT re-stamping
+-- mod/by — for records that arrived another way: an `award` everyone present already heard, or
+-- a peer's `pReport` gear we cache verbatim. The CALLER supplies the right mod/by. Reuses the
+-- mode-aware merge (union: keep-if-absent; lww: greater mod, tie by `by`). Returns true if the
+-- store changed.
+function LCEX:MergeRecord(dataset, key, record)
+    local ds = self.datasets[dataset]
+    if not ds or key == nil or type(record) ~= "table" then return false end
+    return mergeRecords(ds, { [key] = record }) > 0
+end
+
 -- ── Hello (digest broadcast) ─────────────────────────────────────────────────
 function LCEX:BuildDigest()
     local digest = {}
