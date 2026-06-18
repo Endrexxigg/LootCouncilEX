@@ -105,7 +105,9 @@ function LCEX:HandleSlash(input)
     input = strtrim(input or "")
     local cmd = (input:match("^(%S*)") or ""):lower()
     local rest = strtrim(input:match("^%S*%s*(.*)$") or "")
-    if cmd == "ping" then
+    if cmd == "" or cmd == "show" then
+        self:ToggleSessionFrame()
+    elseif cmd == "ping" then
         self:CmdPing()
     elseif cmd == "version" or cmd == "ver" then
         self:PrintKnownVersions()

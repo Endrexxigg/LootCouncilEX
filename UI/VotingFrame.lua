@@ -34,7 +34,7 @@ end
 function LCEX:EnsureVotingFrame()
     if self.votingFrame then return self.votingFrame end
     local f = self:CreateWindow(FRAME_NAME, {
-        width = 460, height = 320,
+        width = 520, height = 320,
         title = self.L["LootCouncil EX — Council"],
         savedKey = "votingFrame",
     })
@@ -81,10 +81,12 @@ function LCEX:BuildCandRow(parent)
 
     row.note = self:CreateLabel(row, nil, "GameFontDisableSmall")
     row.note:SetPoint("LEFT", row.gear[2], "RIGHT", 4, 0)
-    row.note:SetWidth(120); row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
+    row.note:SetWidth(110); row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
 
+    row.award = self:CreateButton(row, self.L["Award"], 56, 20)
+    row.award:SetPoint("RIGHT", -2, 0)
     row.minus = self:CreateButton(row, "−", 22, 20)
-    row.minus:SetPoint("RIGHT", -2, 0)
+    row.minus:SetPoint("RIGHT", row.award, "LEFT", -6, 0)
     row.votes = self:CreateLabel(row, nil, "GameFontHighlight")
     row.votes:SetPoint("RIGHT", row.minus, "LEFT", -4, 0)
     row.votes:SetWidth(24); row.votes:SetJustifyH("CENTER")
@@ -137,6 +139,14 @@ function LCEX:FillCandRow(row, itemIndex, candKey, data)
 
     row.plus:SetScript("OnClick", function() self:SendVote(itemIndex, candKey, 1) end)
     row.minus:SetScript("OnClick", function() self:SendVote(itemIndex, candKey, -1) end)
+
+    -- Award is the ML's action only — only the ML's award is authoritative.
+    if a and self:IsSelf(a.ml) then
+        row.award:Show()
+        row.award:SetScript("OnClick", function() self:AwardItem(itemIndex, data.name or candKey) end)
+    else
+        row.award:Hide()
+    end
 end
 
 -- Render the candidate rows for the currently-selected item.

@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.5.0
+## Version: 0.6.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -27,6 +27,7 @@ Core\session\Award.lua
 UI\Widgets.lua
 UI\LootFrame.lua
 UI\VotingFrame.lua
+UI\SessionFrame.lua
 
 # Plane A — candidate side: receives sStart, opens the frames, sends cResp. Loads after its
 # UI frames and after Session (the ML aggregator it talks to).

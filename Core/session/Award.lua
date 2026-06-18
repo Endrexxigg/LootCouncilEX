@@ -240,18 +240,24 @@ end
 -- ── Award + assist-trade ──────────────────────────────────────────────────────
 -- /lcex award <itemIndex> <name> — record the winner, broadcast `award`, and set up the
 -- pending trade so opening a trade with them auto-loads the item.
-function LCEX:CmdAward(rest)
-    local indexStr, name = strtrim(rest or ""):match("^(%S+)%s+(.+)$")
-    local itemIndex = tonumber(indexStr)
-    if not itemIndex or not name then
-        self:Msg(self.L["Usage: /lcex award <itemIndex> <name>"])
-        return
-    end
-    name = strtrim(name)
+-- Record `name` as the winner of session item #itemIndex: set up the pending trade (so
+-- opening a trade with them auto-loads the item), broadcast `award`, and arm the 2h ticker.
+-- Shared by the /lcex award command and the VotingFrame's Award button. Returns true on
+-- success. The award carries the winner's own response where we have it (else ANNOUNCED).
+function LCEX:AwardItem(itemIndex, name)
+    name = strtrim(name or "")
     local entry = self.sessionItems and self.sessionItems[itemIndex]
     if not entry then
         self:Msg(string.format(self.L["No item #%d in the session."], itemIndex))
-        return
+        return false
+    end
+    if name == "" then return false end
+
+    -- Carry the winner's response into the award/history record if they responded.
+    local resp = self.STATUS.ANNOUNCED
+    if self.session and self.session.rows[itemIndex] then
+        local r = self.session.rows[itemIndex][self:NormalizeName(name)]
+        if r and r.resp then resp = r.resp end
     end
 
     -- Owed items are keyed per-partner as a LIST (a winner can be owed several), each tagged
@@ -284,7 +290,7 @@ function LCEX:CmdAward(rest)
             item     = entry.link,
             itemID   = entry.itemID,
             winner   = name,
-            resp     = self.STATUS.ANNOUNCED, -- no vote yet (Phase 3); "announced" sentinel
+            resp     = resp,
             boss     = entry.boss,
             instance = entry.instance,
             ts       = time(),
@@ -293,6 +299,18 @@ function LCEX:CmdAward(rest)
     self:Msg(string.format(
         self.L["Recorded: %s → %s. Trade it to them within the window to hand it off."],
         entry.link, name))
+    return true
+end
+
+-- /lcex award <itemIndex> <name> — parse the args and hand off to AwardItem.
+function LCEX:CmdAward(rest)
+    local indexStr, name = strtrim(rest or ""):match("^(%S+)%s+(.+)$")
+    local itemIndex = tonumber(indexStr)
+    if not itemIndex or not name then
+        self:Msg(self.L["Usage: /lcex award <itemIndex> <name>"])
+        return
+    end
+    self:AwardItem(itemIndex, name)
 end
 
 -- Is `link` already sitting in one of the player's six trade slots? (Slot 7 is the
