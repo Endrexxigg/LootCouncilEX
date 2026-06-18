@@ -25,7 +25,9 @@ jobs:
         run: luarocks install luacheck
 
       - name: Lint
-        run: luacheck .
+        # Explicit source dirs: in CI, luarocks installs into .luarocks/ in the workspace, and
+        # a bare `luacheck .` would recurse into it. (Locally `luacheck .` is equivalent.)
+        run: luacheck Core UI
 
       - name: Headless unit tests
         run: lua Tests/run.lua
