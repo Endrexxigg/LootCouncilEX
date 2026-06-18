@@ -40,6 +40,14 @@ it in one batch. Tick items as they pass; note failures with the exact error tex
 - [ ] Pull a mob (enter combat) while the group roster changes — no `vCheck` spam mid-combat.
 - [ ] Same-realm vs cross-realm names don't cause "my vote/award didn't register" (name normalization).
 
+## E. Plane B council sync (Phase 4 proof — 2 council clients, same guild)
+Both A and B must be **council**: in the guild at rank ≤ 1 (default `byRank`), or run `/lcex council add <name>` for each other. Verify with `/lcex council` → lists members and shows `you: member`.
+- [ ] **Live edit:** both online. A: `/lcex dummy foo hello`. **Expected:** B's chat shows `A updated dummy[foo]`, and B's `/lcex dummy` lists `foo = hello`.
+- [ ] **Offline catch-up (the exit criterion):** B logs out. A: `/lcex dummy bar world` (and optionally change foo: `/lcex dummy foo hi2`). B logs back in. Within ~6s **B's chat shows `Synced … dummy record(s) from A`**, and B's `/lcex dummy` now shows both `foo` and `bar` (with `foo = hi2` if changed). No manual step.
+- [ ] **Manual trigger:** `/lcex sync` rebroadcasts the digest (use if the 6s login window was missed).
+- [ ] **LWW:** A sets `foo=x`, then B sets `foo=y` a moment later → both converge to `y` (the later `mod` wins). Set `foo` on both within the same second → tie breaks by author name alphabetically (deterministic, both agree).
+- [ ] **Gating:** a non-council guildie running the addon neither receives nor injects dummy records (their `/lcex dummy` stays empty; `/lcex council` shows `you: not a member`).
+
 ## Known rough edges (expected, not bugs)
 - `/lcex test` on the *first* `/reload` may show `item:NNNNN` instead of a name for the **pad** items (uncached); real bag items and a second run render correctly.
 - The Respond and Council windows both open centered (overlap) until you drag them apart once.

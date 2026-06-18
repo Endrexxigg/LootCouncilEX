@@ -51,6 +51,7 @@ local DB_DEFAULTS = {
         history   = {},
         gearCache = {},
         profCache = {},
+        dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
     },
 }
 
@@ -83,6 +84,9 @@ function LCEX:OnEnable()
     -- Loot detection / master-loot events (Award.lua). Registered here, after the DB
     -- exists, so the handler can read db.profile.minQuality.
     self:SetupLootEvents()
+
+    -- Plane B — council sync (council/Sync.lua): roster-change invalidation + a login digest.
+    self:SetupSync()
 
     self:Msg(string.format(self.L["v%s loaded."], self:GetVersion()))
 end
@@ -117,6 +121,12 @@ function LCEX:HandleSlash(input)
         self:CmdStartFromBags()
     elseif cmd == "respond" then
         self:CmdRespond()
+    elseif cmd == "council" then
+        self:CmdCouncil(rest)
+    elseif cmd == "sync" then
+        self:CmdSync()
+    elseif cmd == "dummy" then
+        self:CmdDummy(rest)
     elseif cmd == "award" then
         self:CmdAward(rest)
     elseif cmd == "end" then

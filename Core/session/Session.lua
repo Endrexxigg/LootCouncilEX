@@ -19,18 +19,19 @@ local counter = 0
 -- the ML's bags, not a loot window, so there is no loot slot — the ML resolves the live
 -- bag/slot at trade time in Award.lua.) `rows` is the per-item response aggregate (see below).
 
--- The voting council for a session, as a list of normalized names carried in sStart. Resolved
--- from profile.council: explicit `extra` names, the session runner (always), and — when
--- byRank — guild members at or above the configured rank. Degrades to just the runner solo /
--- outside a guild (so solo testing still has a council of one).
-function LCEX:GetCouncil()
+-- Resolve the council as a SET of normalized names from profile.council: explicit `extra`,
+-- guild members at/above the configured rank (when byRank), and — when `forceSelf` — the local
+-- player. Plane A (the session, GetCouncil) forces self in so the runner can always vote and
+-- solo testing has a council of one; Plane B (sync) does NOT (you participate only if actually
+-- configured as council). Shared by both planes per DL-1 (one council roster for v1).
+function LCEX:ResolveCouncil(forceSelf)
     local set = {}
     local p = self.db.profile.council or {}
     for _, name in ipairs(p.extra or {}) do
         local n = self:NormalizeName(name)
         if n then set[n] = true end
     end
-    set[self:NormalizeName(UnitName("player"))] = true
+    if forceSelf then set[self:NormalizeName(UnitName("player"))] = true end
     if p.byRank and IsInGuild() then
         if GuildRoster then GuildRoster() end -- nudge a roster refresh (may be stale this frame)
         for i = 1, (GetNumGuildMembers() or 0) do
@@ -41,8 +42,14 @@ function LCEX:GetCouncil()
             end
         end
     end
+    return set
+end
+
+-- The Plane-A session council as a list of normalized names (runner always included), carried
+-- in sStart.
+function LCEX:GetCouncil()
     local list = {}
-    for n in pairs(set) do list[#list + 1] = n end
+    for n in pairs(self:ResolveCouncil(true)) do list[#list + 1] = n end
     return list
 end
 
