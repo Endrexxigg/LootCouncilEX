@@ -63,6 +63,25 @@ _G.GetInventorySlotInfo = function() return nil end
 _G.C_AddOns = { GetAddOnMetadata = function() return "test" end }
 _G.LOOT_ITEM_SELF = "You receive loot: %s."
 
+-- ── WoW frame API (magic stubs) ──────────────────────────────────────────────
+-- Enough to LOAD the UI files and exercise their PURE helpers (tab state, display builders) —
+-- not to render. Every frame method returns the frame (chainable). We don't assert on frames.
+local function newFrame()
+    local f = {}
+    setmetatable(f, { __index = function() return function() return f end end })
+    return f
+end
+_G.CreateFrame = function() return newFrame() end
+_G.UIParent = newFrame()
+_G.GameTooltip = newFrame()
+_G.UISpecialFrames = {}
+_G.BackdropTemplateMixin = nil
+_G.FauxScrollFrame_Update = function() end
+_G.FauxScrollFrame_GetOffset = function() return 0 end
+_G.FauxScrollFrame_OnVerticalScroll = function() end
+_G.FauxScrollFrame_SetOffset = function() end
+_G.GetItemInfoInstant = function() return nil end
+
 -- ── LibStub + the Ace3 mixins the addon embeds ───────────────────────────────
 local function deepcopy(t)
     if type(t) ~= "table" then return t end
@@ -110,6 +129,7 @@ local FILES = {
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
+    "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
 }
 for _, f in ipairs(FILES) do
     local chunk, err = loadfile(f)

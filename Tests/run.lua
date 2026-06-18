@@ -153,6 +153,15 @@ test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     ok(sawHello, "we're ahead -> hello back so they pull")
 end)
 
+-- ── Widgets: tab-strip state (Phase 6) ───────────────────────────────────────
+test("Widgets _TabSelect", function()
+    local st = { active = "a", valid = { a = true, b = true, c = true } }
+    eq(L:_TabSelect(st, "b"), "b", "select a valid key")
+    eq(L:_TabSelect(st, "b"), "b", "re-select is idempotent")
+    eq(L:_TabSelect(st, "zzz"), "b", "unknown key is a no-op (keeps current)")
+    eq(L:_TabSelect(st, "c"), "c", "switch to another valid key")
+end)
+
 -- ── Static data accessors (Phase 6) ──────────────────────────────────────────
 test("DataAPI: loot accessors", function()
     eq(table.concat(L:GetLootPhases(), ","), "P2", "only P2 has data, in PHASES order")

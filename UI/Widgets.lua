@@ -108,3 +108,115 @@ function LCEX:CreateItemIcon(parent, size)
     end
     return btn
 end
+
+-- ── Tab strip ────────────────────────────────────────────────────────────────
+-- Pure tab-state transition, factored out so the active-key logic is headless-testable.
+-- `state` = { active, valid={key=true} }. Selecting a valid key makes it active; an unknown
+-- key is a no-op (keeps the current active). Returns the active key.
+function LCEX:_TabSelect(state, key)
+    if state.valid[key] then state.active = key end
+    return state.active
+end
+
+-- A row of toggle buttons. `tabs` = { {key, text}, ... }. `onSelect(key)` fires on every
+-- Select (incl. programmatic). `strip:Select(key)` highlights the active and calls onSelect.
+-- Reused for PlayerDetail's content tabs and LootBrowser's phase tabs.
+function LCEX:CreateTabStrip(parent, tabs, onSelect)
+    local addon = self
+    local strip = CreateFrame("Frame", nil, parent)
+    strip.buttons = {}
+    strip.state = { active = nil, valid = {} }
+
+    local x = 0
+    for _, t in ipairs(tabs) do
+        strip.state.valid[t.key] = true
+        local b = self:CreateButton(strip, t.text, math.max(56, #t.text * 8 + 16), 22)
+        b:SetPoint("LEFT", x, 0)
+        b.tabKey = t.key
+        b:SetScript("OnClick", function() strip:Select(t.key) end)
+        strip.buttons[#strip.buttons + 1] = b
+        x = x + b:GetWidth() + 2
+    end
+    strip:SetSize(math.max(1, x), 24)
+
+    function strip.Select(s, key)
+        local active = addon:_TabSelect(s.state, key)
+        for _, b in ipairs(s.buttons) do
+            if b.tabKey == active then b:LockHighlight() else b:UnlockHighlight() end
+        end
+        if onSelect then onSelect(active) end
+        return active
+    end
+    return strip
+end
+
+-- ── Scroll list (FauxScrollFrame) ────────────────────────────────────────────
+-- A virtualized list: a fixed pool of `visibleRows` rows re-filled from a windowed slice of the
+-- backing data as the user scrolls. `opts = { rowHeight, visibleRows, width, buildRow(list)->row,
+-- fillRow(row, item, index) }`. The ONLY way to set data is `list:SetData(items)`, which resets
+-- the scroll offset first — so a stale offset from a longer previous list can never render the
+-- new (shorter) list empty (the classic FauxScrollFrame bug, CLAUDE.md).
+function LCEX:CreateScrollList(parent, opts)
+    local rowHeight   = opts.rowHeight or self.STYLE.rowHeight
+    local visibleRows = opts.visibleRows or 10
+    local width       = opts.width or 320
+
+    local list = CreateFrame("Frame", nil, parent)
+    list:SetSize(width, visibleRows * rowHeight)
+    list.rows, list.items = {}, {}
+
+    local sf = CreateFrame("ScrollFrame", nil, list, "FauxScrollFrameTemplate")
+    sf:SetAllPoints(list)
+    list.scroll = sf
+
+    local function Refresh()
+        FauxScrollFrame_Update(sf, #list.items, visibleRows, rowHeight)
+        local offset = FauxScrollFrame_GetOffset(sf)
+        for i = 1, visibleRows do
+            local row = list.rows[i]
+            if not row then
+                row = opts.buildRow(list)
+                row:SetHeight(rowHeight)
+                row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -(i - 1) * rowHeight)
+                row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -24, -(i - 1) * rowHeight) -- scrollbar gap
+                list.rows[i] = row
+            end
+            local item = list.items[offset + i]
+            if item then
+                opts.fillRow(row, item, offset + i)
+                row:Show()
+            else
+                row:Hide()
+            end
+        end
+    end
+    list.Refresh = Refresh
+
+    sf:SetScript("OnVerticalScroll", function(self2, delta)
+        FauxScrollFrame_OnVerticalScroll(self2, delta, rowHeight, Refresh)
+    end)
+
+    function list.SetData(l, items)
+        l.items = items or {}
+        l.scroll.offset = 0              -- the load-bearing reset
+        l.scroll:SetVerticalScroll(0)
+        Refresh()
+    end
+    return list
+end
+
+-- ── Edit box ─────────────────────────────────────────────────────────────────
+-- A single-line input (generalizes LootFrame's note box). `opts = { width, onCommit(text) }`.
+-- Enter commits (then unfocuses); Escape unfocuses. Commits should route through SetRecord.
+function LCEX:CreateEditBox(parent, opts)
+    opts = opts or {}
+    local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    eb:SetSize(opts.width or 200, 20)
+    eb:SetAutoFocus(false)
+    eb:SetScript("OnEscapePressed", function(self2) self2:ClearFocus() end)
+    eb:SetScript("OnEnterPressed", function(self2)
+        if opts.onCommit then opts.onCommit(self2:GetText()) end
+        self2:ClearFocus()
+    end)
+    return eb
+end
