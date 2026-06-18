@@ -58,8 +58,29 @@ _G.LE_PARTY_CATEGORY_INSTANCE = 2
 _G.GetInventoryItemLink = function() return nil end
 _G.GetNumSkillLines = function() return 0 end
 _G.GetSkillLineInfo = function() return nil end
-_G.GetItemInfo = function() return nil end
+_G.GetItemInfo = function() -- name, link, quality, ilvl, req, class, sub, stack, equip, icon
+    if H.itemEmpty then return nil end
+    return "Test Item", "[Test Item]", 4, 60, 60, "", "", 1, "", 135
+end
 _G.GetInventorySlotInfo = function() return nil end
+-- Blizzard Item mixin (ItemMixin) used by WithItemQuality/WithItemID. H.itemCached/itemEmpty
+-- drive the cached/empty branches; ContinueOnItemLoad fires synchronously here.
+_G.Item = {
+    CreateFromItemID = function(_, _id)
+        return {
+            IsItemEmpty        = function() return H.itemEmpty == true end,
+            IsItemDataCached   = function() return H.itemCached ~= false end,
+            ContinueOnItemLoad = function(_, cb) cb() end,
+        }
+    end,
+    CreateFromItemLink = function(_, _link)
+        return {
+            IsItemEmpty        = function() return H.itemEmpty == true end,
+            IsItemDataCached   = function() return H.itemCached ~= false end,
+            ContinueOnItemLoad = function(_, cb) cb() end,
+        }
+    end,
+}
 _G.C_AddOns = { GetAddOnMetadata = function() return "test" end }
 _G.LOOT_ITEM_SELF = "You receive loot: %s."
 
@@ -149,6 +170,7 @@ function H.reset()
     H.now, H.inGuild, H.inRaid = 1000, true, false
     H.guild, H.group = {}, {}
     H.playerName, H.tradePartner = "Tester", nil
+    H.itemCached, H.itemEmpty = true, false
     LCEX._councilSet = nil
     LCEX.db.profile.council = { byRank = true, rank = 1, extra = {} }
     LCEX.db.profile.syncChannel = "GUILD"

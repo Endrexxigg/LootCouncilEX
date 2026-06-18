@@ -111,6 +111,27 @@ function LCEX:WithItemQuality(link, cb)
     self:ScheduleTimer(finish, 0.5)
 end
 
+-- Like WithItemQuality but keyed by itemID — for static Loot/BiS lists a council member may not
+-- have cached. cb receives GetItemInfo's returns (name, link, quality, ..., icon) once resolved,
+-- or cb(nil) for a missing/invalid item. Synchronous when cached, else ContinueOnItemLoad with a
+-- 0.5s AceTimer safety net (the same proven shape as WithItemQuality). UI callers paint the icon
+-- instantly from GetItemInfoInstant and use this to fill the name + tooltip on resolve.
+function LCEX:WithItemID(itemID, cb)
+    if not itemID then return cb(nil) end
+    local item = Item:CreateFromItemID(itemID)
+    if item:IsItemEmpty() then return cb(nil) end
+    local function finish() cb(GetItemInfo(itemID)) end
+    if item:IsItemDataCached() then return finish() end
+    local fired = false
+    local function once()
+        if fired then return end
+        fired = true
+        finish()
+    end
+    item:ContinueOnItemLoad(once)
+    self:ScheduleTimer(once, 0.5)
+end
+
 -- ── Passive detection: track what the ML loots ───────────────────────────────
 function LCEX:OnChatMsgLoot(_, text)
     if not self:PlayerIsML() then return end

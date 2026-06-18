@@ -162,6 +162,28 @@ test("Widgets _TabSelect", function()
     eq(L:_TabSelect(st, "c"), "c", "switch to another valid key")
 end)
 
+-- ── WithItemID async loader (Phase 6) ────────────────────────────────────────
+test("WithItemID", function()
+    local got
+    L:WithItemID(123, function(name) got = name end)
+    eq(got, "Test Item", "cached -> cb with the item name (sync fast-path)")
+
+    local n = "sentinel"
+    L:WithItemID(nil, function(v) n = v end)
+    eq(n, nil, "nil itemID -> cb(nil)")
+
+    H.itemEmpty = true
+    local e = "sentinel"
+    L:WithItemID(999, function(v) e = v end)
+    eq(e, nil, "empty/invalid item -> cb(nil)")
+    H.itemEmpty = false
+
+    H.itemCached = false
+    local u
+    L:WithItemID(456, function(name) u = name end)
+    eq(u, "Test Item", "uncached -> resolves via ContinueOnItemLoad")
+end)
+
 -- ── Static data accessors (Phase 6) ──────────────────────────────────────────
 test("DataAPI: loot accessors", function()
     eq(table.concat(L:GetLootPhases(), ","), "P2", "only P2 has data, in PHASES order")
