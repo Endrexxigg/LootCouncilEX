@@ -29,4 +29,7 @@ jobs:
       - name: Package and create release
         uses: BigWigsMods/packager@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The packager reads the token from GITHUB_OAUTH (NOT GITHUB_TOKEN); the value is the
+          # auto-provided secrets.GITHUB_TOKEN. Naming it GITHUB_TOKEN makes it silently skip the
+          # GitHub release (still exits success) — it must be GITHUB_OAUTH.
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
