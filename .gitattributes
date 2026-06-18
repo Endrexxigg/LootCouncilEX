@@ -1,0 +1,10 @@
+# Normalize line endings for files parsed on Linux CI / packagers; leave Lua sources
+# to keep their existing endings (matches the ArenaSmartStats setup).
+*.yml           text eol=lf
+*.yaml          text eol=lf
+.gitattributes  text eol=lf
+.pkgmeta        text eol=lf
+
+# Mark vendored trees so GitHub language stats and diffs ignore them.
+Libs/**         linguist-vendored
+References/**   linguist-vendored

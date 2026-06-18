@@ -1,0 +1,24 @@
+# ── LootCouncil EX — gitignore ───────────────────────────────────────────────
+# The repo root IS the addon: Lua / .toc / .xml are source and must be tracked.
+# Ignore only machine-local state, WoW runtime data, and build artifacts.
+
+# WoW runtime data (only relevant if the repo is cloned inside the AddOns dir)
+WTF/
+**/SavedVariables/
+*.bak
+
+# Packaged release archives (built artifacts, not source)
+LootCouncilEX-*.zip
+
+# Personal / machine-local Claude Code state (keep shared skills tracked)
+.claude/*
+!.claude/skills/
+
+# Editor / IDE local settings
+.vscode/settings.json
+.idea/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+Desktop.ini
