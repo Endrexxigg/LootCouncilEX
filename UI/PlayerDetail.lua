@@ -63,9 +63,67 @@ function LCEX:BuildProfsDisplay(player)
     return out
 end
 
--- Placeholder until slice 6 (BiS class/spec/phase browser).
-function LCEX:BuildBiSDisplay()
-    return { { kind = "info", text = self.L["BiS — coming next."] } }
+-- Cycle to the next element after `current` (wraps; unknown/empty -> first/nil). Pure/testable.
+function LCEX:_CycleNext(list, current)
+    if #list == 0 then return nil end
+    for i, v in ipairs(list) do
+        if v == current then return list[(i % #list) + 1] end
+    end
+    return list[1]
+end
+
+-- Live class token (UnitClass) for the local player or a grouped member; nil otherwise.
+function LCEX:ClassOf(name)
+    if self:IsSelf(name) then return select(2, UnitClass("player")) end
+    local n = self:NormalizeName(name)
+    if not n then return nil end
+    local inRaid = IsInRaid()
+    for i = 1, GetNumGroupMembers() do
+        local unit = inRaid and ("raid" .. i) or ("party" .. i)
+        local u = UnitName(unit)
+        if u and self:NormalizeName(u) == n then return select(2, UnitClass(unit)) end
+    end
+    return nil
+end
+
+-- Classes that have BiS data (sorted) — the browse set for the class cycler.
+function LCEX:BiSClassesWithData()
+    local out = {}
+    for class in pairs(self.BiS) do out[#out + 1] = class end
+    table.sort(out)
+    return out
+end
+
+-- Resolve the current BiS class/spec/phase. Class defaults to the player's LIVE class on first
+-- view (when unset/invalid), else the first class with data; spec/phase default to the first
+-- available. Manual cycling sticks until a different player is opened (OpenPlayerDetail resets).
+function LCEX:ResolveBiSContext(player)
+    if not self.bisClass or not self.BiS[self.bisClass] then
+        local live = self:ClassOf(player)
+        self.bisClass = (live and self.BiS[live] and live) or self:BiSClassesWithData()[1]
+    end
+    local c = self.bisClass and self.BiS[self.bisClass]
+    if not self.bisSpec or not (c and c[self.bisSpec]) then
+        self.bisSpec = (self.bisClass and self:GetBiSSpecs(self.bisClass)[1]) or nil
+    end
+    if not self.bisPhase then self.bisPhase = self.PHASES[1] end
+end
+
+-- BiS rows for the resolved class/spec/phase, with a header line. UI-only: class is the
+-- player's live class by default; spec/phase are user-cycled (full capture is Phase 7).
+function LCEX:BuildBiSDisplay(player)
+    self:ResolveBiSContext(player)
+    local out = { { kind = "info", text = string.format(self.L["Class %s · Spec %s · %s"],
+        tostring(self.bisClass or "?"), tostring(self.bisSpec or "?"), tostring(self.bisPhase or "?")) } }
+    if self.bisClass and self.bisSpec and self.bisPhase then
+        for _, r in ipairs(self:GetBiSForSpecPhase(self.bisClass, self.bisSpec, self.bisPhase)) do
+            for _, itemID in ipairs(r.items) do
+                out[#out + 1] = { kind = "bisitem", slot = r.slot, itemID = itemID }
+            end
+        end
+    end
+    if #out == 1 then out[#out + 1] = { kind = "info", text = self.L["No BiS data for this class/spec/phase."] } end
+    return out
 end
 
 -- ── Shared list row ──────────────────────────────────────────────────────────
@@ -81,6 +139,7 @@ function LCEX:BuildDetailRow(parent)
 end
 
 function LCEX:FillDetailRow(row, entry)
+    row.loadingID = nil -- invalidate any pending async fill from a previous use of this pooled row
     if entry.kind == "gearitem" then
         row.icon:SetItem(entry.link, GetItemInfoInstant and select(5, GetItemInfoInstant(entry.link)))
         row.icon:Show()
@@ -91,7 +150,20 @@ function LCEX:FillDetailRow(row, entry)
         row.icon:Show()
         row.text:SetText(string.format("%s  |cff888888%s, %s|r",
             tostring(rec.itemLink), tostring(rec.boss or "?"), date("%m/%d", rec.ts or 0)))
-    else -- "info" / "prof" / placeholder: plain text, no icon
+    elseif entry.kind == "bisitem" then
+        local id = entry.itemID
+        row.loadingID = id
+        row.icon:SetItem(nil, GetItemInfoInstant and select(5, GetItemInfoInstant(id)))
+        row.icon:Show()
+        local token = self:FindTokenForItem(id)
+        local suffix = token and "  |cff888888(token)|r" or ""
+        row.text:SetText(entry.slot .. ":  item:" .. id .. suffix)
+        self:WithItemID(id, function(name, link)
+            if row.loadingID ~= id then return end -- row reused while loading
+            row.text:SetText(entry.slot .. ":  " .. tostring(link or name or ("item:" .. id)) .. suffix)
+            row.icon:SetItem(link, GetItemInfoInstant and select(5, GetItemInfoInstant(id)))
+        end)
+    else -- "info" / "prof": plain text, no icon
         row.icon:Hide()
         row.text:SetText(entry.text or "")
     end
@@ -113,11 +185,38 @@ function LCEX:EnsurePlayerDetail()
     f.tabs:SetPoint("TOPLEFT", 16, -58)
 
     f.list = self:CreateScrollList(f, {
-        rowHeight = 22, visibleRows = 12, width = 406,
+        rowHeight = 22, visibleRows = 11, width = 406,
         buildRow = function(parent) return self:BuildDetailRow(parent) end,
         fillRow = function(row, entry) self:FillDetailRow(row, entry) end,
     })
     f.list:SetPoint("TOPLEFT", 16, -88)
+
+    -- BiS sub-bar: class / spec / phase cycle buttons (shown only on the BiS tab; the list drops
+    -- below it on that tab). Each cycles its value and re-renders.
+    local bisBar = CreateFrame("Frame", nil, f)
+    bisBar:SetPoint("TOPLEFT", 16, -86)
+    bisBar:SetSize(400, 22)
+    bisBar.classBtn = self:CreateButton(bisBar, "", 120, 20)
+    bisBar.classBtn:SetPoint("LEFT", 0, 0)
+    bisBar.classBtn:SetScript("OnClick", function()
+        self.bisClass = self:_CycleNext(self:BiSClassesWithData(), self.bisClass)
+        self.bisSpec = nil
+        self:RenderDetailTab("bis")
+    end)
+    bisBar.specBtn = self:CreateButton(bisBar, "", 100, 20)
+    bisBar.specBtn:SetPoint("LEFT", bisBar.classBtn, "RIGHT", 4, 0)
+    bisBar.specBtn:SetScript("OnClick", function()
+        self.bisSpec = self:_CycleNext(self:GetBiSSpecs(self.bisClass), self.bisSpec)
+        self:RenderDetailTab("bis")
+    end)
+    bisBar.phaseBtn = self:CreateButton(bisBar, "", 56, 20)
+    bisBar.phaseBtn:SetPoint("LEFT", bisBar.specBtn, "RIGHT", 4, 0)
+    bisBar.phaseBtn:SetScript("OnClick", function()
+        self.bisPhase = self:_CycleNext(self.PHASES, self.bisPhase)
+        self:RenderDetailTab("bis")
+    end)
+    bisBar:Hide()
+    f.bisBar = bisBar
 
     -- Notes editor (shown instead of the list on the Notes tab).
     local notes = CreateFrame("Frame", nil, f)
@@ -146,8 +245,7 @@ function LCEX:RenderDetailTab(key)
     local player = f.player
 
     if key == "notes" then
-        f.list:Hide()
-        f.notes:Show()
+        f.list:Hide(); f.bisBar:Hide(); f.notes:Show()
         local rec = self.db.global.notes[self:NormalizeName(player)]
         f.notes.edit:SetText((rec and rec.text) or "")
         f.notes.meta:SetText(rec and string.format(self.L["by %s, %s"],
@@ -157,11 +255,25 @@ function LCEX:RenderDetailTab(key)
 
     f.notes:Hide()
     f.list:Show()
+    f.list:ClearAllPoints()
+    if key == "bis" then
+        f.bisBar:Show()
+        f.list:SetPoint("TOPLEFT", 16, -114) -- below the BiS cycle bar
+    else
+        f.bisBar:Hide()
+        f.list:SetPoint("TOPLEFT", 16, -88)
+    end
+
     local data
     if key == "gear" then data = self:BuildGearDisplay(player)
     elseif key == "history" then data = self:BuildHistoryDisplay(player)
     elseif key == "profs" then data = self:BuildProfsDisplay(player)
-    else data = self:BuildBiSDisplay(player) end
+    else
+        data = self:BuildBiSDisplay(player)
+        f.bisBar.classBtn:SetText(string.format(self.L["Class: %s"], tostring(self.bisClass or "?")))
+        f.bisBar.specBtn:SetText(string.format(self.L["Spec: %s"], tostring(self.bisSpec or "?")))
+        f.bisBar.phaseBtn:SetText(tostring(self.bisPhase or "?"))
+    end
     f.list:SetData(data)
 end
 
@@ -169,6 +281,9 @@ end
 function LCEX:OpenPlayerDetail(name)
     if not name or name == "" then name = UnitName("player") end
     local f = self:EnsurePlayerDetail()
+    if self:NormalizeName(name) ~= self:NormalizeName(f.player or "") then
+        self.bisClass, self.bisSpec = nil, nil -- a new player re-resolves BiS to THEIR class
+    end
     f.player = name
     f.header:SetText(name)
     f.tabs:Select(self.detailTab or "gear")

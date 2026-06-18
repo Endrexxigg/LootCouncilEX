@@ -180,6 +180,25 @@ test("PlayerDetail display builders", function()
     ok(p[1].text:find("Enchanting"), "professions sorted (Enchanting before Tailoring)")
 end)
 
+test("BiS: _CycleNext + BuildBiSDisplay", function()
+    eq(L:_CycleNext({ "a", "b", "c" }, "a"), "b", "cycle forward")
+    eq(L:_CycleNext({ "a", "b", "c" }, "c"), "a", "wraps to first")
+    eq(L:_CycleNext({ "a", "b", "c" }, "zzz"), "a", "unknown -> first")
+    eq(L:_CycleNext({}, "a"), nil, "empty -> nil")
+
+    -- self is a MAGE (UnitClass mock); class resolves live, spec defaults to first.
+    local d = L:BuildBiSDisplay("Tester")
+    eq(L.bisClass, "MAGE", "class resolves to the live class")
+    eq(L.bisSpec, "Fire", "spec defaults to first (Fire)")
+    eq(d[1].kind, "info", "header row first")
+
+    L.bisPhase = "P2" -- where MAGE/Fire has stub data
+    local d2 = L:BuildBiSDisplay("Tester")
+    eq(#d2, 4, "header + 3 Fire/P2 BiS slots")
+    eq(d2[2].kind, "bisitem", "then BiS item rows")
+    eq(d2[2].slot, "head", "slot order -> head first")
+end)
+
 -- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
 test("LootBrowser BuildBrowserDisplay", function()
     local d = L:BuildBrowserDisplay("P2")

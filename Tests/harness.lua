@@ -37,6 +37,7 @@ _G.UnitName = function(unit)
     return nil
 end
 _G.UnitIsUnit = function(a, b) return a == b end
+_G.UnitClass = function() return "Mage", H.class or "MAGE" end -- localizedName, classToken
 _G.UnitAffectingCombat = function() return false end
 _G.IsInGuild = function() return H.inGuild end
 _G.GuildRoster = function() end
@@ -172,7 +173,9 @@ function H.reset()
     H.guild, H.group = {}, {}
     H.playerName, H.tradePartner = "Tester", nil
     H.itemCached, H.itemEmpty = true, false
+    H.class = "MAGE"
     LCEX._councilSet = nil
+    LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil
     LCEX.db.profile.council = { byRank = true, rank = 1, extra = {} }
     LCEX.db.profile.syncChannel = "GUILD"
     LCEX.db.profile.selfReport = true
