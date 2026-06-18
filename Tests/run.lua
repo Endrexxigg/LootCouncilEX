@@ -153,6 +153,37 @@ test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     ok(sawHello, "we're ahead -> hello back so they pull")
 end)
 
+-- ── Static data accessors (Phase 6) ──────────────────────────────────────────
+test("DataAPI: loot accessors", function()
+    eq(table.concat(L:GetLootPhases(), ","), "P2", "only P2 has data, in PHASES order")
+    eq(table.concat(L:GetRaidsForPhase("P2"), "|"), "Serpentshrine Cavern|Tempest Keep",
+        "raids alphabetical")
+    eq(table.concat(L:GetBossesForRaid("P2", "Serpentshrine Cavern"), "|"),
+        "Hydross the Unstable|Leotheras the Blind|Lady Vashj", "bosses in kill order (_order)")
+    eq(#L:GetItemsForBoss("P2", "Tempest Keep", "Al'ar"), 1, "Al'ar drops 1")
+    eq(#L:GetItemsForBoss("P2", "Tempest Keep", "Nobody"), 0, "missing boss -> empty")
+    eq(#L:GetRaidsForPhase("P9"), 0, "missing phase -> empty")
+end)
+
+test("DataAPI: BiS accessors", function()
+    eq(table.concat(L:GetBiSSpecs("MAGE"), ","), "Fire,Frost", "specs alphabetical")
+    eq(#L:GetBiSSpecs("ROGUE"), 0, "class without data -> empty")
+    local rows = L:GetBiSForSpecPhase("MAGE", "Fire", "P2")
+    eq(#rows, 3, "Fire P2 has 3 slots with data")
+    eq(rows[1].slot, "head", "slot order respects BIS_SLOT_ORDER (head)")
+    eq(rows[2].slot, "neck", "...(neck)")
+    eq(rows[3].slot, "hands", "...(hands after neck)")
+    eq(#L:GetBiSForSpecPhase("MAGE", "Fire", "P9"), 0, "missing phase -> empty")
+end)
+
+test("DataAPI: tier tokens", function()
+    eq(L:GetTierToken(29753).name, "Helm of the Fallen Champion", "token name")
+    eq(L:GetTierPieceForClass(29753, "WARRIOR"), 29021, "warrior piece")
+    eq(L:GetTierPieceForClass(29753, "DRUID"), nil, "no druid piece on this token")
+    ok(L:FindTokenForItem(29753), "29753 is a token")
+    ok(not L:FindTokenForItem(28830), "a normal item is not a token")
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

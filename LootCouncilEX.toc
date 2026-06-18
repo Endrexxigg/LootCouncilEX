@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.8.3
+## Version: 0.9.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -16,6 +16,13 @@ Core\Init.lua
 Core\Const.lua
 Core\Comms.lua
 Core\Roster.lua
+
+# Static reference data (stub samples; Phase 7 fills real content) + pure accessors. Inert
+# tables, so they load early; DataAPI reads them at call time so it goes last of the four.
+Core\Data\Loot.lua
+Core\Data\BiS.lua
+Core\Data\TierTokens.lua
+Core\Data\DataAPI.lua
 
 # Plane A — live loot session (ML authority). Session holds state + sStart/sEnd;
 # Award tracks looted/bag items and hands them off by trade, so Session precedes Award.
