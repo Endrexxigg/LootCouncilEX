@@ -153,6 +153,19 @@ test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     ok(sawHello, "we're ahead -> hello back so they pull")
 end)
 
+-- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
+test("LootBrowser BuildBrowserDisplay", function()
+    local d = L:BuildBrowserDisplay("P2")
+    eq(#d, 17, "raid + boss + item entries for P2")
+    eq(d[1].kind, "raid", "first entry is a raid header")
+    eq(d[1].text, "Serpentshrine Cavern", "raids alpha -> SSC first")
+    eq(d[2].kind, "boss", "then a boss header")
+    eq(d[2].text, "Hydross the Unstable", "kill order -> Hydross first")
+    eq(d[3].kind, "item", "then items")
+    eq(d[3].itemID, 28830, "first SSC/Hydross item")
+    eq(#L:BuildBrowserDisplay("P9"), 0, "empty phase -> empty array")
+end)
+
 -- ── Widgets: tab-strip state (Phase 6) ───────────────────────────────────────
 test("Widgets _TabSelect", function()
     local st = { active = "a", valid = { a = true, b = true, c = true } }

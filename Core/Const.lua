@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], council [add|remove <name>], sync"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], council [add|remove <name>], sync"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, council [add|remove <name>], sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, council [add|remove <name>], sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -138,3 +138,7 @@ L["(no cached report)"]                     = "(no cached report)"
 L["Gear/profs — %s %s"]                     = "Gear/profs — %s %s"
 L["  slot %d: %s"]                          = "  slot %d: %s"
 L["  %s: %d"]                               = "  %s: %d"
+
+-- Phase 6 — viewer UIs.
+L["LootCouncil EX — Loot Browser"]          = "LootCouncil EX — Loot Browser"
+L["LootCouncil EX — Player"]                = "LootCouncil EX — Player"

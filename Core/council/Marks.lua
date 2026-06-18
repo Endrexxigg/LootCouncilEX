@@ -9,6 +9,15 @@ local LCEX = LootCouncilEX
 
 LCEX:RegisterDataset("marks", "lww", function() return LCEX.db.global.marks end)
 
+-- Set an item's mark and sync it (council-gated warning, then SetRecord broadcasts pSet).
+-- Shared by /lcex mark and the LootBrowser's inline editor.
+function LCEX:SetMark(itemID, text)
+    if not self:AmCouncil() then
+        self:Msg(self.L["Heads-up: you're not on the council — this won't sync to others."])
+    end
+    self:SetRecord("marks", itemID, { text = text })
+end
+
 -- /lcex mark <itemID|link> [text] — set or read a mark. Accepts a raw itemID or a
 -- shift-clicked item link (whose [Name] may contain spaces, so we extract the id from the
 -- hyperlink and take the text after the link's closing |r).
@@ -31,10 +40,7 @@ function LCEX:CmdMark(rest)
     end
 
     if text and text ~= "" then
-        if not self:AmCouncil() then
-            self:Msg(self.L["Heads-up: you're not on the council — this won't sync to others."])
-        end
-        self:SetRecord("marks", itemID, { text = text })
+        self:SetMark(itemID, text)
         self:Msg(string.format(self.L["Mark on item %d set."], itemID))
     else
         local rec = self.db.global.marks[itemID]

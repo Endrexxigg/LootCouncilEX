@@ -151,6 +151,7 @@ local FILES = {
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
     "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
+    "UI/LootBrowser.lua",
 }
 for _, f in ipairs(FILES) do
     local chunk, err = loadfile(f)
