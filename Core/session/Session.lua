@@ -14,7 +14,9 @@ local LCEX = LootCouncilEX
 local counter = 0
 
 -- LCEX.session is nil when idle, else { sid, items, council, startedAt }. `items` holds
--- the wire form { [i] = { link, slot, quality } } that was broadcast in sStart.
+-- the wire form { [i] = { link, quality } } that was broadcast in sStart. (Items live in
+-- the ML's bags, not a loot window, so there is no loot slot — the ML resolves the live
+-- bag/slot at trade time in Award.lua.)
 
 -- The voting council for a session. Phase-2 stand-in: empty. The sStart schema carries
 -- a `council` key, but no Phase-2 consumer reads it; real (rank-based) resolution lands
@@ -29,26 +31,29 @@ function LCEX:NewSessionID()
 end
 
 -- Open a session over the given trimmed item list and broadcast sStart. Refuses if a
--- session is already open, we are not in a group, or there is nothing to council.
+-- session is already open or there is nothing to council. With no group we still open the
+-- session locally (no broadcast) so the flow can be exercised/tested solo.
 function LCEX:StartSession(items)
     if self.session then
         self:Msg(self.L["A session is already active. /lcex end first."])
         return
     end
-    local channel = self:GroupChannel()
-    if not channel then
-        self:Msg(self.L["Not in a group — nothing to broadcast."])
-        return
-    end
     if not items or #items == 0 then
-        self:Msg(self.L["Nothing scanned — open a corpse as master looter first."])
+        self:Msg(self.L["Nothing to council."])
         return
     end
 
     local sid = self:NewSessionID()
     self.session = { sid = sid, items = items, council = self:GetCouncil(), startedAt = time() }
-    self:Send("sStart", sid, { items = items, council = self.session.council }, channel)
-    self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
+
+    local channel = self:GroupChannel()
+    if channel then
+        self:Send("sStart", sid, { items = items, council = self.session.council }, channel)
+        self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
+    else
+        self:Msg(string.format(self.L["Session started (%s) — %d item(s) [local only, not in a group]."],
+            sid, #items))
+    end
 end
 
 -- Close the active session and broadcast sEnd.
@@ -62,6 +67,7 @@ function LCEX:EndSession()
         self:Send("sEnd", self.session.sid, {}, channel)
     end
     self.session = nil
+    self.sessionItems = nil -- the ML-side full records (Award.lua); pendingTrades outlive the session
     self:Msg(self.L["Session ended."])
 end
 
@@ -74,6 +80,6 @@ function LCEX:CmdSession()
     local s = self.session
     self:Msg(string.format(self.L["Session %s — %d item(s):"], s.sid, #s.items))
     for i, it in ipairs(s.items) do
-        self:Msg(string.format(self.L["  %d. %s (slot %d, q%d)"], i, it.link, it.slot, it.quality))
+        self:Msg(string.format(self.L["  %d. %s (q%d)"], i, it.link, it.quality))
     end
 end

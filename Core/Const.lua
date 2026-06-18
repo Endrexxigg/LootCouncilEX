@@ -16,12 +16,17 @@ LCEX.PROTOCOL_VERSION = 1
 
 -- Candidate response options. UI columns/buttons and comms responses are built from
 -- this table, never hardcoded (PROJECT.md §6.5). Index order = display order.
+--
+-- These are DEFAULTS. Making the set user-configurable (add/remove/rename) is Phase 3,
+-- once there is a settings UI and the responses actually drive candidate/voting frames.
+-- `PASS` is a built-in: it must always exist so a candidate can decline and so timeouts
+-- resolve to a non-response.
 LCEX.RESPONSES = {
-    [1] = { id = 1, key = "BIS",   text = "BiS",       color = { 0.96, 0.55, 0.73 } },
-    [2] = { id = 2, key = "MS",    text = "Mainspec",  color = { 0.20, 1.00, 0.20 } },
-    [3] = { id = 3, key = "OS",    text = "Offspec",   color = { 1.00, 1.00, 0.40 } },
-    [4] = { id = 4, key = "MINOR", text = "Minor Upg", color = { 0.70, 0.70, 0.70 } },
-    [5] = { id = 5, key = "PASS",  text = "Pass",      color = { 0.60, 0.20, 0.20 } },
+    [1] = { id = 1, key = "BIS",   text = "BiS",   color = { 0.96, 0.55, 0.73 } },
+    [2] = { id = 2, key = "MAJOR", text = "Major", color = { 0.20, 1.00, 0.20 } },
+    [3] = { id = 3, key = "MINOR", text = "Minor", color = { 1.00, 0.96, 0.41 } },
+    [4] = { id = 4, key = "GREED", text = "Greed", color = { 0.70, 0.70, 0.70 } },
+    [5] = { id = 5, key = "PASS",  text = "Pass",  color = { 0.60, 0.20, 0.20 } },
 }
 
 -- Non-response status codes (PROJECT.md §6.5). Kept numerically clear of RESPONSES ids.
@@ -43,28 +48,36 @@ L["%s is running v%s"]                = "%s is running v%s"
 L["Known addon users:"]               = "Known addon users:"
 L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
-L["Commands: ping, version, scan, start, award <n> <name>, end, session"] =
-    "Commands: ping, version, scan, start, award <n> <name>, end, session"
+L["Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"] =
+    "Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"
 
--- Phase 2 — loot engine (session + award).
-L["Detected %d councilable item(s):"]      = "Detected %d councilable item(s):"
-L["  %d. %s (slot %d, q%d)"]                = "  %d. %s (slot %d, q%d)"
-L["No councilable items on this corpse."]   = "No councilable items on this corpse."
-L["No loot window open (or you are not the master looter)."] =
-    "No loot window open (or you are not the master looter)."
-L["Nothing scanned — open a corpse as master looter first."] =
-    "Nothing scanned — open a corpse as master looter first."
+-- Phase 2 — bags + trade loot engine.
+L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
+L["You are not the master looter."]         = "You are not the master looter."
+L["Councilable items in your bags:"]        = "Councilable items in your bags:"
+L["  %d. %s (q%d)"]                         = "  %d. %s (q%d)"
+L["  %d. %s (q%d) — looted before reload, no trade timer"] =
+    "  %d. %s (q%d) — looted before reload, no trade timer"
+L["Nothing councilable in your bags."]      = "Nothing councilable in your bags."
 L["A session is already active. /lcex end first."] =
     "A session is already active. /lcex end first."
+L["Nothing to council."]                    = "Nothing to council."
 L["Session started (%s) — %d item(s) broadcast."] =
     "Session started (%s) — %d item(s) broadcast."
+L["Session started (%s) — %d item(s) [local only, not in a group]."] =
+    "Session started (%s) — %d item(s) [local only, not in a group]."
 L["Session %s — %d item(s):"]               = "Session %s — %d item(s):"
 L["Session ended."]                         = "Session ended."
 L["No active session."]                     = "No active session."
 L["Usage: /lcex award <itemIndex> <name>"]  = "Usage: /lcex award <itemIndex> <name>"
-L["No item #%d in the scan."]               = "No item #%d in the scan."
-L["Loot window is closed."]                 = "Loot window is closed."
-L["Item #%d is no longer in slot %d."]      = "Item #%d is no longer in slot %d."
-L["%s is not an eligible candidate for that item."] =
-    "%s is not an eligible candidate for that item."
-L["Awarded %s to %s."]                      = "Awarded %s to %s."
+L["No item #%d in the session."]            = "No item #%d in the session."
+L["Recorded: %s → %s. Trade it to them within the window to hand it off."] =
+    "Recorded: %s → %s. Trade it to them within the window to hand it off."
+L["Auto-filled %s into the trade with %s."] = "Auto-filled %s into the trade with %s."
+L["Could not auto-fill %s — drag it into the trade window yourself."] =
+    "Could not auto-fill %s — drag it into the trade window yourself."
+L["You have %d minute(s) left to trade %s to %s."] =
+    "You have %d minute(s) left to trade %s to %s."
+L["Trade window for %s (%s) has expired."]  = "Trade window for %s (%s) has expired."
+L["Test session: broadcasting %d sample item(s)."] =
+    "Test session: broadcasting %d sample item(s)."

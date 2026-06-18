@@ -39,7 +39,11 @@ read_globals = {
     "LE_PARTY_CATEGORY_INSTANCE", "GetInstanceInfo",
     -- Loot / master loot
     "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems", "GetLootMethod",
-    "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem",
+    "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem", "LOOT_ITEM_SELF",
+    -- Bags / trade
+    "GetContainerNumSlots", "GetContainerItemLink", "GetContainerItemInfo",
+    "PickupContainerItem", "ClickTradeButton", "GetTradePlayerItemLink",
+    "CursorHasItem", "ClearCursor",
     -- Items / gear / professions
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",
     "GetNumSkillLines", "GetSkillLineInfo",

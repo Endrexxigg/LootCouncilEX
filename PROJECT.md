@@ -35,6 +35,8 @@ Keep these two subsystems mentally and structurally separate.
 ### Plane A — Live session (ephemeral, ML-authoritative)
 The loot voting itself. The **master looter is the single source of truth.** Candidates and council members whisper to the ML; the ML aggregates and rebroadcasts canonical state to RAID. Exists only while a session is open. No peer-to-peer sync — every change funnels through the ML.
 
+**Loot sourcing & handoff (DL-7):** the ML **auto-loots every drop into their own bags** during the raid and councils them in sessions started later (periodically / end of night) — there is no master-loot-from-corpse. The winner receives the item by **trading** it within the BoP 2-hour window; the addon assists the trade and tracks the timer.
+
 ### Plane B — Persistent council (durable, multi-writer, replicated)
 Player notes, item/gear marks, shared award history, and cached gear/professions. Authored by any council member, replicated among the council over the **GUILD** channel, persisted in SavedVariables, available in or out of raid. No single authority; conflicts resolve **last-write-wins** on a per-record timestamp. Eventually-consistent.
 
@@ -77,7 +79,7 @@ LootCouncilEX/
 │   │   ├── Session.lua        # ML state machine (authority)
 │   │   ├── Candidate.lua      # receive sStart → loot frame → send cResp
 │   │   ├── Council.lua        # receive cUpdate → voting frame → send vVote
-│   │   └── Award.lua          # GiveMasterLoot wrapper, eligibility, manual-trade path
+│   │   └── Award.lua          # bags/loot detection; award = assist-trade (TRADE_SHOW fill + 2h timer)
 │   ├── council/               # PLANE B
 │   │   ├── Sync.lua           # GUILD sync engine (manifest, deltas, LWW merge)
 │   │   ├── Notes.lua          # player notes dataset
@@ -108,7 +110,7 @@ Envelope `{ v, cmd, sid, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`.
 |---|---|---|---|
 | `vCheck` | any → raid | RAID | `{ ver }` |
 | `vReply` | client → asker | WHISPER | `{ ver }` |
-| `sStart` | ML → raid | RAID | `{ items={[i]={link,slot,quality}}, council={names} }` |
+| `sStart` | ML → raid | RAID | `{ items={[i]={link,quality}}, council={names} }` |
 | `sEnd` | ML → raid | RAID | `{}` |
 | `cResp` | candidate → ML | WHISPER | `{ item, resp, note, ilvl, gear={link,link} }` |
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,note,ilvl,gear,votes}} }` |
@@ -116,6 +118,8 @@ Envelope `{ v, cmd, sid, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`.
 | `award` | ML → raid | RAID | `{ item, itemID, winner, resp, boss, instance, ts }` |
 
 Reliability: ML holds the authoritative table; drop inbound `cResp`/`vVote` with a stale `sid` or non-member/non-council sender. Debounce `cUpdate` (~0.2s). Idempotent — re-sends overwrite last value. No ACK in v1. `award` carries enough to build a complete local history record on every present client.
+
+Notes: items live in the ML's bags (no loot slot), so `sStart` items carry only `{link,quality}` — the ML resolves the live `{bag,slot}` locally at trade time. Until Phase-3 voting exists, `award.resp` carries the `STATUS.ANNOUNCED` sentinel.
 
 ### 6.2 Plane B messages
 Channel GUILD; only council members participate.
@@ -154,15 +158,16 @@ LootCouncilEXDB = {
 
 ### 6.5 Response enum
 ```lua
-RESPONSES = {
-  [1]={id=1,key="BIS",  text="BiS",      color={0.96,0.55,0.73}},
-  [2]={id=2,key="MS",   text="Mainspec", color={0.20,1.00,0.20}},
-  [3]={id=3,key="OS",   text="Offspec",  color={1.00,1.00,0.40}},
-  [4]={id=4,key="MINOR",text="Minor Upg",color={0.70,0.70,0.70}},
-  [5]={id=5,key="PASS", text="Pass",     color={0.60,0.20,0.20}},
+RESPONSES = {  -- DEFAULTS; user-configurable (add/remove/rename) is Phase 3
+  [1]={id=1,key="BIS",  text="BiS",   color={0.96,0.55,0.73}},
+  [2]={id=2,key="MAJOR",text="Major", color={0.20,1.00,0.20}},
+  [3]={id=3,key="MINOR",text="Minor", color={1.00,0.96,0.41}},
+  [4]={id=4,key="GREED",text="Greed", color={0.70,0.70,0.70}},
+  [5]={id=5,key="PASS", text="Pass",  color={0.60,0.20,0.20}},  -- built-in: always present
 }
 STATUS = { ANNOUNCED=90, TIMEOUT=91, NOADDON=92 }
 ```
+`PASS` is a built-in response (a candidate must always be able to decline; timeouts resolve to a non-response). The rest are defaults the council may reconfigure once the settings UI lands (DL-8).
 
 ### 6.6 Static data shapes
 ```lua
@@ -173,8 +178,8 @@ TierTokens = { [30243]={ name="Helm of the Fallen Hero", pieces={ ["WARRIOR"]=it
 
 ### 6.7 Key TBC APIs (verify signatures)
 - **ESC close:** `tinsert(UISpecialFrames, "LCEX_FrameName")`.
-- **Loot detect:** `LOOT_OPENED` → `GetNumLootItems()`, per slot `GetLootSlotLink`/`GetLootSlotInfo`(quality)/`LootSlotHasItem`.
-- **Master loot:** `GetMasterLootCandidate(lootSlot, index)`, `GiveMasterLoot(lootSlot, candidateIndex)`. Item in bags: BoP 2-hour trade window.
+- **Loot detect (bags flow):** passively track the ML's own loot via `CHAT_MSG_LOOT` ("You receive loot:" — derive the prefix from `LOOT_ITEM_SELF` for locale) to capture the source boss (`UnitName("target")`) + a looted-at `time()` stamp; plus a bag scan over bags 0-4 with the **global** `GetContainerNumSlots`/`GetContainerItemLink` (NOT `C_Container`, which is Dragonflight+). Quality from `GetItemInfo(link)` (3rd return); itemID via `link:match("item:(%d+)")`.
+- **Award handoff (trade):** the ML trades the item to the winner within the BoP 2-hour window. Do NOT auto-open (`InitiateTrade` is hardware-gated); on `TRADE_SHOW` auto-fill via `PickupContainerItem(bag,slot)` + `ClickTradeButton(slot)` (slots 1-6 tradeable, 7 = will-not-be-traded), with a manual-drag fallback. Track the 2h window from the looted-at `time()` and warn before it lapses. (`GetMasterLootCandidate`/`GiveMasterLoot` are **not used** — the guild auto-loots to bags, see §3 / DL-7.)
 - **Own gear:** `GetInventoryItemLink("player", slotID)`; snapshot on `PLAYER_REGEN_DISABLED` (anti-swap).
 - **Own professions:** scan `GetNumSkillLines()`/`GetSkillLineInfo(i)` for the two professions + level. (No reliable cross-player profession inspect — self-report only.)
 - **Equipped ilvl:** `GetAverageItemLevel` unreliable in Classic; show the competing-slot item from the snapshot instead.
@@ -189,8 +194,8 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 **Phase 1 — Skeleton + comms proof.** `Const`, `Init`, `Comms`, `Roster` + libs.
 *Exit:* two clients in a raid, `/lcex` works, `vCheck` round-trips and each prints the other's name + version. No UI. No Lua errors on load.
 
-**Phase 2 — Loot engine (headless).** `session/Session.lua` (state machine), `session/Award.lua` (LOOT_OPENED scan, candidate resolution, `GiveMasterLoot`).
-*Exit:* ML opens a corpse, addon detects epics, can broadcast `sStart` and award an item via `GiveMasterLoot` — all driven/verified through chat output and test commands, still no real UI.
+**Phase 2 — Loot engine (headless).** `session/Session.lua` (state machine), `session/Award.lua` (bags/loot detection, session start, award = assist-trade). Items are sourced from the ML's bags (auto-looted during the raid), not a corpse.
+*Exit:* the ML's looted epics are tracked → `/lcex start` broadcasts `sStart` → `/lcex award <n> <name>` records the winner + broadcasts `award` → opening a trade with the winner auto-fills the item (or prompts a manual drag) → the 2h trade timer warns before it lapses. Driven/verified through chat output, `/lcex test`, and a willing trade partner — no live boss required, still no real UI.
 
 **Phase 3 — Session UI → MVP.** `UI/Widgets.lua`, `SessionFrame`, `LootFrame`, `VotingFrame`, wired via `session/Candidate.lua` + `session/Council.lua`.
 *Exit:* full live loop between 2+ clients — item drops → candidates respond in a frame → council sees the table and votes → ML awards → item assigned. **This is a usable loot council addon.**
@@ -217,6 +222,9 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 - **DL-4 (accepted, no alternative):** gear/professions are self-reported; out-of-raid / non-addon users show cached or none.
 - **DL-5 (open, content task):** static datasets must be maintained each phase; consider a build-time import from a community dataset instead of hand-editing.
 - **DL-6 (open, Phase 7):** ML disconnect mid-session recovery behavior is undefined.
+- **DL-7 (accepted v1):** loot flow is auto-loot-to-ML-bags + later sessions + handoff by **trade** within the BoP 2h window. This supersedes the original master-loot-from-corpse assumption; `GetMasterLootCandidate`/`GiveMasterLoot` are not used.
+- **DL-8 (open, Phase 3):** response buttons are user-configurable (add/remove/rename); only the DEFAULT set (BiS/Major/Minor/Greed + built-in Pass) exists until the settings UI lands. The set used in a session will need to be consistent across participants (likely carried in `sStart` or a synced config).
+- **DL-9 (accepted v1):** the 2h trade window is tracked from the looted-at `time()`; reliable only for items looted while the addon was loaded. Items already in bags before login show "no timer" rather than a false countdown; a tooltip-scan refinement is deferred.
 
 ---
 

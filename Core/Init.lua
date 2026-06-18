@@ -112,14 +112,16 @@ function LCEX:HandleSlash(input)
     elseif cmd == "scan" then
         self:CmdScan()
     elseif cmd == "start" then
-        self:CmdStartFromScan()
+        self:CmdStartFromBags()
     elseif cmd == "award" then
         self:CmdAward(rest)
     elseif cmd == "end" then
         self:EndSession()
     elseif cmd == "session" then
         self:CmdSession()
+    elseif cmd == "test" then
+        self:CmdTest(rest)
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, award <n> <name>, end, session"])
+        self:Msg(self.L["Commands: ping, version, scan, start, award <n> <name>, end, session, test [n]"])
     end
 end
