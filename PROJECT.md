@@ -112,6 +112,7 @@ Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`;
 | `vReply` | client → asker | WHISPER | `{}` (ver rides on the envelope) |
 | `sStart` | ML → raid | RAID | `{ items={[i]={link,quality}}, council={names} }` |
 | `sEnd` | ML → raid | RAID | `{}` |
+| `sPing` | ML → raid | RAID | `{}` (liveness heartbeat, ~30s while open; sid on the envelope — DL-6) |
 | `cResp` | candidate → ML | WHISPER | `{ item, resp, note, ilvl, gear={link,link} }` |
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,note,ilvl,gear,votes}} }` |
 | `vVote` | council → ML | WHISPER | `{ item, candidate, vote=±1|0 }` |
@@ -126,7 +127,7 @@ Channel GUILD; only council members participate.
 
 | cmd | Direction | Channel | Payload |
 |---|---|---|---|
-| `pReport` | any group member → GUILD | GUILD | `{ gear={slot→link}, profs={name→level}, mod }` |
+| `pReport` | any group member → GUILD | GUILD | `{ gear={slot→link}, profs={name→level}, class, spec, mod }` |
 | `pSet` | council → GUILD | GUILD | `{ dataset="notes"|"marks", key, record={text,mod,by} }` |
 | `pHello` | council → GUILD | GUILD | `{ digest={ notes={n,maxMod}, marks={n,maxMod}, history={n}, gearCache={n,maxMod}, profCache={n,maxMod} } }` |
 | `pSyncReq` | council → peer | WHISPER | `{ dataset, since=<mod|0> }` |
@@ -138,7 +139,7 @@ Sync flow: on login/load broadcast `pHello`; a peer that's behind sends `pSyncRe
 - `notes`: name → `{text, mod, by}`
 - `marks`: itemID → `{text, mod, by}`
 - `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (immutable; union merge). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts for display; union ignores both for merge. Logged locally on every present client from the `award` broadcast (§6.1).
-- `gearCache`: name → `{items={slot→link}, mod}` (self-reported)
+- `gearCache`: name → `{items={slot→link}, class, spec, mod}` (self-reported; `class`/`spec` let the BiS tab auto-resolve a cached player — talent-derived spec, §6.7)
 - `profCache`: name → `{profs={name→level}, mod}` (self-reported)
 
 ### 6.4 SavedVariables
@@ -152,7 +153,13 @@ LootCouncilEXDB = {
     ui                 = { lootFrame={pos}, votingFrame={pos}, sessionFrame={pos}, playerDetail={pos}, lootBrowser={pos} },
     useWhisperFallback = false,
   },
-  global = { notes={}, marks={}, history={}, gearCache={}, profCache={} },
+  global = {
+    dbVersion = <int>,                  -- schema version; MigrateDB stamps/upgrades on load (Phase 7)
+    notes={}, marks={}, history={}, gearCache={}, profCache={},
+    -- Local (NOT synced) owner-keyed recovery stores so a /reload can't lose ML state (DL-6):
+    pendingTrades = { [owner] = { [shortKey] = {owed records} } },  -- owed loot still to be traded out
+    session       = { [owner] = {sid, items, council, sessionItems, startedAt} },  -- the open ML session
+  },
 }
 ```
 
@@ -182,6 +189,7 @@ TierTokens = { [30243]={ name="Helm of the Fallen Hero", pieces={ ["WARRIOR"]=it
 - **Award handoff (trade):** the ML trades the item to the winner within the BoP 2-hour window. Do NOT auto-open (`InitiateTrade` is hardware-gated); on `TRADE_SHOW` auto-fill via a single **`UseContainerItem(bag,slot)`** guarded by `TradeFrame:IsShown()` (it drops the item into the first free trade slot; slots 1-6 are tradeable, slot 7 = will-not-be-traded), with a manual-drag fallback and a short bag-locked retry. Confirm delivery on `UI_INFO_MESSAGE == ERR_TRADE_COMPLETE` (snapshot the given items at `TRADE_ACCEPT_UPDATE`, warn on a wrong-winner hand-off) — NOT `TRADE_CLOSED`, which also fires on cancel. Track the 2h window from the looted-at `time()` and warn before it lapses. (`GetMasterLootCandidate`/`GiveMasterLoot` are **not used** — the guild auto-loots to bags, see §3 / DL-7.)
 - **Own gear:** `GetInventoryItemLink("player", slotID)`; snapshot on `PLAYER_REGEN_DISABLED` (anti-swap).
 - **Own professions:** scan `GetNumSkillLines()`/`GetSkillLineInfo(i)` for the two professions + level. (No reliable cross-player profession inspect — self-report only.)
+- **Own spec:** `GetTalentTabInfo(1..3)` → the tab with the most `pointsSpent`; map the tab index to a spec name (CLASS_SPECS is in talent-tab order). Self-reported in `pReport` like gear/profs. (`GetActiveTalentGroup` is WotLK+; do NOT use.)
 - **Equipped ilvl:** `GetAverageItemLevel` unreliable in Classic; show the competing-slot item from the snapshot instead.
 - **Comms:** `RegisterComm("LCEX", handler)`; `SendCommMessage("LCEX", msg, "RAID"|"GUILD"|"WHISPER", target)`. GUILD reaches all online guildies (the out-of-raid path).
 
@@ -221,10 +229,10 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 - **DL-3 (accepted v1):** no ACK on Plane A; last-write-wins + re-click. Revisit only if delivery gaps appear in practice.
 - **DL-4 (accepted, no alternative):** gear/professions are self-reported; out-of-raid / non-addon users show cached or none.
 - **DL-5 (open, content task):** static datasets must be maintained each phase; consider a build-time import from a community dataset instead of hand-editing.
-- **DL-6 (open, Phase 7):** ML disconnect mid-session recovery behavior is undefined.
+- **DL-6 (closed, Phase 7):** ML disconnect mid-session recovery is defined. The ML heartbeats `sPing` (~30s) while a session is open; a candidate that hears nothing for 95s closes the stale view (no one is stuck). The open ML session and any owed trades are mirrored to `global.session`/`global.pendingTrades` (owner-keyed, local) and restored on login — the ML is offered `/lcex resume` (re-broadcasts `sStart` with the same sid) or `/lcex end` to discard.
 - **DL-7 (accepted v1):** loot flow is auto-loot-to-ML-bags + later sessions + handoff by **trade** within the BoP 2h window. This supersedes the original master-loot-from-corpse assumption; `GetMasterLootCandidate`/`GiveMasterLoot` are not used.
 - **DL-8 (open, Phase 3):** response buttons are user-configurable (add/remove/rename); only the DEFAULT set (BiS/Major/Minor/Greed + built-in Pass) exists until the settings UI lands. The set used in a session will need to be consistent across participants (likely carried in `sStart` or a synced config).
-- **DL-9 (accepted v1):** the 2h trade window is tracked from the looted-at `time()`; reliable only for items looted while the addon was loaded. Items already in bags before login show "no timer" rather than a false countdown; a tooltip-scan refinement is deferred. (Refinement = tooltip-scan `GetContainerItemTradeTimeRemaining` / `BIND_TRADE_TIME_REMAINING` with a `measuredAt` anchor — approach confirmed against RCLC + Gargul; gate on `C_Item.GetItemGUID` existing on Anniversary.)
+- **DL-9 (done, Phase 7):** the 2h trade window prefers the looted-at `time()` anchor; for items already in bags before login it now reads the *real* remaining time by scanning the item tooltip for the localized `BIND_TRADE_TIME_REMAINING` line (RCLC's technique — `GetContainerItemTradeTimeRemaining` is RCLC's own method, not a Blizzard global) and sets `expireAt = now + remaining`. The scan is guarded: if the string/line is absent it falls back to the prior "no timer" behavior, so it only ever adds a countdown.
 - **DL-10 (Phase 4, partially mitigated):** the §6.2 `{n, maxMod}` digest + delta can miss records. *Implemented* (`council/Sync.lua`): pull is **directional** — request only when the peer's `maxMod` or `n` exceeds ours (a higher count → full pull, `since=0`); a peer that's *ahead* **hellos back** (WHISPER) so a freshly-logged-in client is reached by those already online. *Remaining gap:* two peers with the **same count and same `maxMod` but disjoint keys** (e.g. each wrote one record in the same second while apart) can't be told apart by this digest. Acceptable for v1 (rare, second-granularity); closing it needs a content-hash digest or a periodic `since=0` resync.
 - **DL-11 (accepted, Phase 3):** Plane-A session authority is bound to the **`sStart` sender**, per `sid` — candidates/council record the ML as whoever opened the session and accept subsequent `cUpdate`/`sEnd`/`award` only from that same sender carrying that `sid`. The WoW master-looter API is **not** the authority source: under DL-7 the group need not be using master loot during a council session, so `GetRaidRosterInfo`-derived ML (RCLC's model) doesn't apply here. The trusted guild model (§2) makes initial trust of the `sStart` sender acceptable for v1; `sid` stays an identifier, not a credential. On the ML's own client the session ML is simply whoever runs `/lcex start` (it broadcasts `sStart`); `PlayerIsML` governs only passive loot-tracking, a separate concern.
 
