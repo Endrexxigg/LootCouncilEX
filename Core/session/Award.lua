@@ -97,16 +97,23 @@ function LCEX:SetupLootEvents()
     self:RestoreSession()    -- offer to resume a session that was open before the /reload (DL-6)
 end
 
--- True only when the player themselves is the master looter (PROJECT.md §3 authority).
+-- Whether we should passively track our own loot into pendingLoot for councilling. Under DL-7
+-- the group need NOT use master loot — in fact the Anniversary/Era client removed master loot
+-- entirely (GetLootMethod is nil), which is the whole reason this addon councils from bags + trade.
+-- So we can't key off the loot method: track whenever grouped (the council source is our own
+-- bags; non-ML members simply never /lcex start, and pendingLoot is local + quality-filtered
+-- downstream). The master-loot fast-path is kept only for any older client that still exposes it.
 function LCEX:PlayerIsML()
-    local method, mlPartyID, mlRaidID = GetLootMethod()
-    if method ~= "master" then
-        return false
+    if GetLootMethod then
+        local method, mlPartyID, mlRaidID = GetLootMethod()
+        if method == "master" then
+            if IsInRaid() then
+                return mlRaidID ~= nil and UnitIsUnit("player", "raid" .. mlRaidID)
+            end
+            return mlPartyID == 0 -- party context: 0 == us
+        end
     end
-    if IsInRaid() then
-        return mlRaidID ~= nil and UnitIsUnit("player", "raid" .. mlRaidID)
-    end
-    return mlPartyID == 0 -- party context: 0 == us
+    return IsInGroup()
 end
 
 -- True if an item of this quality meets the council threshold.

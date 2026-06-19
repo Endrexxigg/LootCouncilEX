@@ -213,6 +213,15 @@ test("Candidate watchdog closes a dropped ML's session", function()
     ok(not L.sessionTimeout, "no watchdog when we are the session ML")
 end)
 
+test("PlayerIsML tracks loot when grouped (Anniversary has no master-loot API)", function()
+    -- GetLootMethod is removed on the Era/Anniversary client (nil here too) — PlayerIsML must
+    -- nil-guard it and fall back to IsInGroup, not crash.
+    H.group = {}
+    ok(not L:PlayerIsML(), "solo / ungrouped -> don't track")
+    H.group = { "Ally", "Mate" }
+    ok(L:PlayerIsML(), "grouped -> track our own loot")
+end)
+
 -- ── pReport caching: group-gated, NOT council-gated (§6.2) ────────────────────
 test("pReport caches gear from a group member (group-gated)", function()
     H.group = { "Carol" }
