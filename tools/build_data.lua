@@ -129,14 +129,16 @@ local function buildTokens()
     local rows = readCSV(ROOT .. "/tools/sources/tokens.csv")
     local order, seen, tokens = {}, {}, {}
     for _, r in ipairs(rows) do
-        -- pieceID is optional: blank → a `true` coverage marker (the class is covered; the exact
-        -- piece item isn't sourced yet). The cross-ref only needs the token name + class set today.
-        local id, class = tonumber(r.tokenID), r.class
-        local piece = (r.pieceID and r.pieceID ~= "") and tonumber(r.pieceID) or true
-        assert(id and r.name and class, "bad token row: " .. (r.tokenID or "?"))
+        -- pieces[CLASS] is a LIST: a class with spec-variant tier sets (paladin/shaman/druid/
+        -- warrior/priest) redeems one token into several possible items, so each (token,class)
+        -- piece is its own CSV row and they accumulate in first-seen order.
+        local id, class, piece = tonumber(r.tokenID), r.class, tonumber(r.pieceID)
+        assert(id and r.name and class and piece, "bad token row: " .. (r.tokenID or "?"))
         if not seen[id] then seen[id] = true; order[#order + 1] = id; tokens[id] = { name = r.name, pieces = {}, pieceOrder = {} } end
-        tokens[id].pieces[class] = piece
-        tokens[id].pieceOrder[#tokens[id].pieceOrder + 1] = class
+        local t = tokens[id]
+        if not t.pieces[class] then t.pieces[class] = {}; t.pieceOrder[#t.pieceOrder + 1] = class end
+        local list = t.pieces[class]
+        list[#list + 1] = piece
     end
     table.sort(order)
 
@@ -157,8 +159,7 @@ local function buildTokens()
         w(string.format("        name = %q,", t.name))
         local parts = {}
         for _, class in ipairs(t.pieceOrder) do
-            local v = t.pieces[class]
-            parts[#parts + 1] = string.format("[%q] = %s", class, v == true and "true" or tostring(v))
+            parts[#parts + 1] = string.format("[%q] = { %s }", class, table.concat(t.pieces[class], ", "))
         end
         w("        pieces = { " .. table.concat(parts, ", ") .. " },")
         w("    },")

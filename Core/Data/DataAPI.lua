@@ -115,6 +115,8 @@ end
 -- ── Tier tokens ──────────────────────────────────────────────────────────────
 function LCEX:GetTierToken(tokenID) return self.TierTokens[tokenID] end
 
+-- The piece itemID(s) a class redeems this token for, as a LIST (a class with spec-variant tier
+-- sets has several), or nil if the token's line doesn't cover that class.
 function LCEX:GetTierPieceForClass(tokenID, class)
     local t = self.TierTokens[tokenID]
     return t and t.pieces and t.pieces[class]

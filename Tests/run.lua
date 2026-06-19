@@ -425,10 +425,12 @@ test("DataAPI: BiS accessors", function()
 end)
 
 test("DataAPI: tier tokens", function()
-    -- Real T5 data: Helm of the Vanquished Defender (30243) → Druid/Priest/Warrior. Piece IDs
-    -- aren't sourced yet, so coverage is a `true` marker (see tools/sources/tokens.csv).
+    -- Real T5 data: Helm of the Vanquished Defender (30243) → Druid/Priest/Warrior. A class with
+    -- spec-variant tier sets redeems into several pieces (warrior: Destroyer Armor + Battlegear).
     eq(L:GetTierToken(30243).name, "Helm of the Vanquished Defender", "token name")
-    eq(L:GetTierPieceForClass(30243, "WARRIOR"), true, "warrior is covered by the Defender helm")
+    eq(table.concat(L:GetTierPieceForClass(30243, "WARRIOR"), ","), "30115,30120",
+        "warrior helm pieces (both Destroyer sets)")
+    eq(#L:GetTierPieceForClass(30244, "MAGE"), 1, "single-set class -> one piece (mage Tirisfal helm)")
     eq(L:GetTierPieceForClass(30243, "MAGE"), nil, "mage is NOT on the Defender line")
     ok(L:FindTokenForItem(30243), "30243 is a token")
     ok(L:FindTokenForItem(30242) and L:FindTokenForItem(30250), "champion + hero tokens too")

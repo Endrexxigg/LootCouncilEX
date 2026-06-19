@@ -1,60 +1,101 @@
 # LootCouncil EX — Tier 5 token source (Serpentshrine Cavern + Tempest Keep).
 # Columns: tokenID,name,class,pieceID
-#   class  = WoW class token (uppercase). Token lines: Champion = Rogue/Shaman/Paladin,
-#            Defender = Druid/Priest/Warrior, Hero = Warlock/Hunter/Mage.
-#   pieceID = the actual armor item the class redeems (OPTIONAL). Left blank for now — the per-
-#            class piece IDs aren't in the AtlasLoot token data and aren't displayed yet; the
-#            converter emits a `true` coverage marker. Fill the column + re-run to upgrade later.
-# Verified vs AtlasLoot data-tbc.lua (token IDs/names) + warcraft.wiki.gg (class groupings).
+#   class   = WoW class token (uppercase). Token lines: Champion = Rogue/Shaman/Paladin,
+#             Defender = Druid/Priest/Warrior, Hero = Warlock/Hunter/Mage.
+#   pieceID = the actual armor item the class redeems for this token. A class with spec-variant
+#             tier sets (paladin/shaman/druid/warrior/priest) redeems into SEVERAL items, so it
+#             gets one row PER piece; the converter accumulates pieces[CLASS] into a list.
+# Verified vs AtlasLoot: token IDs/names from data-tbc.lua; piece IDs from Data/ItemSet.lua
+#   (set order helm,shoulder,chest,hands,legs); class groupings from warcraft.wiki.gg.
 # Regenerate Core/Data/TierTokens.lua with:  lua tools/build_data.lua
 tokenID,name,class,pieceID
 # ── Helm (drops: Lady Vashj) ───────────────────────────────────────────────────
-30242,Helm of the Vanquished Champion,ROGUE,
-30242,Helm of the Vanquished Champion,SHAMAN,
-30242,Helm of the Vanquished Champion,PALADIN,
-30243,Helm of the Vanquished Defender,DRUID,
-30243,Helm of the Vanquished Defender,PRIEST,
-30243,Helm of the Vanquished Defender,WARRIOR,
-30244,Helm of the Vanquished Hero,WARLOCK,
-30244,Helm of the Vanquished Hero,HUNTER,
-30244,Helm of the Vanquished Hero,MAGE,
+30242,Helm of the Vanquished Champion,ROGUE,30146
+30242,Helm of the Vanquished Champion,SHAMAN,30166
+30242,Helm of the Vanquished Champion,SHAMAN,30171
+30242,Helm of the Vanquished Champion,SHAMAN,30190
+30242,Helm of the Vanquished Champion,PALADIN,30136
+30242,Helm of the Vanquished Champion,PALADIN,30125
+30242,Helm of the Vanquished Champion,PALADIN,30131
+30243,Helm of the Vanquished Defender,DRUID,30228
+30243,Helm of the Vanquished Defender,DRUID,30219
+30243,Helm of the Vanquished Defender,DRUID,30233
+30243,Helm of the Vanquished Defender,PRIEST,30152
+30243,Helm of the Vanquished Defender,PRIEST,30161
+30243,Helm of the Vanquished Defender,WARRIOR,30115
+30243,Helm of the Vanquished Defender,WARRIOR,30120
+30244,Helm of the Vanquished Hero,WARLOCK,30212
+30244,Helm of the Vanquished Hero,HUNTER,30141
+30244,Helm of the Vanquished Hero,MAGE,30206
 # ── Pauldrons (drops: Void Reaver) ─────────────────────────────────────────────
-30248,Pauldrons of the Vanquished Champion,ROGUE,
-30248,Pauldrons of the Vanquished Champion,SHAMAN,
-30248,Pauldrons of the Vanquished Champion,PALADIN,
-30249,Pauldrons of the Vanquished Defender,DRUID,
-30249,Pauldrons of the Vanquished Defender,PRIEST,
-30249,Pauldrons of the Vanquished Defender,WARRIOR,
-30250,Pauldrons of the Vanquished Hero,WARLOCK,
-30250,Pauldrons of the Vanquished Hero,HUNTER,
-30250,Pauldrons of the Vanquished Hero,MAGE,
+30248,Pauldrons of the Vanquished Champion,ROGUE,30149
+30248,Pauldrons of the Vanquished Champion,SHAMAN,30168
+30248,Pauldrons of the Vanquished Champion,SHAMAN,30173
+30248,Pauldrons of the Vanquished Champion,SHAMAN,30194
+30248,Pauldrons of the Vanquished Champion,PALADIN,30138
+30248,Pauldrons of the Vanquished Champion,PALADIN,30127
+30248,Pauldrons of the Vanquished Champion,PALADIN,30133
+30249,Pauldrons of the Vanquished Defender,DRUID,30230
+30249,Pauldrons of the Vanquished Defender,DRUID,30221
+30249,Pauldrons of the Vanquished Defender,DRUID,30235
+30249,Pauldrons of the Vanquished Defender,PRIEST,30154
+30249,Pauldrons of the Vanquished Defender,PRIEST,30163
+30249,Pauldrons of the Vanquished Defender,WARRIOR,30117
+30249,Pauldrons of the Vanquished Defender,WARRIOR,30122
+30250,Pauldrons of the Vanquished Hero,WARLOCK,30215
+30250,Pauldrons of the Vanquished Hero,HUNTER,30143
+30250,Pauldrons of the Vanquished Hero,MAGE,30210
 # ── Chestguard (drops: Kael'thas Sunstrider) ───────────────────────────────────
-30236,Chestguard of the Vanquished Champion,ROGUE,
-30236,Chestguard of the Vanquished Champion,SHAMAN,
-30236,Chestguard of the Vanquished Champion,PALADIN,
-30237,Chestguard of the Vanquished Defender,DRUID,
-30237,Chestguard of the Vanquished Defender,PRIEST,
-30237,Chestguard of the Vanquished Defender,WARRIOR,
-30238,Chestguard of the Vanquished Hero,WARLOCK,
-30238,Chestguard of the Vanquished Hero,HUNTER,
-30238,Chestguard of the Vanquished Hero,MAGE,
+30236,Chestguard of the Vanquished Champion,ROGUE,30144
+30236,Chestguard of the Vanquished Champion,SHAMAN,30164
+30236,Chestguard of the Vanquished Champion,SHAMAN,30169
+30236,Chestguard of the Vanquished Champion,SHAMAN,30185
+30236,Chestguard of the Vanquished Champion,PALADIN,30134
+30236,Chestguard of the Vanquished Champion,PALADIN,30123
+30236,Chestguard of the Vanquished Champion,PALADIN,30129
+30237,Chestguard of the Vanquished Defender,DRUID,30222
+30237,Chestguard of the Vanquished Defender,DRUID,30216
+30237,Chestguard of the Vanquished Defender,DRUID,30231
+30237,Chestguard of the Vanquished Defender,PRIEST,30150
+30237,Chestguard of the Vanquished Defender,PRIEST,30159
+30237,Chestguard of the Vanquished Defender,WARRIOR,30113
+30237,Chestguard of the Vanquished Defender,WARRIOR,30118
+30238,Chestguard of the Vanquished Hero,WARLOCK,30214
+30238,Chestguard of the Vanquished Hero,HUNTER,30139
+30238,Chestguard of the Vanquished Hero,MAGE,30196
 # ── Gloves (drops: Leotheras the Blind) ────────────────────────────────────────
-30239,Gloves of the Vanquished Champion,ROGUE,
-30239,Gloves of the Vanquished Champion,SHAMAN,
-30239,Gloves of the Vanquished Champion,PALADIN,
-30240,Gloves of the Vanquished Defender,DRUID,
-30240,Gloves of the Vanquished Defender,PRIEST,
-30240,Gloves of the Vanquished Defender,WARRIOR,
-30241,Gloves of the Vanquished Hero,WARLOCK,
-30241,Gloves of the Vanquished Hero,HUNTER,
-30241,Gloves of the Vanquished Hero,MAGE,
+30239,Gloves of the Vanquished Champion,ROGUE,30145
+30239,Gloves of the Vanquished Champion,SHAMAN,30165
+30239,Gloves of the Vanquished Champion,SHAMAN,30170
+30239,Gloves of the Vanquished Champion,SHAMAN,30189
+30239,Gloves of the Vanquished Champion,PALADIN,30135
+30239,Gloves of the Vanquished Champion,PALADIN,30124
+30239,Gloves of the Vanquished Champion,PALADIN,30130
+30240,Gloves of the Vanquished Defender,DRUID,30223
+30240,Gloves of the Vanquished Defender,DRUID,30217
+30240,Gloves of the Vanquished Defender,DRUID,30232
+30240,Gloves of the Vanquished Defender,PRIEST,30151
+30240,Gloves of the Vanquished Defender,PRIEST,30160
+30240,Gloves of the Vanquished Defender,WARRIOR,30114
+30240,Gloves of the Vanquished Defender,WARRIOR,30119
+30241,Gloves of the Vanquished Hero,WARLOCK,30211
+30241,Gloves of the Vanquished Hero,HUNTER,30140
+30241,Gloves of the Vanquished Hero,MAGE,30205
 # ── Leggings (drops: Fathom-Lord Karathress) ───────────────────────────────────
-30245,Leggings of the Vanquished Champion,ROGUE,
-30245,Leggings of the Vanquished Champion,SHAMAN,
-30245,Leggings of the Vanquished Champion,PALADIN,
-30246,Leggings of the Vanquished Defender,DRUID,
-30246,Leggings of the Vanquished Defender,PRIEST,
-30246,Leggings of the Vanquished Defender,WARRIOR,
-30247,Leggings of the Vanquished Hero,WARLOCK,
-30247,Leggings of the Vanquished Hero,HUNTER,
-30247,Leggings of the Vanquished Hero,MAGE,
+30245,Leggings of the Vanquished Champion,ROGUE,30148
+30245,Leggings of the Vanquished Champion,SHAMAN,30167
+30245,Leggings of the Vanquished Champion,SHAMAN,30172
+30245,Leggings of the Vanquished Champion,SHAMAN,30192
+30245,Leggings of the Vanquished Champion,PALADIN,30137
+30245,Leggings of the Vanquished Champion,PALADIN,30126
+30245,Leggings of the Vanquished Champion,PALADIN,30132
+30246,Leggings of the Vanquished Defender,DRUID,30229
+30246,Leggings of the Vanquished Defender,DRUID,30220
+30246,Leggings of the Vanquished Defender,DRUID,30234
+30246,Leggings of the Vanquished Defender,PRIEST,30153
+30246,Leggings of the Vanquished Defender,PRIEST,30162
+30246,Leggings of the Vanquished Defender,WARRIOR,30116
+30246,Leggings of the Vanquished Defender,WARRIOR,30121
+30247,Leggings of the Vanquished Hero,WARLOCK,30213
+30247,Leggings of the Vanquished Hero,HUNTER,30142
+30247,Leggings of the Vanquished Hero,MAGE,30207

@@ -9,62 +9,62 @@ local LCEX = LootCouncilEX
 LCEX.TierTokens = {
     [30236] = {
         name = "Chestguard of the Vanquished Champion",
-        pieces = { ["ROGUE"] = true, ["SHAMAN"] = true, ["PALADIN"] = true },
+        pieces = { ["ROGUE"] = { 30144 }, ["SHAMAN"] = { 30164, 30169, 30185 }, ["PALADIN"] = { 30134, 30123, 30129 } },
     },
     [30237] = {
         name = "Chestguard of the Vanquished Defender",
-        pieces = { ["DRUID"] = true, ["PRIEST"] = true, ["WARRIOR"] = true },
+        pieces = { ["DRUID"] = { 30222, 30216, 30231 }, ["PRIEST"] = { 30150, 30159 }, ["WARRIOR"] = { 30113, 30118 } },
     },
     [30238] = {
         name = "Chestguard of the Vanquished Hero",
-        pieces = { ["WARLOCK"] = true, ["HUNTER"] = true, ["MAGE"] = true },
+        pieces = { ["WARLOCK"] = { 30214 }, ["HUNTER"] = { 30139 }, ["MAGE"] = { 30196 } },
     },
     [30239] = {
         name = "Gloves of the Vanquished Champion",
-        pieces = { ["ROGUE"] = true, ["SHAMAN"] = true, ["PALADIN"] = true },
+        pieces = { ["ROGUE"] = { 30145 }, ["SHAMAN"] = { 30165, 30170, 30189 }, ["PALADIN"] = { 30135, 30124, 30130 } },
     },
     [30240] = {
         name = "Gloves of the Vanquished Defender",
-        pieces = { ["DRUID"] = true, ["PRIEST"] = true, ["WARRIOR"] = true },
+        pieces = { ["DRUID"] = { 30223, 30217, 30232 }, ["PRIEST"] = { 30151, 30160 }, ["WARRIOR"] = { 30114, 30119 } },
     },
     [30241] = {
         name = "Gloves of the Vanquished Hero",
-        pieces = { ["WARLOCK"] = true, ["HUNTER"] = true, ["MAGE"] = true },
+        pieces = { ["WARLOCK"] = { 30211 }, ["HUNTER"] = { 30140 }, ["MAGE"] = { 30205 } },
     },
     [30242] = {
         name = "Helm of the Vanquished Champion",
-        pieces = { ["ROGUE"] = true, ["SHAMAN"] = true, ["PALADIN"] = true },
+        pieces = { ["ROGUE"] = { 30146 }, ["SHAMAN"] = { 30166, 30171, 30190 }, ["PALADIN"] = { 30136, 30125, 30131 } },
     },
     [30243] = {
         name = "Helm of the Vanquished Defender",
-        pieces = { ["DRUID"] = true, ["PRIEST"] = true, ["WARRIOR"] = true },
+        pieces = { ["DRUID"] = { 30228, 30219, 30233 }, ["PRIEST"] = { 30152, 30161 }, ["WARRIOR"] = { 30115, 30120 } },
     },
     [30244] = {
         name = "Helm of the Vanquished Hero",
-        pieces = { ["WARLOCK"] = true, ["HUNTER"] = true, ["MAGE"] = true },
+        pieces = { ["WARLOCK"] = { 30212 }, ["HUNTER"] = { 30141 }, ["MAGE"] = { 30206 } },
     },
     [30245] = {
         name = "Leggings of the Vanquished Champion",
-        pieces = { ["ROGUE"] = true, ["SHAMAN"] = true, ["PALADIN"] = true },
+        pieces = { ["ROGUE"] = { 30148 }, ["SHAMAN"] = { 30167, 30172, 30192 }, ["PALADIN"] = { 30137, 30126, 30132 } },
     },
     [30246] = {
         name = "Leggings of the Vanquished Defender",
-        pieces = { ["DRUID"] = true, ["PRIEST"] = true, ["WARRIOR"] = true },
+        pieces = { ["DRUID"] = { 30229, 30220, 30234 }, ["PRIEST"] = { 30153, 30162 }, ["WARRIOR"] = { 30116, 30121 } },
     },
     [30247] = {
         name = "Leggings of the Vanquished Hero",
-        pieces = { ["WARLOCK"] = true, ["HUNTER"] = true, ["MAGE"] = true },
+        pieces = { ["WARLOCK"] = { 30213 }, ["HUNTER"] = { 30142 }, ["MAGE"] = { 30207 } },
     },
     [30248] = {
         name = "Pauldrons of the Vanquished Champion",
-        pieces = { ["ROGUE"] = true, ["SHAMAN"] = true, ["PALADIN"] = true },
+        pieces = { ["ROGUE"] = { 30149 }, ["SHAMAN"] = { 30168, 30173, 30194 }, ["PALADIN"] = { 30138, 30127, 30133 } },
     },
     [30249] = {
         name = "Pauldrons of the Vanquished Defender",
-        pieces = { ["DRUID"] = true, ["PRIEST"] = true, ["WARRIOR"] = true },
+        pieces = { ["DRUID"] = { 30230, 30221, 30235 }, ["PRIEST"] = { 30154, 30163 }, ["WARRIOR"] = { 30117, 30122 } },
     },
     [30250] = {
         name = "Pauldrons of the Vanquished Hero",
-        pieces = { ["WARLOCK"] = true, ["HUNTER"] = true, ["MAGE"] = true },
+        pieces = { ["WARLOCK"] = { 30215 }, ["HUNTER"] = { 30143 }, ["MAGE"] = { 30210 } },
     },
 }

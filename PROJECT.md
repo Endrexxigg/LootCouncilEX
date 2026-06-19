@@ -180,7 +180,7 @@ STATUS = { ANNOUNCED=90, TIMEOUT=91, NOADDON=92 }
 ```lua
 Loot       = { ["P2"]={ raids={ ["Serpentshrine Cavern"]={ ["Hydross the Unstable"]={itemID,...}, ... }, ["Tempest Keep"]={...} } } }
 BiS        = { ["MAGE"]={ ["Fire"]={ ["P2"]={ ["head"]={itemID}, ["neck"]={itemID,altID}, ... } } } }
-TierTokens = { [30243]={ name="Helm of the Fallen Hero", pieces={ ["WARRIOR"]=itemID, ["HUNTER"]=itemID, ["SHAMAN"]=itemID } } }
+TierTokens = { [30243]={ name="Helm of the Vanquished Defender", pieces={ ["WARRIOR"]={itemID,...}, ["PRIEST"]={...}, ["DRUID"]={...} } } }  -- pieces[CLASS] is a LIST (spec-variant sets → several pieces)
 ```
 
 ### 6.7 Key TBC APIs (verify signatures)
