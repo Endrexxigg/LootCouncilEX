@@ -34,15 +34,17 @@ jobs:
           # GitHub release (still exits success) — it must be GITHUB_OAUTH.
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
-      # The packager unconditionally attaches a `release.json` (BigWigs/WoWUp manifest) to the
-      # GitHub release. WowUp-CF's "Install from URL" reacts to that manifest by downloading the
-      # asset via the GitHub *API* endpoint (api.github.com/.../releases/assets/<id>) WITHOUT the
-      # `Accept: application/octet-stream` header — so GitHub hands back the asset's JSON metadata
-      # instead of the binary. WowUp saves that JSON as the .zip and extraction dies with
-      # "end of central directory record signature not found". Deleting release.json makes WowUp
-      # fall back to the plain browser_download_url path, which always returns the real zip.
-      # (We don't publish to CurseForge/Wago, so the manifest serves no other purpose here.)
-      - name: Strip release.json so WowUp can install from URL
+      # Defensive cleanup: drop the BigWigs/WoWUp `release.json` manifest the packager attaches.
+      # We don't publish to CurseForge/Wago, so it serves no purpose here, and leaving only the
+      # zip keeps WowUp on its simplest install path (it never enters the release-metadata branch).
+      # NOTE: release.json is NOT what broke "Install from URL". The real cause was a GitHub
+      # Personal Access Token configured in WowUp: with a token, WowUp-CF v2.22.0 downloads the
+      # asset from api.github.com/.../releases/assets/<id> but omits `Accept: application/octet-
+      # stream` on the file download, so GitHub returns the asset's JSON metadata, WowUp saves it
+      # as the .zip, and unzip dies with "end of central directory record signature not found".
+      # With no token it uses browser_download_url, which always returns the binary. So the user
+      # fix is "no GitHub token in WowUp"; this step is just hygiene.
+      - name: Strip release.json (hygiene; not the install fix)
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
