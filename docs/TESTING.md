@@ -19,6 +19,14 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.12.0 — BiS auto-resolves spec
+- [ ] Open a **grouped** player who has the addon (e.g. a Fury warrior) → **BiS** tab. The **Spec**
+  now auto-selects *their* spec (Fury), not just defaulting to the first. Cycling Class away and
+  back re-resolves sensibly.
+- [ ] Open a council member who's **online but not grouped** with you → their class **and** spec
+  still resolve (from their last self-report cached in `gearCache`). `/lcex report` on them first
+  if their cache is empty.
+
 ### v0.11.0 — Owed-trade persistence (DL-6)
 - [ ] Award an item to someone (`/lcex test 1` → `/lcex award 1 <name>`), then **`/reload`**. Open
   a trade with that player → the awarded item **still auto-fills** (the owed list survived the

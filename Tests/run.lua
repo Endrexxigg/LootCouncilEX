@@ -250,6 +250,32 @@ test("BiS: own class without data resolves; class cycler walks all classes", fun
     ok(L:IsKnownClass("DRUID") and not L:IsKnownClass("NOPE"), "IsKnownClass validates tokens")
 end)
 
+-- ── Spec capture → BiS auto-resolve (A4) ─────────────────────────────────────
+test("SnapshotSpec maps the top talent tab to a spec name", function()
+    H.class = "MAGE"
+    H.talentPoints = { 41, 0, 0 }; local c, s = L:SnapshotSpec()
+    eq(c, "MAGE", "class from UnitClass"); eq(s, "Arcane", "tab 1 -> Arcane")
+    H.talentPoints = { 0, 41, 0 };  eq(select(2, L:SnapshotSpec()), "Fire",  "tab 2 -> Fire")
+    H.talentPoints = { 0, 8, 41 };  eq(select(2, L:SnapshotSpec()), "Frost", "tab 3 -> Frost")
+    H.class = "WARRIOR"
+    H.talentPoints = { 0, 0, 41 };  eq(select(2, L:SnapshotSpec()), "Protection", "warrior tab 3 -> Protection")
+    H.talentPoints = { 0, 0, 0 };   eq(select(2, L:SnapshotSpec()), nil, "untalented -> nil spec")
+end)
+
+test("ResolveBiSContext honors a cached (out-of-group) class + spec", function()
+    -- Amy isn't grouped (ClassOf returns nil), but a prior pReport cached her class+spec.
+    L.db.global.gearCache.amy = { items = {}, class = "WARRIOR", spec = "Fury", mod = 1 }
+    L.bisClass, L.bisSpec = nil, nil
+    L:BuildBiSDisplay("Amy")
+    eq(L.bisClass, "WARRIOR", "class resolved from the cached report")
+    eq(L.bisSpec, "Fury", "spec resolved from the cached report")
+    -- Cycling class away makes the cached Mage-less spec invalid → falls back, not stuck on Fury.
+    L.bisClass, L.bisSpec = "MAGE", nil
+    L:BuildBiSDisplay("Amy")
+    eq(L.bisClass, "MAGE", "manual class pick kept")
+    ok(L.bisSpec ~= "Fury", "cached spec ignored when it doesn't fit the picked class")
+end)
+
 -- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
 test("LootBrowser BuildBrowserDisplay", function()
     local d = L:BuildBrowserDisplay("P2")

@@ -53,6 +53,8 @@ read_globals = {
     "Item", "C_Item", "GetItemInfoInstant",
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",
     "GetNumSkillLines", "GetSkillLineInfo",
+    -- Talents (self-reported spec)
+    "GetNumTalentTabs", "GetTalentTabInfo",
     -- Misc WoW
     "GetTime", "GetServerTime", "GetRealmName",
     -- Lua 5.1 + WoW string/table extras

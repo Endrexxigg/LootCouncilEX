@@ -86,22 +86,38 @@ function LCEX:ClassOf(name)
     return nil
 end
 
--- Resolve the current BiS class/spec/phase. Class defaults to the player's LIVE class on first
--- view (when unset/invalid) — ANY TBC class, even one without BiS data yet, so own-character /
--- grouped views show the right class rather than falling back to whichever class happens to have
--- stub data. Spec defaults to the first spec that actually has data (so items show immediately),
--- else the class's first talent tree; phase to the first. Manual cycling sticks until a different
--- player is opened (OpenPlayerDetail resets).
+-- Self-reported class/spec for a player, from their gearCache record (SelfReport.lua), or nil.
+-- Lets the BiS tab resolve class+spec for a cached player who isn't currently grouped.
+function LCEX:CachedClass(name)
+    local key = self:NormalizeName(name)
+    local rec = key and self.db.global.gearCache[key]
+    return rec and rec.class
+end
+
+function LCEX:CachedSpec(name)
+    local key = self:NormalizeName(name)
+    local rec = key and self.db.global.gearCache[key]
+    return rec and rec.spec
+end
+
+-- Resolve the current BiS class/spec/phase. Class defaults to the player's class on first view
+-- (when unset/invalid) — their LIVE class if grouped, else their last self-reported class, else
+-- the first class. Spec defaults to their reported spec when it fits the resolved class, else the
+-- first spec with data (so items show immediately), else the class's first talent tree; phase to
+-- the first. Manual cycling sticks until a different player is opened (OpenPlayerDetail resets).
 function LCEX:ResolveBiSContext(player)
     if not self.bisClass or not self:IsKnownClass(self.bisClass) then
-        local live = self:ClassOf(player)
+        local live = self:ClassOf(player) or self:CachedClass(player)
         self.bisClass = (live and self:IsKnownClass(live) and live) or self.CLASSES[1]
     end
     local specs = self:SpecsForClass(self.bisClass)
     local valid = false
     for _, s in ipairs(specs) do if s == self.bisSpec then valid = true; break end end
     if not valid then
-        self.bisSpec = self:GetBiSSpecs(self.bisClass)[1] or specs[1]
+        local cached = self:CachedSpec(player)
+        local cachedFits = false
+        if cached then for _, s in ipairs(specs) do if s == cached then cachedFits = true; break end end end
+        self.bisSpec = (cachedFits and cached) or self:GetBiSSpecs(self.bisClass)[1] or specs[1]
     end
     if not self.bisPhase then self.bisPhase = self.PHASES[1] end
 end

@@ -41,6 +41,25 @@ function LCEX:SnapshotGear()
     return gear
 end
 
+-- Active class + spec, self-reported (talents aren't reliably inspectable for others — same
+-- model as gear/profs). Reads the talent tabs and takes the one with the most points; the spec
+-- NAME comes from CLASS_SPECS (which is in talent-tab order, so the winning tab index maps
+-- straight across). Returns (classToken, specName|nil) — nil spec for an untalented character or
+-- a client without the talent API.
+function LCEX:SnapshotSpec()
+    local class = select(2, UnitClass("player"))
+    if not GetTalentTabInfo then return class, nil end
+    local tabs = (GetNumTalentTabs and GetNumTalentTabs()) or 3
+    local bestTab, bestPts
+    for tab = 1, tabs do
+        local pts = select(3, GetTalentTabInfo(tab)) or 0
+        if not bestPts or pts > bestPts then bestPts, bestTab = pts, tab end
+    end
+    local spec
+    if bestPts and bestPts > 0 then spec = self:SpecsForClass(class)[bestTab] end
+    return class, spec
+end
+
 -- Professions → rank. Scans the skill lines (§6.7); a profession under a COLLAPSED skill
 -- header won't enumerate — acceptable for v1 (re-sent on equip change / login), refine later.
 function LCEX:SnapshotProfs()
@@ -64,9 +83,12 @@ function LCEX:SendSelfReport()
         self:Debug("pReport NOT sent: syncChannel is GUILD but you're not in a guild")
         return false
     end
+    local class, spec = self:SnapshotSpec()
     self:Send("pReport", nil, {
         gear  = self.lastGearSnapshot or self:SnapshotGear(),
         profs = self:SnapshotProfs(),
+        class = class,
+        spec  = spec,
         mod   = time(),
     }, channel)
     self:Debug("sent pReport via %s", channel)
@@ -102,7 +124,10 @@ LCEX.dispatch.pReport = function(self, msg, sender)
     if not key then return end
     local mod = tonumber(msg.mod) or time()
     if type(msg.gear) == "table" then
-        self:MergeRecord("gearCache", key, { items = msg.gear, mod = mod, by = sender })
+        -- class/spec ride in the gearCache record (§6.3) so the BiS tab can auto-resolve a
+        -- cached (even out-of-group) player's class + spec.
+        self:MergeRecord("gearCache", key,
+            { items = msg.gear, class = msg.class, spec = msg.spec, mod = mod, by = sender })
     end
     if type(msg.profs) == "table" then
         self:MergeRecord("profCache", key, { profs = msg.profs, mod = mod, by = sender })

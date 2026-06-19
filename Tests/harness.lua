@@ -38,6 +38,12 @@ _G.UnitName = function(unit)
 end
 _G.UnitIsUnit = function(a, b) return a == b end
 _G.UnitClass = function() return "Mage", H.class or "MAGE" end -- localizedName, classToken
+-- Talent tabs (SnapshotSpec). H.talentPoints = {tab1, tab2, tab3} points-spent; the winning tab
+-- maps to the spec via CLASS_SPECS order. Default: Fire mage (tab 2 highest).
+_G.GetNumTalentTabs = function() return 3 end
+_G.GetTalentTabInfo = function(tab)
+    return "Tab" .. tostring(tab), nil, (H.talentPoints and H.talentPoints[tab]) or 0
+end
 _G.UnitAffectingCombat = function() return false end
 _G.IsInGuild = function() return H.inGuild end
 _G.GuildRoster = function() end
@@ -174,6 +180,7 @@ function H.reset()
     H.playerName, H.tradePartner = "Tester", nil
     H.itemCached, H.itemEmpty = true, false
     H.class = "MAGE"
+    H.talentPoints = { 0, 41, 20 } -- Fire mage by default (tab 2 wins)
     LCEX._councilSet = nil
     LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil
     LCEX.pendingTrades = {}
