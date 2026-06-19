@@ -150,6 +150,27 @@ test("Owed-trade save/restore round-trips and prunes expired", function()
     ok(not L.db.global.pendingTrades["tester"], "and the persisted copy (owner pruned to nil)")
 end)
 
+-- ── Real trade-timer (DL-9 / A2) ─────────────────────────────────────────────
+test("ParseTradeDuration + TradeExpiry + missing-API fallback", function()
+    eq(L:ParseTradeDuration("1 hr 59 min"), 3600 + 59 * 60, "hours + minutes")
+    eq(L:ParseTradeDuration("45 min"), 45 * 60, "minutes only")
+    eq(L:ParseTradeDuration("30 sec"), 30, "seconds only")
+    eq(L:ParseTradeDuration("2 hours"), 2 * 3600, "long unit word")
+    eq(L:ParseTradeDuration("soulbound"), nil, "no number -> nil")
+
+    eq(L:TradeExpiry(1000, nil, 9999), 1000 + 7200, "lootedAt anchor wins")
+    eq(L:TradeExpiry(nil, 600, 1000), 1600, "measured remaining -> now + remaining")
+    eq(L:TradeExpiry(nil, 0, 1000), nil, "zero remaining -> no timer")
+    eq(L:TradeExpiry(nil, math.huge, 1000), nil, "unbound (huge) -> no timer")
+    eq(L:TradeExpiry(nil, nil, 1000), nil, "nothing -> no timer")
+
+    eq(L:FormatDuration(3900), "1h 5m", "h+m render")
+    eq(L:FormatDuration(720), "12m", "minutes render")
+
+    -- BIND_TRADE_TIME_REMAINING absent in the headless env → the scan declines gracefully.
+    eq(L:ItemTradeTimeRemaining(0, 1), nil, "no API/string -> nil (fallback)")
+end)
+
 -- ── pReport caching: group-gated, NOT council-gated (§6.2) ────────────────────
 test("pReport caches gear from a group member (group-gated)", function()
     H.group = { "Carol" }

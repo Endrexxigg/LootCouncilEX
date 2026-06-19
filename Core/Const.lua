@@ -60,6 +60,8 @@ L["Councilable items in your bags:"]        = "Councilable items in your bags:"
 L["  %d. %s (q%d)"]                         = "  %d. %s (q%d)"
 L["  %d. %s (q%d) — looted before reload, no trade timer"] =
     "  %d. %s (q%d) — looted before reload, no trade timer"
+L["  %d. %s (q%d) — ~%s left to trade"] =
+    "  %d. %s (q%d) — ~%s left to trade"
 L["Nothing councilable in your bags."]      = "Nothing councilable in your bags."
 L["A session is already active. /lcex end first."] =
     "A session is already active. /lcex end first."

@@ -34,6 +34,30 @@ local SELF_LOOT_PREFIX = (LOOT_ITEM_SELF and LOOT_ITEM_SELF:match("^(.-)%%s")) o
 local TRADE_WINDOW = 7200 -- BoP trade window, seconds (2 hours)
 local WARN_AT = 900       -- warn when <= 15 min left
 
+-- Hidden tooltip used to scan an item's real "tradeable for the next …" line (DL-9). Lazily
+-- created. The pattern is built once from the localized BIND_TRADE_TIME_REMAINING global (the
+-- RCLC technique): escape its magic chars, then turn its %s placeholder into a capture group.
+local scanTip
+local function ScanTooltip()
+    if not scanTip then
+        scanTip = CreateFrame("GameTooltip", "LCEX_ScanTooltip", UIParent, "GameTooltipTemplate")
+    end
+    return scanTip
+end
+
+local tradePattern
+local function TradeTimePattern()
+    if tradePattern == nil then
+        local s = BIND_TRADE_TIME_REMAINING
+        if not s then
+            tradePattern = false -- string absent (e.g. headless / unexpected client) → no scan
+        else
+            tradePattern = s:gsub("([%^%$%(%)%%%.%[%]%*%+%-%?])", "%%%1"):gsub("%%%%s", "(.+)")
+        end
+    end
+    return tradePattern or nil
+end
+
 -- "Trade complete" signal. UI_INFO_MESSAGE fires (errorType, message); newer clients pass
 -- the LE_GAME_ERR_* enum as the first arg, older ones the localized string — match either.
 local ERR_TRADE_COMPLETE = _G.ERR_TRADE_COMPLETE
@@ -238,8 +262,16 @@ function LCEX:CmdScan()
         if it.lootedAt then
             self:Msg(string.format(self.L["  %d. %s (q%d)"], i, it.link, it.quality))
         else
-            self:Msg(string.format(self.L["  %d. %s (q%d) — looted before reload, no trade timer"],
-                i, it.link, it.quality))
+            -- No looted-at anchor (in bags before we logged it): read the real window off the
+            -- tooltip (DL-9) so a pre-login item shows an actual countdown, not "no timer".
+            local rem = it.bag and self:ItemTradeTimeRemaining(it.bag, it.slot)
+            if rem and rem > 0 then
+                self:Msg(string.format(self.L["  %d. %s (q%d) — ~%s left to trade"],
+                    i, it.link, it.quality, self:FormatDuration(rem)))
+            else
+                self:Msg(string.format(self.L["  %d. %s (q%d) — looted before reload, no trade timer"],
+                    i, it.link, it.quality))
+            end
         end
     end
 end
@@ -301,7 +333,9 @@ function LCEX:AwardItem(itemIndex, name)
         boss     = entry.boss,
         instance = entry.instance,
         lootedAt = entry.lootedAt,
-        expireAt = entry.lootedAt and (entry.lootedAt + TRADE_WINDOW) or nil,
+        -- looted-at anchor when we have it; else the real remaining window off the tooltip (DL-9).
+        expireAt = entry.lootedAt and (entry.lootedAt + TRADE_WINDOW)
+                   or self:MeasuredExpiryForLink(entry.link),
         warned   = false,
     }
     self:EnsureTradeTicker()
@@ -493,6 +527,71 @@ function LCEX:ForgetAward(uid)
     end
 end
 
+-- ── Real trade-timer (tooltip scan; DL-9) ────────────────────────────────────
+-- Parse a localized trade-time string ("1 hr 59 min", "45 min", "30 sec") to seconds. enUS-
+-- leaning: sums every <number><unit> pair by the unit's first letter (h/m/s). Pure/testable.
+function LCEX:ParseTradeDuration(text)
+    if not text then return nil end
+    local total, found = 0, false
+    for num, unit in text:gmatch("(%d+)%s*(%a+)") do
+        local u = unit:sub(1, 1):lower()
+        if u == "h" then total, found = total + tonumber(num) * 3600, true
+        elseif u == "m" then total, found = total + tonumber(num) * 60, true
+        elseif u == "s" then total, found = total + tonumber(num), true end
+    end
+    return found and total or nil
+end
+
+-- Compact "1h 5m" / "12m" rendering of a seconds duration (for the scan list). Pure/testable.
+function LCEX:FormatDuration(sec)
+    sec = math.max(0, math.floor(sec or 0))
+    local h, m = math.floor(sec / 3600), math.floor((sec % 3600) / 60)
+    if h > 0 then return string.format("%dh %dm", h, m) end
+    return string.format("%dm", m)
+end
+
+-- Seconds left in a bag item's BoP trade window by scanning its tooltip for the
+-- BIND_TRADE_TIME_REMAINING line. Returns a number, or nil when the API/string is unavailable,
+-- the item shows no such line (already untradeable / never BoP), or the scan fails — callers
+-- treat nil as "no timer" (the prior behavior), so this only ever ADDS a countdown.
+function LCEX:ItemTradeTimeRemaining(bag, slot)
+    local pattern = TradeTimePattern()
+    if not pattern then return nil end
+    local tip = ScanTooltip()
+    tip:SetOwner(UIParent, "ANCHOR_NONE")
+    tip:SetBagItem(bag, slot)
+    local n = tip:NumLines()
+    if type(n) ~= "number" or n == 0 then tip:Hide(); return nil end
+    for i = 1, n do
+        local fs = _G[tip:GetName() .. "TextLeft" .. i]
+        local text = fs and fs.GetText and fs:GetText()
+        local cap = text and text:match(pattern)
+        if cap then
+            tip:Hide()
+            return self:ParseTradeDuration(cap)
+        end
+    end
+    tip:Hide()
+    return nil
+end
+
+-- Resolve an owed item's absolute expiry: the looted-at anchor (lootedAt + 2h) when we have it,
+-- else a measured remaining window (now + remaining), else nil (no timer). Pure/testable.
+function LCEX:TradeExpiry(lootedAt, remaining, now)
+    if lootedAt then return lootedAt + TRADE_WINDOW end
+    if remaining and remaining > 0 and remaining ~= math.huge then return (now or time()) + remaining end
+    return nil
+end
+
+-- Best expiry for an owed link not anchored by lootedAt: locate it in bags and scan its tooltip.
+-- Container-API-guarded so it's a no-op (nil) on a client/headless run without the bag API.
+function LCEX:MeasuredExpiryForLink(link)
+    if not GetContainerNumSlots then return nil end
+    local bag, slot = self:FindItemInBags(link)
+    if not bag then return nil end
+    return self:TradeExpiry(nil, self:ItemTradeTimeRemaining(bag, slot), time())
+end
+
 -- ── Owed-trade persistence (survive /reload; DL-6 part 1) ─────────────────────
 -- self.pendingTrades is the live working copy; it also mirrors into the account-wide DB under
 -- the OWNER character's key so a /reload or crash never loses the "who do I still owe" ledger.
@@ -535,6 +634,9 @@ function LCEX:RestoreOwedTrades()
         local keep = {}
         for _, rec in ipairs(list) do
             if not (rec.expireAt and rec.expireAt <= now) then
+                -- A debt with no anchor (awarded from a pre-login bag item) can get a real
+                -- countdown now that the item is in bags again (DL-9).
+                if not rec.expireAt then rec.expireAt = self:MeasuredExpiryForLink(rec.link) end
                 keep[#keep + 1] = rec
             end
         end

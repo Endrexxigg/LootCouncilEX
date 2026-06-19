@@ -19,6 +19,13 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.14.0 — Real trade-timer (DL-9) — **verify the tooltip parse on Anniversary**
+- [ ] Loot a BoP item, `/reload`, then `/lcex scan` → the item now shows **"~Nm left to trade"**
+  (a real countdown), not "looted before reload, no trade timer". If it still says no timer, the
+  `BIND_TRADE_TIME_REMAINING` tooltip line didn't parse — tell me the exact tooltip wording.
+- [ ] Award that pre-reload item → its owed record carries a real expiry (the "N minutes left"
+  warning fires on the true window, and an expired one is pruned).
+
 ### v0.13.0 — Stale-cache indicator
 - [ ] Open a peer's **Gear** (and **Professions**) tab → a grey **"cached Nh ago"** line shows at
   the bottom of the panel. Open **your own** → it reads **"(your live snapshot)"**. The line is

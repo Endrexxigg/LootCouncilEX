@@ -48,7 +48,7 @@ read_globals = {
     "C_Container",
     "GetContainerNumSlots", "GetContainerItemLink", "GetContainerItemInfo",
     "PickupContainerItem", "ClickTradeButton", "GetTradePlayerItemLink",
-    "CursorHasItem", "ClearCursor",
+    "CursorHasItem", "ClearCursor", "BIND_TRADE_TIME_REMAINING",
     -- Items / gear / professions
     "Item", "C_Item", "GetItemInfoInstant",
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",
