@@ -42,21 +42,25 @@ function LCEX:SnapshotGear()
 end
 
 -- Active class + spec, self-reported (talents aren't reliably inspectable for others — same
--- model as gear/profs). Reads the talent tabs and takes the one with the most points; the spec
--- NAME comes from CLASS_SPECS (which is in talent-tab order, so the winning tab index maps
--- straight across). Returns (classToken, specName|nil) — nil spec for an untalented character or
+-- model as gear/profs). Reads the talent tabs and takes the one with the most points, using its
+-- NAME as the spec. Returns (classToken, specName|nil) — nil spec for an untalented character or
 -- a client without the talent API.
+--
+-- TBC/Anniversary GetTalentTabInfo(tab) signature is (id, name, description, icon, pointsSpent,
+-- fileName) — points is the 5th return (NOT the 3rd; that's the description, which is ""), and the
+-- 2nd return is the localized tab name = the spec. Verified against BigWigs/Cell/Details/
+-- NovaInstanceTracker. `tonumber` guards the comparison against a non-number return.
 function LCEX:SnapshotSpec()
     local class = select(2, UnitClass("player"))
     if not GetTalentTabInfo then return class, nil end
     local tabs = (GetNumTalentTabs and GetNumTalentTabs()) or 3
-    local bestTab, bestPts
+    local bestName, bestPts = nil, -1
     for tab = 1, tabs do
-        local pts = select(3, GetTalentTabInfo(tab)) or 0
-        if not bestPts or pts > bestPts then bestPts, bestTab = pts, tab end
+        local _, name, _, _, pointsSpent = GetTalentTabInfo(tab)
+        local pts = tonumber(pointsSpent) or 0
+        if pts > bestPts then bestPts, bestName = pts, name end
     end
-    local spec
-    if bestPts and bestPts > 0 then spec = self:SpecsForClass(class)[bestTab] end
+    local spec = (bestPts > 0) and bestName or nil
     return class, spec
 end
 
