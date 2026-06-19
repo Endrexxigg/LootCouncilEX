@@ -16,6 +16,7 @@ exclude_files = {
     "Libs/",
     "References/",
     "Tests/", -- headless test harness: mocks WoW + sets globals, lints under its own rules
+    "tools/", -- dev-time data converter: standalone Lua (io/os/arg), not shipped
 }
 
 -- Addon globals we define and read across files.

@@ -13,6 +13,7 @@ enable-nolib-creation: no
 ignore:
   - .github
   - Tests
+  - tools
   - docs
   - PROJECT.md
   - CLAUDE.md

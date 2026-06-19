@@ -316,13 +316,14 @@ end)
 -- ── LootBrowser display array (Phase 6) ──────────────────────────────────────
 test("LootBrowser BuildBrowserDisplay", function()
     local d = L:BuildBrowserDisplay("P2")
-    eq(#d, 17, "raid + boss + item entries for P2")
+    -- 2 raid headers + 10 boss headers + 128 items (real SSC + TK P2 dataset).
+    eq(#d, 140, "raid + boss + item entries for P2")
     eq(d[1].kind, "raid", "first entry is a raid header")
     eq(d[1].text, "Serpentshrine Cavern", "raids alpha -> SSC first")
     eq(d[2].kind, "boss", "then a boss header")
     eq(d[2].text, "Hydross the Unstable", "kill order -> Hydross first")
     eq(d[3].kind, "item", "then items")
-    eq(d[3].itemID, 28830, "first SSC/Hydross item")
+    eq(d[3].itemID, 30056, "first SSC/Hydross item (Robe of Hateful Echoes)")
     eq(#L:BuildBrowserDisplay("P9"), 0, "empty phase -> empty array")
 end)
 
@@ -363,8 +364,9 @@ test("DataAPI: loot accessors", function()
     eq(table.concat(L:GetRaidsForPhase("P2"), "|"), "Serpentshrine Cavern|Tempest Keep",
         "raids alphabetical")
     eq(table.concat(L:GetBossesForRaid("P2", "Serpentshrine Cavern"), "|"),
-        "Hydross the Unstable|Leotheras the Blind|Lady Vashj", "bosses in kill order (_order)")
-    eq(#L:GetItemsForBoss("P2", "Tempest Keep", "Al'ar"), 1, "Al'ar drops 1")
+        "Hydross the Unstable|The Lurker Below|Leotheras the Blind|Fathom-Lord Karathress|Morogrim Tidewalker|Lady Vashj",
+        "bosses in kill order (_order)")
+    ok(#L:GetItemsForBoss("P2", "Tempest Keep", "Al'ar") > 1, "Al'ar drops several items")
     eq(#L:GetItemsForBoss("P2", "Tempest Keep", "Nobody"), 0, "missing boss -> empty")
     eq(#L:GetRaidsForPhase("P9"), 0, "missing phase -> empty")
 end)
@@ -381,11 +383,14 @@ test("DataAPI: BiS accessors", function()
 end)
 
 test("DataAPI: tier tokens", function()
-    eq(L:GetTierToken(29753).name, "Helm of the Fallen Champion", "token name")
-    eq(L:GetTierPieceForClass(29753, "WARRIOR"), 29021, "warrior piece")
-    eq(L:GetTierPieceForClass(29753, "DRUID"), nil, "no druid piece on this token")
-    ok(L:FindTokenForItem(29753), "29753 is a token")
-    ok(not L:FindTokenForItem(28830), "a normal item is not a token")
+    -- Real T5 data: Helm of the Vanquished Defender (30243) → Druid/Priest/Warrior. Piece IDs
+    -- aren't sourced yet, so coverage is a `true` marker (see tools/sources/tokens.csv).
+    eq(L:GetTierToken(30243).name, "Helm of the Vanquished Defender", "token name")
+    eq(L:GetTierPieceForClass(30243, "WARRIOR"), true, "warrior is covered by the Defender helm")
+    eq(L:GetTierPieceForClass(30243, "MAGE"), nil, "mage is NOT on the Defender line")
+    ok(L:FindTokenForItem(30243), "30243 is a token")
+    ok(L:FindTokenForItem(30242) and L:FindTokenForItem(30250), "champion + hero tokens too")
+    ok(not L:FindTokenForItem(30056), "a normal gear item is not a token")
 end)
 
 -- ── Summary ──────────────────────────────────────────────────────────────────

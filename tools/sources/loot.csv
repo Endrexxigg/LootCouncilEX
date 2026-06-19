@@ -1,0 +1,135 @@
+# LootCouncil EX — P2 loot source (Serpentshrine Cavern + Tempest Keep: The Eye).
+# Columns: phase,raid,order,boss,itemID  (one item per row; order = boss kill order)
+# Source: AtlasLootClassic_DungeonsAndRaids data-tbc.lua (NORMAL_DIFF per-boss drops), verified.
+# Regenerate Core/Data/Loot.lua with:  lua tools/build_data.lua
+phase,raid,order,boss,itemID
+# ── Serpentshrine Cavern ───────────────────────────────────────────────────────
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30056
+P2,Serpentshrine Cavern,1,Hydross the Unstable,32516
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30050
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30055
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30047
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30054
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30048
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30053
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30052
+P2,Serpentshrine Cavern,1,Hydross the Unstable,33055
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30664
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30629
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30049
+P2,Serpentshrine Cavern,1,Hydross the Unstable,30051
+P2,Serpentshrine Cavern,2,The Lurker Below,30064
+P2,Serpentshrine Cavern,2,The Lurker Below,30067
+P2,Serpentshrine Cavern,2,The Lurker Below,30062
+P2,Serpentshrine Cavern,2,The Lurker Below,30060
+P2,Serpentshrine Cavern,2,The Lurker Below,30066
+P2,Serpentshrine Cavern,2,The Lurker Below,30065
+P2,Serpentshrine Cavern,2,The Lurker Below,30057
+P2,Serpentshrine Cavern,2,The Lurker Below,30059
+P2,Serpentshrine Cavern,2,The Lurker Below,30061
+P2,Serpentshrine Cavern,2,The Lurker Below,33054
+P2,Serpentshrine Cavern,2,The Lurker Below,30665
+P2,Serpentshrine Cavern,2,The Lurker Below,30063
+P2,Serpentshrine Cavern,2,The Lurker Below,30058
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30092
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30097
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30091
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30096
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30627
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30095
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30239
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30240
+P2,Serpentshrine Cavern,3,Leotheras the Blind,30241
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30100
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30101
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30099
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30663
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30626
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30090
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30245
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30246
+P2,Serpentshrine Cavern,4,Fathom-Lord Karathress,30247
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30098
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30079
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30075
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30085
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30068
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30084
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30081
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30008
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30083
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,33058
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30720
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30082
+P2,Serpentshrine Cavern,5,Morogrim Tidewalker,30080
+P2,Serpentshrine Cavern,6,Lady Vashj,30107
+P2,Serpentshrine Cavern,6,Lady Vashj,30111
+P2,Serpentshrine Cavern,6,Lady Vashj,30106
+P2,Serpentshrine Cavern,6,Lady Vashj,30104
+P2,Serpentshrine Cavern,6,Lady Vashj,30102
+P2,Serpentshrine Cavern,6,Lady Vashj,30112
+P2,Serpentshrine Cavern,6,Lady Vashj,30109
+P2,Serpentshrine Cavern,6,Lady Vashj,30110
+P2,Serpentshrine Cavern,6,Lady Vashj,30621
+P2,Serpentshrine Cavern,6,Lady Vashj,30103
+P2,Serpentshrine Cavern,6,Lady Vashj,30108
+P2,Serpentshrine Cavern,6,Lady Vashj,30105
+P2,Serpentshrine Cavern,6,Lady Vashj,30242
+P2,Serpentshrine Cavern,6,Lady Vashj,30243
+P2,Serpentshrine Cavern,6,Lady Vashj,30244
+P2,Serpentshrine Cavern,6,Lady Vashj,29906
+# ── Tempest Keep: The Eye ──────────────────────────────────────────────────────
+P2,Tempest Keep,1,Al'ar,29925
+P2,Tempest Keep,1,Al'ar,29918
+P2,Tempest Keep,1,Al'ar,29947
+P2,Tempest Keep,1,Al'ar,29921
+P2,Tempest Keep,1,Al'ar,29922
+P2,Tempest Keep,1,Al'ar,29920
+P2,Tempest Keep,1,Al'ar,30448
+P2,Tempest Keep,1,Al'ar,30447
+P2,Tempest Keep,1,Al'ar,29923
+P2,Tempest Keep,1,Al'ar,32944
+P2,Tempest Keep,1,Al'ar,29948
+P2,Tempest Keep,1,Al'ar,29924
+P2,Tempest Keep,1,Al'ar,29949
+P2,Tempest Keep,2,Void Reaver,29986
+P2,Tempest Keep,2,Void Reaver,29984
+P2,Tempest Keep,2,Void Reaver,29985
+P2,Tempest Keep,2,Void Reaver,29983
+P2,Tempest Keep,2,Void Reaver,32515
+P2,Tempest Keep,2,Void Reaver,30619
+P2,Tempest Keep,2,Void Reaver,30450
+P2,Tempest Keep,2,Void Reaver,30248
+P2,Tempest Keep,2,Void Reaver,30249
+P2,Tempest Keep,2,Void Reaver,30250
+P2,Tempest Keep,3,High Astromancer Solarian,29977
+P2,Tempest Keep,3,High Astromancer Solarian,29972
+P2,Tempest Keep,3,High Astromancer Solarian,29966
+P2,Tempest Keep,3,High Astromancer Solarian,29976
+P2,Tempest Keep,3,High Astromancer Solarian,29951
+P2,Tempest Keep,3,High Astromancer Solarian,29965
+P2,Tempest Keep,3,High Astromancer Solarian,29950
+P2,Tempest Keep,3,High Astromancer Solarian,32267
+P2,Tempest Keep,3,High Astromancer Solarian,30446
+P2,Tempest Keep,3,High Astromancer Solarian,30449
+P2,Tempest Keep,3,High Astromancer Solarian,29962
+P2,Tempest Keep,3,High Astromancer Solarian,29981
+P2,Tempest Keep,3,High Astromancer Solarian,29982
+P2,Tempest Keep,4,Kael'thas Sunstrider,29992
+P2,Tempest Keep,4,Kael'thas Sunstrider,29989
+P2,Tempest Keep,4,Kael'thas Sunstrider,29994
+P2,Tempest Keep,4,Kael'thas Sunstrider,29990
+P2,Tempest Keep,4,Kael'thas Sunstrider,29987
+P2,Tempest Keep,4,Kael'thas Sunstrider,29995
+P2,Tempest Keep,4,Kael'thas Sunstrider,29991
+P2,Tempest Keep,4,Kael'thas Sunstrider,29998
+P2,Tempest Keep,4,Kael'thas Sunstrider,29997
+P2,Tempest Keep,4,Kael'thas Sunstrider,29993
+P2,Tempest Keep,4,Kael'thas Sunstrider,29996
+P2,Tempest Keep,4,Kael'thas Sunstrider,29988
+P2,Tempest Keep,4,Kael'thas Sunstrider,30236
+P2,Tempest Keep,4,Kael'thas Sunstrider,30237
+P2,Tempest Keep,4,Kael'thas Sunstrider,30238
+P2,Tempest Keep,4,Kael'thas Sunstrider,32458
+P2,Tempest Keep,4,Kael'thas Sunstrider,32405
+P2,Tempest Keep,4,Kael'thas Sunstrider,29905

@@ -31,3 +31,7 @@ jobs:
 
       - name: Headless unit tests
         run: lua Tests/run.lua
+
+      - name: Data is generated from source (no drift)
+        # The committed Core/Data/*.lua must match what the converter produces from tools/sources/.
+        run: lua tools/build_data.lua --check

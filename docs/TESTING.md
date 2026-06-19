@@ -19,6 +19,16 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.15.0 — Real P2 loot content (SSC + Tempest Keep)
+- [ ] `/lcex loot` → P2 shows **Serpentshrine Cavern** and **Tempest Keep** with their real bosses
+  in kill order, each listing real item **names + icons** (not `item:NNNNN`). The five Tier-5
+  token drops (Vashj=helm, Leotheras=gloves, Karathress=legs, Void Reaver=shoulder, Kael=chest)
+  show a `(token)` annotation.
+- [ ] **FauxScrollFrame (now a real long list):** scroll P2 to the bottom, click an empty phase
+  tab (P1/P3…), then back to P2 → the list **never renders empty** (offset reset).
+- [ ] Spot-check a couple of item names against what you expect (e.g. Lady Vashj drops *Vestments
+  of the Sea-Witch*); flag any wrong name so I can fix the CSV.
+
 ### v0.14.0 — Real trade-timer (DL-9) — **verify the tooltip parse on Anniversary**
 - [ ] Loot a BoP item, `/reload`, then `/lcex scan` → the item now shows **"~Nm left to trade"**
   (a real countdown), not "looted before reload, no trade timer". If it still says no timer, the

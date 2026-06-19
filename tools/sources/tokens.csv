@@ -1,0 +1,60 @@
+# LootCouncil EX — Tier 5 token source (Serpentshrine Cavern + Tempest Keep).
+# Columns: tokenID,name,class,pieceID
+#   class  = WoW class token (uppercase). Token lines: Champion = Rogue/Shaman/Paladin,
+#            Defender = Druid/Priest/Warrior, Hero = Warlock/Hunter/Mage.
+#   pieceID = the actual armor item the class redeems (OPTIONAL). Left blank for now — the per-
+#            class piece IDs aren't in the AtlasLoot token data and aren't displayed yet; the
+#            converter emits a `true` coverage marker. Fill the column + re-run to upgrade later.
+# Verified vs AtlasLoot data-tbc.lua (token IDs/names) + warcraft.wiki.gg (class groupings).
+# Regenerate Core/Data/TierTokens.lua with:  lua tools/build_data.lua
+tokenID,name,class,pieceID
+# ── Helm (drops: Lady Vashj) ───────────────────────────────────────────────────
+30242,Helm of the Vanquished Champion,ROGUE,
+30242,Helm of the Vanquished Champion,SHAMAN,
+30242,Helm of the Vanquished Champion,PALADIN,
+30243,Helm of the Vanquished Defender,DRUID,
+30243,Helm of the Vanquished Defender,PRIEST,
+30243,Helm of the Vanquished Defender,WARRIOR,
+30244,Helm of the Vanquished Hero,WARLOCK,
+30244,Helm of the Vanquished Hero,HUNTER,
+30244,Helm of the Vanquished Hero,MAGE,
+# ── Pauldrons (drops: Void Reaver) ─────────────────────────────────────────────
+30248,Pauldrons of the Vanquished Champion,ROGUE,
+30248,Pauldrons of the Vanquished Champion,SHAMAN,
+30248,Pauldrons of the Vanquished Champion,PALADIN,
+30249,Pauldrons of the Vanquished Defender,DRUID,
+30249,Pauldrons of the Vanquished Defender,PRIEST,
+30249,Pauldrons of the Vanquished Defender,WARRIOR,
+30250,Pauldrons of the Vanquished Hero,WARLOCK,
+30250,Pauldrons of the Vanquished Hero,HUNTER,
+30250,Pauldrons of the Vanquished Hero,MAGE,
+# ── Chestguard (drops: Kael'thas Sunstrider) ───────────────────────────────────
+30236,Chestguard of the Vanquished Champion,ROGUE,
+30236,Chestguard of the Vanquished Champion,SHAMAN,
+30236,Chestguard of the Vanquished Champion,PALADIN,
+30237,Chestguard of the Vanquished Defender,DRUID,
+30237,Chestguard of the Vanquished Defender,PRIEST,
+30237,Chestguard of the Vanquished Defender,WARRIOR,
+30238,Chestguard of the Vanquished Hero,WARLOCK,
+30238,Chestguard of the Vanquished Hero,HUNTER,
+30238,Chestguard of the Vanquished Hero,MAGE,
+# ── Gloves (drops: Leotheras the Blind) ────────────────────────────────────────
+30239,Gloves of the Vanquished Champion,ROGUE,
+30239,Gloves of the Vanquished Champion,SHAMAN,
+30239,Gloves of the Vanquished Champion,PALADIN,
+30240,Gloves of the Vanquished Defender,DRUID,
+30240,Gloves of the Vanquished Defender,PRIEST,
+30240,Gloves of the Vanquished Defender,WARRIOR,
+30241,Gloves of the Vanquished Hero,WARLOCK,
+30241,Gloves of the Vanquished Hero,HUNTER,
+30241,Gloves of the Vanquished Hero,MAGE,
+# ── Leggings (drops: Fathom-Lord Karathress) ───────────────────────────────────
+30245,Leggings of the Vanquished Champion,ROGUE,
+30245,Leggings of the Vanquished Champion,SHAMAN,
+30245,Leggings of the Vanquished Champion,PALADIN,
+30246,Leggings of the Vanquished Defender,DRUID,
+30246,Leggings of the Vanquished Defender,PRIEST,
+30246,Leggings of the Vanquished Defender,WARRIOR,
+30247,Leggings of the Vanquished Hero,WARLOCK,
+30247,Leggings of the Vanquished Hero,HUNTER,
+30247,Leggings of the Vanquished Hero,MAGE,
