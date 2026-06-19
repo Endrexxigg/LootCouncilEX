@@ -56,6 +56,9 @@ local DB_DEFAULTS = {
         -- Account-wide, keyed by OWNER character name → the in-memory pendingTrades shape. Local
         -- only (NOT a sync dataset). See Award.lua SaveOwedTrades/RestoreOwedTrades.
         pendingTrades = {},
+        -- An open ML session, mirrored so it survives /reload (DL-6): owner → session descriptor.
+        -- On login the ML is offered /lcex resume. See Session.lua SaveSession/RestoreSession.
+        session = {},
         -- NOTE: `dbVersion` is deliberately NOT defaulted here. An AceDB default would mask the
         -- difference between a fresh DB and a pre-versioning one (both would read the default),
         -- breaking migration detection — so MigrateDB reads it raw (nil ⇒ unversioned) and stamps
@@ -187,11 +190,13 @@ function LCEX:HandleSlash(input)
         self:CmdAward(rest)
     elseif cmd == "end" then
         self:EndSession()
+    elseif cmd == "resume" then
+        self:CmdResume()
     elseif cmd == "session" then
         self:CmdSession()
     elseif cmd == "test" then
         self:CmdTest(rest)
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"])
     end
 end

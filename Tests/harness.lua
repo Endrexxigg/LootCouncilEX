@@ -172,6 +172,14 @@ LCEX:OnInitialize() -- creates LCEX.db (mock AceDB)
 -- Capture chat output instead of printing it.
 function LCEX:Msg(text) H.msgs[#H.msgs + 1] = tostring(text) end
 
+-- The session Show/Hide frame plumbing is pure UI; stub it so the session lifecycle (start /
+-- enter / leave / resume) can be exercised headlessly without rendering.
+function LCEX:ShowLootFrame() end
+function LCEX:HideLootFrame() end
+function LCEX:ShowVotingFrame() end
+function LCEX:HideVotingFrame() end
+function LCEX:RefreshVotingItem() end
+
 -- Reset mutable state between tests.
 function H.reset()
     H.sent, H.msgs = {}, {}
@@ -185,7 +193,10 @@ function H.reset()
     LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil
     LCEX.pendingTrades = {}
     LCEX.pendingLoot = {}
+    LCEX.session, LCEX.sessionItems, LCEX.activeSession = nil, nil, nil
+    LCEX.recoverableSession, LCEX.sessionTimeout, LCEX.sPingTimer = nil, nil, nil
     if LCEX.db.global.pendingTrades then wipe(LCEX.db.global.pendingTrades) end
+    if LCEX.db.global.session then wipe(LCEX.db.global.session) end
     LCEX.db.profile.council = { byRank = true, rank = 1, extra = {} }
     LCEX.db.profile.syncChannel = "GUILD"
     LCEX.db.profile.selfReport = true

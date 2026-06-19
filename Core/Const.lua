@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -73,6 +73,14 @@ L["Session started (%s) — %d item(s) [local only, not in a group]."] =
 L["Session %s — %d item(s):"]               = "Session %s — %d item(s):"
 L["Session ended."]                         = "Session ended."
 L["No active session."]                     = "No active session."
+-- Phase 7 — session recovery on ML disconnect (DL-6).
+L["Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."] =
+    "Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."
+L["Resumed session (%s) — %d item(s)."]     = "Resumed session (%s) — %d item(s)."
+L["Discarded the unfinished session."]      = "Discarded the unfinished session."
+L["No session to resume."]                  = "No session to resume."
+L["Session ML %s went quiet — closing the session view."] =
+    "Session ML %s went quiet — closing the session view."
 L["Usage: /lcex award <itemIndex> <name>"]  = "Usage: /lcex award <itemIndex> <name>"
 L["No item #%d in the session."]            = "No item #%d in the session."
 L["Recorded: %s → %s. Trade it to them within the window to hand it off."] =

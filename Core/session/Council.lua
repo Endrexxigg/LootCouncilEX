@@ -54,6 +54,7 @@ LCEX.dispatch.cUpdate = function(self, msg, sender)
     if not a or msg.sid ~= a.sid then return end
     if self:NormalizeName(sender) ~= self:NormalizeName(a.ml) then return end
     if type(msg.item) ~= "number" or type(msg.rows) ~= "table" then return end
+    self:ResetSessionTimeout() -- a real update from our ML counts as a heartbeat (DL-6)
     self:ApplyCUpdate(msg.sid, msg.item, msg.rows)
 end
 

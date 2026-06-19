@@ -19,6 +19,14 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
+- [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
+  *"Session ML A went quiet — closing the session view"* and the frames close (B isn't stuck).
+- [ ] On reload, A prints *"Unfinished session … /lcex resume to re-open, /lcex end to discard"*.
+  `/lcex resume` → B's frames re-open (B re-responds); `/lcex end` instead → discarded, nothing re-opens.
+- [ ] **Heartbeat:** with A's session left open and untouched, B does **not** time out past 95s
+  (the 30s `sPing` keeps it alive). End normally → B closes.
+
 ### v0.15.0 — Real P2 loot content (SSC + Tempest Keep)
 - [ ] `/lcex loot` → P2 shows **Serpentshrine Cavern** and **Tempest Keep** with their real bosses
   in kill order, each listing real item **names + icons** (not `item:NNNNN`). The five Tier-5

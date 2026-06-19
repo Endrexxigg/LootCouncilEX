@@ -9,6 +9,11 @@
 local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
+-- A candidate that hasn't heard from the session ML (cUpdate or sPing) for this many seconds
+-- assumes the ML dropped and closes the stale session view so it isn't stuck (DL-6). Just over
+-- three missed 30s heartbeats.
+local STALE_AFTER = 95
+
 -- The session we are currently in (candidate/council view), distinct from LCEX.session (the
 -- ML-authority state on the ML's own client):
 --   { sid, ml, items, responses, council=<set normName->true>, amCouncil, myVotes }.
@@ -108,6 +113,31 @@ function LCEX:EnterSession(sid, ml, items, responses, council)
     if amCouncil then
         self:ShowVotingFrame(items)
     end
+    -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself out).
+    if not self:IsSelf(ml) then self:ResetSessionTimeout() end
+end
+
+-- ── ML-liveness watchdog (DL-6) ──────────────────────────────────────────────
+-- Restarted whenever we hear from the bound ML (sPing / cUpdate); on lapse, OnSessionTimeout
+-- closes the view so voters aren't stuck waiting on a dropped ML.
+function LCEX:ResetSessionTimeout()
+    self:ClearSessionTimeout()
+    self.sessionTimeout = self:ScheduleTimer("OnSessionTimeout", STALE_AFTER)
+end
+
+function LCEX:ClearSessionTimeout()
+    if self.sessionTimeout then
+        self:CancelTimer(self.sessionTimeout)
+        self.sessionTimeout = nil
+    end
+end
+
+function LCEX:OnSessionTimeout()
+    self.sessionTimeout = nil
+    local a = self.activeSession
+    if not a then return end
+    self:Msg(string.format(self.L["Session ML %s went quiet — closing the session view."], tostring(a.ml)))
+    self:LeaveSession(a.sid)
 end
 
 -- Leave the session: close both frames and drop the view. Guarded by sid so it won't close a
@@ -117,6 +147,7 @@ function LCEX:LeaveSession(sid)
     if a and (not sid or a.sid == sid) then
         self.activeSession = nil
         self.voteRows = nil
+        self:ClearSessionTimeout()
         self:HideLootFrame()
         self:HideVotingFrame()
     end
@@ -137,5 +168,15 @@ LCEX.dispatch.sEnd = function(self, msg, sender)
     local a = self.activeSession
     if a and msg.sid == a.sid and self:NormalizeName(sender) == self:NormalizeName(a.ml) then
         self:LeaveSession(a.sid)
+    end
+end
+
+-- The ML's liveness heartbeat (DL-6): only the bound ML for our session resets the watchdog.
+-- (Ignore our own echo — the ML doesn't watchdog its own session.)
+LCEX.dispatch.sPing = function(self, msg, sender)
+    if self:IsSelf(sender) then return end
+    local a = self.activeSession
+    if a and msg.sid == a.sid and self:NormalizeName(sender) == self:NormalizeName(a.ml) then
+        self:ResetSessionTimeout()
     end
 end

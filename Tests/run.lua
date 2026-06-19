@@ -171,6 +171,48 @@ test("ParseTradeDuration + TradeExpiry + missing-API fallback", function()
     eq(L:ItemTradeTimeRemaining(0, 1), nil, "no API/string -> nil (fallback)")
 end)
 
+-- ── ML-disconnect session recovery (A3, DL-6) ────────────────────────────────
+test("Session persist → restore → resume → end", function()
+    L.sessionItems = { { link = "[Axe]", itemID = 1, quality = 4 } }
+    L:StartSession({ { link = "[Axe]", quality = 4 } })
+    local sid = L.session.sid
+    ok(L.db.global.session.tester, "open session mirrored to the DB under the owner")
+    eq(L.db.global.session.tester.sid, sid, "stored sid matches")
+
+    -- Simulate a /reload: in-memory session gone, DB record remains.
+    L.session, L.sessionItems, L.activeSession = nil, nil, nil
+    L:RestoreSession()
+    ok(L.recoverableSession, "restore finds the persisted session and offers resume")
+
+    ok(L:ResumeSession(), "resume succeeds")
+    eq(L.session.sid, sid, "resumed with the SAME sid (history uids stay stable)")
+    ok(L.sessionItems and L.sessionItems[1].link == "[Axe]", "ML award records restored")
+    ok(not L.recoverableSession, "recoverable cleared after resume")
+
+    L:EndSession()
+    ok(not L.db.global.session.tester, "end clears the persisted session")
+end)
+
+test("Recoverable session can be discarded with /lcex end", function()
+    L.db.global.session.tester = { sid = "S", items = { { link = "[X]", quality = 4 } }, council = {} }
+    L:RestoreSession()
+    ok(L.recoverableSession, "offered for recovery")
+    L:EndSession() -- no live session → discards the recoverable one
+    ok(not L.recoverableSession and not L.db.global.session.tester, "discarded from memory + DB")
+end)
+
+test("Candidate watchdog closes a dropped ML's session", function()
+    L:EnterSession("S1", "OtherML", { { link = "[X]", quality = 4 } }, L.RESPONSES, {})
+    ok(L.activeSession, "entered a remote session")
+    ok(L.sessionTimeout, "watchdog armed for a remote ML")
+    L:OnSessionTimeout()
+    ok(not L.activeSession, "timeout closes the stale session view")
+
+    -- The ML's OWN client never watchdogs itself.
+    L:EnterSession("S2", "Tester", { { link = "[X]", quality = 4 } }, L.RESPONSES, {})
+    ok(not L.sessionTimeout, "no watchdog when we are the session ML")
+end)
+
 -- ── pReport caching: group-gated, NOT council-gated (§6.2) ────────────────────
 test("pReport caches gear from a group member (group-gated)", function()
     H.group = { "Carol" }

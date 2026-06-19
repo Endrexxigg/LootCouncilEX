@@ -94,6 +94,7 @@ function LCEX:SetupLootEvents()
     self:RegisterEvent("UI_INFO_MESSAGE", "OnUiInfoMessage")
     self:RegisterEvent("TRADE_CLOSED", "OnTradeClosed")
     self:RestoreOwedTrades() -- rehydrate owed items left over from before a /reload (DL-6)
+    self:RestoreSession()    -- offer to resume a session that was open before the /reload (DL-6)
 end
 
 -- True only when the player themselves is the master looter (PROJECT.md §3 authority).

@@ -14,6 +14,10 @@ LCEX.dispatch = LCEX.dispatch or {}
 -- (PROJECT.md §6.1: "<MLname>-<unixtime>-<counter>").
 local counter = 0
 
+-- While a session is open the ML pings the raid every SPING_INTERVAL so candidates know it's
+-- still alive (DL-6); a candidate that hears nothing for STALE_AFTER (Candidate.lua) gives up.
+local SPING_INTERVAL = 30
+
 -- LCEX.session is nil when idle, else { sid, items, council, rows, startedAt }. `items` holds
 -- the wire form { [i] = { link, quality } } that was broadcast in sStart. (Items live in
 -- the ML's bags, not a loot window, so there is no loot slot — the ML resolves the live
@@ -134,12 +138,111 @@ function LCEX:StartSession(items)
     -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
     -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
     self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council)
+
+    self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
+    self:StartHeartbeat() -- tell candidates we're alive
 end
 
--- Close the active session and broadcast sEnd.
+-- ── ML heartbeat (DL-6) ──────────────────────────────────────────────────────
+function LCEX:StartHeartbeat()
+    self:StopHeartbeat()
+    if self:GroupChannel() then
+        self.sPingTimer = self:ScheduleRepeatingTimer("SendSessionPing", SPING_INTERVAL)
+    end
+end
+
+function LCEX:StopHeartbeat()
+    if self.sPingTimer then
+        self:CancelTimer(self.sPingTimer)
+        self.sPingTimer = nil
+    end
+end
+
+function LCEX:SendSessionPing()
+    local s = self.session
+    local channel = s and self:GroupChannel()
+    if channel then self:Send("sPing", s.sid, {}, channel) end
+end
+
+-- ── ML session persistence + resume (DL-6) ───────────────────────────────────
+-- Mirror / restore the open ML session under the owner key (like owed trades, Award.lua). On
+-- /reload the in-memory session is gone; RestoreSession offers the ML `/lcex resume`, which
+-- re-broadcasts sStart (with the SAME sid, so history uids stay stable) and rebuilds ML state.
+function LCEX:SaveSession()
+    local owner = self:OwnerKey()
+    local s = self.session
+    if not owner or not s then return end
+    self.db.global.session[owner] = {
+        sid = s.sid, items = s.items, council = s.council,
+        sessionItems = self.sessionItems, startedAt = s.startedAt,
+    }
+end
+
+function LCEX:ClearSavedSession()
+    local owner = self:OwnerKey()
+    if owner then self.db.global.session[owner] = nil end
+    self.recoverableSession = nil
+end
+
+function LCEX:RestoreSession()
+    local owner = self:OwnerKey()
+    local saved = owner and self.db and self.db.global.session[owner]
+    if not saved or type(saved.items) ~= "table" or #saved.items == 0 then return end
+    self.recoverableSession = saved
+    self:Msg(string.format(
+        self.L["Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."],
+        #saved.items))
+end
+
+function LCEX:ResumeSession()
+    local saved = self.recoverableSession
+    if not saved then return false end
+    if self.session then
+        self:Msg(self.L["A session is already active. /lcex end first."])
+        return false
+    end
+    self.recoverableSession = nil
+
+    local councilSet = {}
+    for _, n in ipairs(saved.council or {}) do councilSet[n] = true end
+    self.session = {
+        sid = saved.sid, items = saved.items, council = saved.council, councilSet = councilSet,
+        rows = {}, voters = {}, startedAt = saved.startedAt or time(),
+    }
+    self.sessionItems = saved.sessionItems
+
+    local channel = self:GroupChannel()
+    if channel then
+        self:Send("sStart", saved.sid, {
+            items = saved.items, council = saved.council, responses = self:ResponseSet(),
+        }, channel)
+    end
+    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council)
+    self:SaveSession()
+    self:StartHeartbeat()
+    self:Msg(string.format(self.L["Resumed session (%s) — %d item(s)."], saved.sid, #saved.items))
+    return true
+end
+
+-- /lcex resume — re-open the session that was open before a /reload.
+function LCEX:CmdResume()
+    if self.recoverableSession then
+        self:ResumeSession()
+    else
+        self:Msg(self.L["No session to resume."])
+    end
+end
+
+-- Close the active session and broadcast sEnd. With no live session but a recoverable one (a
+-- /reload left one persisted), /lcex end discards it instead (DL-6).
 function LCEX:EndSession()
     if not self.session then
-        self:Msg(self.L["No active session."])
+        if self.recoverableSession then
+            self:ClearSavedSession()
+            self:Msg(self.L["Discarded the unfinished session."])
+        else
+            self:Msg(self.L["No active session."])
+        end
         return
     end
     local sid = self.session.sid
@@ -147,8 +250,10 @@ function LCEX:EndSession()
     if channel then
         self:Send("sEnd", sid, {}, channel)
     end
+    self:StopHeartbeat()
     self.session = nil
     self.sessionItems = nil -- the ML-side full records (Award.lua); pendingTrades outlive the session
+    self:ClearSavedSession()
     self:LeaveSession(sid)
     self:Msg(self.L["Session ended."])
 end
