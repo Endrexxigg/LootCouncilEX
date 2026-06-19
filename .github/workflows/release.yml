@@ -33,3 +33,17 @@ jobs:
           # auto-provided secrets.GITHUB_TOKEN. Naming it GITHUB_TOKEN makes it silently skip the
           # GitHub release (still exits success) — it must be GITHUB_OAUTH.
           GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+
+      # The packager unconditionally attaches a `release.json` (BigWigs/WoWUp manifest) to the
+      # GitHub release. WowUp-CF's "Install from URL" reacts to that manifest by downloading the
+      # asset via the GitHub *API* endpoint (api.github.com/.../releases/assets/<id>) WITHOUT the
+      # `Accept: application/octet-stream` header — so GitHub hands back the asset's JSON metadata
+      # instead of the binary. WowUp saves that JSON as the .zip and extraction dies with
+      # "end of central directory record signature not found". Deleting release.json makes WowUp
+      # fall back to the plain browser_download_url path, which always returns the real zip.
+      # (We don't publish to CurseForge/Wago, so the manifest serves no other purpose here.)
+      - name: Strip release.json so WowUp can install from URL
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release delete-asset "${GITHUB_REF_NAME}" release.json --yes
