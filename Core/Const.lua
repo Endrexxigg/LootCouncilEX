@@ -149,3 +149,11 @@ L["Class %s · Spec %s · %s"]                = "Class %s · Spec %s · %s"
 L["No BiS data for this class/spec/phase."] = "No BiS data for this class/spec/phase."
 L["Class: %s"]                              = "Class: %s"
 L["Spec: %s"]                               = "Spec: %s"
+
+-- Phase 7 — data-freshness (stale-cache indicators).
+L["cached %s"]                              = "cached %s"
+L["just now"]                               = "just now"
+L["%dm ago"]                                = "%dm ago"
+L["%dh ago"]                                = "%dh ago"
+L["%dd ago"]                                = "%dd ago"
+L["unknown"]                                = "unknown"

@@ -250,6 +250,22 @@ test("BiS: own class without data resolves; class cycler walks all classes", fun
     ok(L:IsKnownClass("DRUID") and not L:IsKnownClass("NOPE"), "IsKnownClass validates tokens")
 end)
 
+-- ── Stale-cache indicators (A5) ──────────────────────────────────────────────
+test("RelTime buckets + CacheMetaText", function()
+    eq(L:RelTime(1000, 1000), L.L["just now"], "0s -> just now")
+    eq(L:RelTime(1000, 1000 + 59), L.L["just now"], "<1m -> just now")
+    eq(L:RelTime(1000, 1000 + 120), "2m ago", "minutes")
+    eq(L:RelTime(1000, 1000 + 3 * 3600), "3h ago", "hours")
+    eq(L:RelTime(1000, 1000 + 2 * 86400), "2d ago", "days")
+    eq(L:RelTime(nil, 1000), L.L["unknown"], "nil mod -> unknown")
+
+    H.now = 10000
+    eq(L:CacheMetaText("Tester", "gearCache"), L.L["(your live snapshot)"], "self -> live snapshot")
+    eq(L:CacheMetaText("Ghost", "gearCache"), "", "no cache -> blank (list says so)")
+    L.db.global.gearCache.bob = { items = {}, mod = 10000 - 7200 }
+    eq(L:CacheMetaText("Bob", "gearCache"), "cached 2h ago", "peer -> cached <ago>")
+end)
+
 -- ── Spec capture → BiS auto-resolve (A4) ─────────────────────────────────────
 test("SnapshotSpec maps the top talent tab to a spec name", function()
     H.class = "MAGE"

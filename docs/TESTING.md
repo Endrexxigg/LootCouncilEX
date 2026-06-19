@@ -19,6 +19,11 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.13.0 — Stale-cache indicator
+- [ ] Open a peer's **Gear** (and **Professions**) tab → a grey **"cached Nh ago"** line shows at
+  the bottom of the panel. Open **your own** → it reads **"(your live snapshot)"**. The line is
+  hidden on the History/BiS/Notes tabs.
+
 ### v0.12.0 — BiS auto-resolves spec
 - [ ] Open a **grouped** player who has the addon (e.g. a Fury warrior) → **BiS** tab. The **Spec**
   now auto-selects *their* spec (Fury), not just defaulting to the first. Cycling Class away and

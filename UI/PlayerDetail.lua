@@ -63,6 +63,28 @@ function LCEX:BuildProfsDisplay(player)
     return out
 end
 
+-- Coarse "how long ago" for a unixtime, bucketed just-now / Nm / Nh / Nd. Pure/testable.
+function LCEX:RelTime(mod, now)
+    if not mod then return self.L["unknown"] end
+    local d = (now or time()) - mod
+    if d < 0 then d = 0 end
+    if d < 60 then return self.L["just now"] end
+    if d < 3600 then return string.format(self.L["%dm ago"], math.floor(d / 60)) end
+    if d < 86400 then return string.format(self.L["%dh ago"], math.floor(d / 3600)) end
+    return string.format(self.L["%dd ago"], math.floor(d / 86400))
+end
+
+-- Staleness line for the gear/profs tabs: a live snapshot for self, "cached <ago>" for a peer's
+-- last self-report, or "" when there's nothing cached (the list already says so). dataset =
+-- "gearCache" | "profCache". Pure/testable.
+function LCEX:CacheMetaText(player, dataset)
+    if self:IsSelf(player) then return self.L["(your live snapshot)"] end
+    local key = self:NormalizeName(player)
+    local rec = key and self.db.global[dataset][key]
+    if not rec then return "" end
+    return string.format(self.L["cached %s"], self:RelTime(rec.mod))
+end
+
 -- Cycle to the next element after `current` (wraps; unknown/empty -> first/nil). Pure/testable.
 function LCEX:_CycleNext(list, current)
     if #list == 0 then return nil end
@@ -247,6 +269,10 @@ function LCEX:EnsurePlayerDetail()
     notes:Hide()
     f.notes = notes
 
+    -- Bottom status line: data freshness for the Gear/Professions tabs (hidden on the others).
+    f.cacheMeta = self:CreateLabel(f, nil, "GameFontDisableSmall")
+    f.cacheMeta:SetPoint("BOTTOMLEFT", 16, 12)
+
     self.playerDetail = f
     return f
 end
@@ -256,6 +282,15 @@ function LCEX:RenderDetailTab(key)
     if not f then return end
     self.detailTab = key
     local player = f.player
+
+    -- Data-freshness line only makes sense for the self-reported gear/profs tabs.
+    if key == "gear" then
+        f.cacheMeta:SetText(self:CacheMetaText(player, "gearCache")); f.cacheMeta:Show()
+    elseif key == "profs" then
+        f.cacheMeta:SetText(self:CacheMetaText(player, "profCache")); f.cacheMeta:Show()
+    else
+        f.cacheMeta:Hide()
+    end
 
     if key == "notes" then
         f.list:Hide(); f.bisBar:Hide(); f.notes:Show()
