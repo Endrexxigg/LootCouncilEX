@@ -411,7 +411,12 @@ end)
 
 -- ── Static data accessors (Phase 6) ──────────────────────────────────────────
 test("DataAPI: loot accessors", function()
-    eq(table.concat(L:GetLootPhases(), ","), "P2", "only P2 has data, in PHASES order")
+    eq(table.concat(L:GetLootPhases(), ","), "P1,P2", "P1 + P2 have data, in PHASES order")
+    eq(table.concat(L:GetRaidsForPhase("P1"), "|"),
+        "Gruul's Lair|Karazhan|Magtheridon's Lair|World Bosses", "P1 raids alphabetical")
+    eq(L:GetBossesForRaid("P1", "Karazhan")[1], "Attumen the Huntsman", "Kara kill order starts at Attumen")
+    eq(#L:GetBossesForRaid("P1", "Karazhan"), 17, "Kara bosses incl. rares/opera variants/trash")
+    ok(#L:GetItemsForBoss("P1", "Gruul's Lair", "Gruul the Dragonkiller") == 17, "Gruul drops")
     eq(table.concat(L:GetRaidsForPhase("P2"), "|"), "Serpentshrine Cavern|Tempest Keep",
         "raids alphabetical")
     eq(table.concat(L:GetBossesForRaid("P2", "Serpentshrine Cavern"), "|"),
@@ -444,6 +449,14 @@ test("DataAPI: tier tokens", function()
     ok(L:FindTokenForItem(30243), "30243 is a token")
     ok(L:FindTokenForItem(30242) and L:FindTokenForItem(30250), "champion + hero tokens too")
     ok(not L:FindTokenForItem(30056), "a normal gear item is not a token")
+
+    -- T4 (P1 content): 15 tokens, same trio structure. Warrior has both Warbringer sets.
+    eq(L:GetTierToken(29759).name, "Helm of the Fallen Hero", "T4 helm token name")
+    eq(table.concat(L:GetTierPieceForClass(29767, "WARRIOR"), ","), "29016,29023",
+        "warrior legs pieces (both Warbringer sets)")
+    eq(#L:GetTierPieceForClass(29765, "MAGE"), 1, "single-set class -> one T4 piece")
+    eq(L:GetTierPieceForClass(29765, "WARRIOR"), nil, "warrior is NOT on the Hero line")
+    ok(L:FindTokenForItem(29753) and L:FindTokenForItem(29758), "T4 chest + gloves tokens resolve")
 end)
 
 -- ── Self-test runner (Core/SelfTest.lua) ─────────────────────────────────────

@@ -133,3 +133,260 @@ P2,Tempest Keep,4,Kael'thas Sunstrider,30238
 P2,Tempest Keep,4,Kael'thas Sunstrider,32458
 P2,Tempest Keep,4,Kael'thas Sunstrider,32405
 P2,Tempest Keep,4,Kael'thas Sunstrider,29905
+# -- Phase 1 (Karazhan / Gruul's Lair / Magtheridon's Lair / World Bosses) -----
+# Source: AtlasLootClassic_DungeonsAndRaids data-tbc.lua NORMAL_DIFF blocks, agent-
+# extracted and mechanically reconciled (regex harvest) 2026-07-02. Skipped: Prince
+# Tenris Mirkblood (Wrath-gated), Magtheridon quest head 32385 + bags 34845/34846,
+# Terokk (outdoor rare bundled into AtlasLoot's world-boss block).
+# -- Karazhan --
+P1,Karazhan,1,Attumen the Huntsman,28477
+P1,Karazhan,1,Attumen the Huntsman,28507
+P1,Karazhan,1,Attumen the Huntsman,28508
+P1,Karazhan,1,Attumen the Huntsman,28453
+P1,Karazhan,1,Attumen the Huntsman,28506
+P1,Karazhan,1,Attumen the Huntsman,28503
+P1,Karazhan,1,Attumen the Huntsman,28454
+P1,Karazhan,1,Attumen the Huntsman,28502
+P1,Karazhan,1,Attumen the Huntsman,28505
+P1,Karazhan,1,Attumen the Huntsman,28509
+P1,Karazhan,1,Attumen the Huntsman,28510
+P1,Karazhan,1,Attumen the Huntsman,28504
+P1,Karazhan,1,Attumen the Huntsman,30480
+P1,Karazhan,1,Attumen the Huntsman,23809
+P1,Karazhan,2,Rokad the Ravager,30684
+P1,Karazhan,2,Rokad the Ravager,30685
+P1,Karazhan,2,Rokad the Ravager,30686
+P1,Karazhan,2,Rokad the Ravager,30687
+P1,Karazhan,3,Shadikith the Glider,30680
+P1,Karazhan,3,Shadikith the Glider,30681
+P1,Karazhan,3,Shadikith the Glider,30682
+P1,Karazhan,3,Shadikith the Glider,30683
+P1,Karazhan,4,Hyakiss the Lurker,30675
+P1,Karazhan,4,Hyakiss the Lurker,30676
+P1,Karazhan,4,Hyakiss the Lurker,30677
+P1,Karazhan,4,Hyakiss the Lurker,30678
+P1,Karazhan,5,Moroes,28529
+P1,Karazhan,5,Moroes,28570
+P1,Karazhan,5,Moroes,28565
+P1,Karazhan,5,Moroes,28545
+P1,Karazhan,5,Moroes,28567
+P1,Karazhan,5,Moroes,28566
+P1,Karazhan,5,Moroes,28569
+P1,Karazhan,5,Moroes,28530
+P1,Karazhan,5,Moroes,28528
+P1,Karazhan,5,Moroes,28525
+P1,Karazhan,5,Moroes,28568
+P1,Karazhan,5,Moroes,28524
+P1,Karazhan,5,Moroes,22559
+P1,Karazhan,6,Maiden of Virtue,28511
+P1,Karazhan,6,Maiden of Virtue,28515
+P1,Karazhan,6,Maiden of Virtue,28517
+P1,Karazhan,6,Maiden of Virtue,28514
+P1,Karazhan,6,Maiden of Virtue,28521
+P1,Karazhan,6,Maiden of Virtue,28520
+P1,Karazhan,6,Maiden of Virtue,28519
+P1,Karazhan,6,Maiden of Virtue,28512
+P1,Karazhan,6,Maiden of Virtue,28518
+P1,Karazhan,6,Maiden of Virtue,28516
+P1,Karazhan,6,Maiden of Virtue,28523
+P1,Karazhan,6,Maiden of Virtue,28522
+P1,Karazhan,7,Opera: The Wizard of Oz,28586
+P1,Karazhan,7,Opera: The Wizard of Oz,28585
+P1,Karazhan,7,Opera: The Wizard of Oz,28587
+P1,Karazhan,7,Opera: The Wizard of Oz,28588
+P1,Karazhan,7,Opera: The Wizard of Oz,28594
+P1,Karazhan,7,Opera: The Wizard of Oz,28591
+P1,Karazhan,7,Opera: The Wizard of Oz,28589
+P1,Karazhan,7,Opera: The Wizard of Oz,28593
+P1,Karazhan,7,Opera: The Wizard of Oz,28590
+P1,Karazhan,7,Opera: The Wizard of Oz,28592
+P1,Karazhan,8,Opera: The Big Bad Wolf,28582
+P1,Karazhan,8,Opera: The Big Bad Wolf,28583
+P1,Karazhan,8,Opera: The Big Bad Wolf,28584
+P1,Karazhan,8,Opera: The Big Bad Wolf,28581
+P1,Karazhan,8,Opera: The Big Bad Wolf,28594
+P1,Karazhan,8,Opera: The Big Bad Wolf,28591
+P1,Karazhan,8,Opera: The Big Bad Wolf,28589
+P1,Karazhan,8,Opera: The Big Bad Wolf,28593
+P1,Karazhan,8,Opera: The Big Bad Wolf,28590
+P1,Karazhan,8,Opera: The Big Bad Wolf,28592
+P1,Karazhan,9,Opera: Romulo and Julianne,28578
+P1,Karazhan,9,Opera: Romulo and Julianne,28579
+P1,Karazhan,9,Opera: Romulo and Julianne,28572
+P1,Karazhan,9,Opera: Romulo and Julianne,28573
+P1,Karazhan,9,Opera: Romulo and Julianne,28594
+P1,Karazhan,9,Opera: Romulo and Julianne,28591
+P1,Karazhan,9,Opera: Romulo and Julianne,28589
+P1,Karazhan,9,Opera: Romulo and Julianne,28593
+P1,Karazhan,9,Opera: Romulo and Julianne,28590
+P1,Karazhan,9,Opera: Romulo and Julianne,28592
+P1,Karazhan,10,The Curator,28612
+P1,Karazhan,10,The Curator,28647
+P1,Karazhan,10,The Curator,28631
+P1,Karazhan,10,The Curator,28621
+P1,Karazhan,10,The Curator,28649
+P1,Karazhan,10,The Curator,28633
+P1,Karazhan,10,The Curator,29757
+P1,Karazhan,10,The Curator,29758
+P1,Karazhan,10,The Curator,29756
+P1,Karazhan,11,Terestian Illhoof,28660
+P1,Karazhan,11,Terestian Illhoof,28653
+P1,Karazhan,11,Terestian Illhoof,28652
+P1,Karazhan,11,Terestian Illhoof,28654
+P1,Karazhan,11,Terestian Illhoof,28655
+P1,Karazhan,11,Terestian Illhoof,28656
+P1,Karazhan,11,Terestian Illhoof,28662
+P1,Karazhan,11,Terestian Illhoof,28661
+P1,Karazhan,11,Terestian Illhoof,28785
+P1,Karazhan,11,Terestian Illhoof,28657
+P1,Karazhan,11,Terestian Illhoof,28658
+P1,Karazhan,11,Terestian Illhoof,28659
+P1,Karazhan,11,Terestian Illhoof,22561
+P1,Karazhan,12,Shade of Aran,28672
+P1,Karazhan,12,Shade of Aran,28726
+P1,Karazhan,12,Shade of Aran,28670
+P1,Karazhan,12,Shade of Aran,28663
+P1,Karazhan,12,Shade of Aran,28669
+P1,Karazhan,12,Shade of Aran,28671
+P1,Karazhan,12,Shade of Aran,28666
+P1,Karazhan,12,Shade of Aran,23933
+P1,Karazhan,12,Shade of Aran,28674
+P1,Karazhan,12,Shade of Aran,28675
+P1,Karazhan,12,Shade of Aran,28727
+P1,Karazhan,12,Shade of Aran,28728
+P1,Karazhan,12,Shade of Aran,28673
+P1,Karazhan,12,Shade of Aran,22560
+P1,Karazhan,13,Netherspite,28744
+P1,Karazhan,13,Netherspite,28742
+P1,Karazhan,13,Netherspite,28732
+P1,Karazhan,13,Netherspite,28741
+P1,Karazhan,13,Netherspite,28735
+P1,Karazhan,13,Netherspite,28740
+P1,Karazhan,13,Netherspite,28743
+P1,Karazhan,13,Netherspite,28733
+P1,Karazhan,13,Netherspite,28731
+P1,Karazhan,13,Netherspite,28730
+P1,Karazhan,13,Netherspite,28734
+P1,Karazhan,13,Netherspite,28729
+P1,Karazhan,14,Chess Event,28756
+P1,Karazhan,14,Chess Event,28755
+P1,Karazhan,14,Chess Event,28750
+P1,Karazhan,14,Chess Event,28752
+P1,Karazhan,14,Chess Event,28751
+P1,Karazhan,14,Chess Event,28746
+P1,Karazhan,14,Chess Event,28748
+P1,Karazhan,14,Chess Event,28747
+P1,Karazhan,14,Chess Event,28745
+P1,Karazhan,14,Chess Event,28753
+P1,Karazhan,14,Chess Event,28749
+P1,Karazhan,14,Chess Event,28754
+P1,Karazhan,15,Prince Malchezaar,28765
+P1,Karazhan,15,Prince Malchezaar,28766
+P1,Karazhan,15,Prince Malchezaar,28764
+P1,Karazhan,15,Prince Malchezaar,28762
+P1,Karazhan,15,Prince Malchezaar,28763
+P1,Karazhan,15,Prince Malchezaar,28757
+P1,Karazhan,15,Prince Malchezaar,28770
+P1,Karazhan,15,Prince Malchezaar,28768
+P1,Karazhan,15,Prince Malchezaar,28767
+P1,Karazhan,15,Prince Malchezaar,28773
+P1,Karazhan,15,Prince Malchezaar,28771
+P1,Karazhan,15,Prince Malchezaar,28772
+P1,Karazhan,15,Prince Malchezaar,29760
+P1,Karazhan,15,Prince Malchezaar,29761
+P1,Karazhan,15,Prince Malchezaar,29759
+P1,Karazhan,16,Nightbane,28602
+P1,Karazhan,16,Nightbane,28600
+P1,Karazhan,16,Nightbane,28601
+P1,Karazhan,16,Nightbane,28599
+P1,Karazhan,16,Nightbane,28610
+P1,Karazhan,16,Nightbane,28597
+P1,Karazhan,16,Nightbane,28608
+P1,Karazhan,16,Nightbane,31751
+P1,Karazhan,16,Nightbane,24139
+P1,Karazhan,16,Nightbane,28609
+P1,Karazhan,16,Nightbane,28603
+P1,Karazhan,16,Nightbane,28604
+P1,Karazhan,16,Nightbane,28611
+P1,Karazhan,16,Nightbane,28606
+P1,Karazhan,17,Trash,30642
+P1,Karazhan,17,Trash,30668
+P1,Karazhan,17,Trash,30673
+P1,Karazhan,17,Trash,30644
+P1,Karazhan,17,Trash,30674
+P1,Karazhan,17,Trash,30643
+P1,Karazhan,17,Trash,30641
+P1,Karazhan,17,Trash,23857
+P1,Karazhan,17,Trash,23864
+P1,Karazhan,17,Trash,23862
+P1,Karazhan,17,Trash,23865
+P1,Karazhan,17,Trash,21882
+P1,Karazhan,17,Trash,30666
+P1,Karazhan,17,Trash,30667
+P1,Karazhan,17,Trash,21903
+P1,Karazhan,17,Trash,21904
+P1,Karazhan,17,Trash,22545
+# -- Gruul's Lair --
+P1,Gruul's Lair,1,High King Maulgar,28797
+P1,Gruul's Lair,1,High King Maulgar,28799
+P1,Gruul's Lair,1,High King Maulgar,28796
+P1,Gruul's Lair,1,High King Maulgar,28801
+P1,Gruul's Lair,1,High King Maulgar,28795
+P1,Gruul's Lair,1,High King Maulgar,28800
+P1,Gruul's Lair,1,High King Maulgar,29763
+P1,Gruul's Lair,1,High King Maulgar,29764
+P1,Gruul's Lair,1,High King Maulgar,29762
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28804
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28803
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28828
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28827
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28810
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28824
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28822
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28823
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28830
+P1,Gruul's Lair,2,Gruul the Dragonkiller,31750
+P1,Gruul's Lair,2,Gruul the Dragonkiller,29766
+P1,Gruul's Lair,2,Gruul the Dragonkiller,29767
+P1,Gruul's Lair,2,Gruul the Dragonkiller,29765
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28802
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28794
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28825
+P1,Gruul's Lair,2,Gruul the Dragonkiller,28826
+# -- Magtheridon's Lair --
+P1,Magtheridon's Lair,1,Magtheridon,28777
+P1,Magtheridon's Lair,1,Magtheridon,28780
+P1,Magtheridon's Lair,1,Magtheridon,28776
+P1,Magtheridon's Lair,1,Magtheridon,28778
+P1,Magtheridon's Lair,1,Magtheridon,28775
+P1,Magtheridon's Lair,1,Magtheridon,28779
+P1,Magtheridon's Lair,1,Magtheridon,28789
+P1,Magtheridon's Lair,1,Magtheridon,28781
+P1,Magtheridon's Lair,1,Magtheridon,28774
+P1,Magtheridon's Lair,1,Magtheridon,28782
+P1,Magtheridon's Lair,1,Magtheridon,29458
+P1,Magtheridon's Lair,1,Magtheridon,28783
+P1,Magtheridon's Lair,1,Magtheridon,29754
+P1,Magtheridon's Lair,1,Magtheridon,29753
+P1,Magtheridon's Lair,1,Magtheridon,29755
+# -- World Bosses --
+P1,World Bosses,1,Doomwalker,30729
+P1,World Bosses,1,Doomwalker,30725
+P1,World Bosses,1,Doomwalker,30727
+P1,World Bosses,1,Doomwalker,30730
+P1,World Bosses,1,Doomwalker,30728
+P1,World Bosses,1,Doomwalker,30731
+P1,World Bosses,1,Doomwalker,30726
+P1,World Bosses,1,Doomwalker,30723
+P1,World Bosses,1,Doomwalker,30722
+P1,World Bosses,1,Doomwalker,30724
+P1,World Bosses,2,Doom Lord Kazzak,30735
+P1,World Bosses,2,Doom Lord Kazzak,30734
+P1,World Bosses,2,Doom Lord Kazzak,30737
+P1,World Bosses,2,Doom Lord Kazzak,30739
+P1,World Bosses,2,Doom Lord Kazzak,30740
+P1,World Bosses,2,Doom Lord Kazzak,30741
+P1,World Bosses,2,Doom Lord Kazzak,30736
+P1,World Bosses,2,Doom Lord Kazzak,30738
+P1,World Bosses,2,Doom Lord Kazzak,30733
+P1,World Bosses,2,Doom Lord Kazzak,30732

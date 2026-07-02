@@ -513,6 +513,9 @@ LCEX:RegisterSelfTest("data", "loot phases + tier tokens resolve", function(self
     t:Ok(self:GetTierToken(30243) ~= nil, "T5 token 30243 missing")
     local pieces = self:GetTierPieceForClass(30243, "WARRIOR")
     t:Ok(type(pieces) == "table" and #pieces > 0, "no warrior pieces for token 30243")
+    t:Ok(self:GetTierToken(29759) ~= nil, "T4 token 29759 missing")
+    local t4 = self:GetTierPieceForClass(29767, "WARRIOR")
+    t:Ok(type(t4) == "table" and #t4 == 2, "warrior T4 legs should map to both Warbringer sets")
 end)
 
 -- ── council: Plane B against the real client (no broadcasts) ─────────────────

@@ -7,6 +7,66 @@
 local LCEX = LootCouncilEX
 
 LCEX.TierTokens = {
+    [29753] = {
+        name = "Chestguard of the Fallen Defender",
+        pieces = { ["DRUID"] = { 29086, 29093, 29098 }, ["PRIEST"] = { 29049, 29058 }, ["WARRIOR"] = { 29011, 29021 } },
+    },
+    [29754] = {
+        name = "Chestguard of the Fallen Champion",
+        pieces = { ["PALADIN"] = { 29061, 29068, 29073 }, ["ROGUE"] = { 29044 }, ["SHAMAN"] = { 29028, 29035, 29040 } },
+    },
+    [29755] = {
+        name = "Chestguard of the Fallen Hero",
+        pieces = { ["HUNTER"] = { 29081 }, ["MAGE"] = { 29076 }, ["WARLOCK"] = { 28963 } },
+    },
+    [29756] = {
+        name = "Gloves of the Fallen Hero",
+        pieces = { ["HUNTER"] = { 29082 }, ["MAGE"] = { 29077 }, ["WARLOCK"] = { 28964 } },
+    },
+    [29757] = {
+        name = "Gloves of the Fallen Champion",
+        pieces = { ["PALADIN"] = { 29062, 29066, 29071 }, ["ROGUE"] = { 29045 }, ["SHAMAN"] = { 29029, 29033, 29038 } },
+    },
+    [29758] = {
+        name = "Gloves of the Fallen Defender",
+        pieces = { ["DRUID"] = { 29087, 29091, 29096 }, ["PRIEST"] = { 29050, 29056 }, ["WARRIOR"] = { 29012, 29019 } },
+    },
+    [29759] = {
+        name = "Helm of the Fallen Hero",
+        pieces = { ["HUNTER"] = { 29083 }, ["MAGE"] = { 29078 }, ["WARLOCK"] = { 28966 } },
+    },
+    [29760] = {
+        name = "Helm of the Fallen Champion",
+        pieces = { ["PALADIN"] = { 29063, 29069, 29074 }, ["ROGUE"] = { 29046 }, ["SHAMAN"] = { 29030, 29036, 29042 } },
+    },
+    [29761] = {
+        name = "Helm of the Fallen Defender",
+        pieces = { ["DRUID"] = { 29088, 29094, 29099 }, ["PRIEST"] = { 29053, 29059 }, ["WARRIOR"] = { 29015, 29022 } },
+    },
+    [29762] = {
+        name = "Pauldrons of the Fallen Hero",
+        pieces = { ["HUNTER"] = { 29085 }, ["MAGE"] = { 29080 }, ["WARLOCK"] = { 28968 } },
+    },
+    [29763] = {
+        name = "Pauldrons of the Fallen Champion",
+        pieces = { ["PALADIN"] = { 29065, 29067, 29072 }, ["ROGUE"] = { 29048 }, ["SHAMAN"] = { 29032, 29034, 29039 } },
+    },
+    [29764] = {
+        name = "Pauldrons of the Fallen Defender",
+        pieces = { ["DRUID"] = { 29090, 29092, 29097 }, ["PRIEST"] = { 29055, 29057 }, ["WARRIOR"] = { 29017, 29020 } },
+    },
+    [29765] = {
+        name = "Leggings of the Fallen Hero",
+        pieces = { ["HUNTER"] = { 29084 }, ["MAGE"] = { 29079 }, ["WARLOCK"] = { 28967 } },
+    },
+    [29766] = {
+        name = "Leggings of the Fallen Champion",
+        pieces = { ["PALADIN"] = { 29064, 29070, 29075 }, ["ROGUE"] = { 29047 }, ["SHAMAN"] = { 29031, 29037, 29043 } },
+    },
+    [29767] = {
+        name = "Leggings of the Fallen Defender",
+        pieces = { ["DRUID"] = { 29089, 29095, 29100 }, ["PRIEST"] = { 29054, 29060 }, ["WARRIOR"] = { 29016, 29023 } },
+    },
     [30236] = {
         name = "Chestguard of the Vanquished Champion",
         pieces = { ["ROGUE"] = { 30144 }, ["SHAMAN"] = { 30164, 30169, 30185 }, ["PALADIN"] = { 30134, 30123, 30129 } },

@@ -31,6 +31,14 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.18.x — P1 content + polish batch — **one selftest run + a browser glance**
+- [ ] Run **`/lcex selftest`** solo again (now also covers T4 tokens, the GuildRoster shim, and
+  the class-color assert), `/reload`, tell me — I read the report.
+- [ ] `/lcex loot` → **P1 tab** shows Gruul's Lair / Karazhan / Magtheridon's Lair / World
+  Bosses with bosses in kill order. Spot-check a couple of names (e.g. Attumen drops
+  *Steelhawk Crossbow*, Gruul drops the *Dragonspine Trophy*); the five T4 token drops show a
+  `(token)` annotation (Curator=gloves, Prince=helm, Maulgar=shoulder, Gruul=legs, Mag=chest).
+
 ### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
 - [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
   *"Session ML A went quiet — closing the session view"* and the frames close (B isn't stuck).
