@@ -31,16 +31,6 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.17.0 — In-game self-test (`/lcex selftest`) — **solo, one command**
-- [ ] Log in **solo** (not grouped), run **`/lcex selftest`**, wait ~5s for the chat summary,
-  then **`/reload`** and tell me "selftest done" — I read the full report out of SavedVariables
-  and update this file myself. That one run now automatically covers: load/API-contract checks
-  (`GetTalentTabInfo` signature, `C_Container`, Item mixin, tooltip-scan plumbing), frame
-  rendering + the FauxScrollFrame offset regression, snapshots, the comm receive path + a live
-  GUILD echo, and the whole solo session pipeline (start → respond → vote toggle → award → end,
-  self-cleaning). It absorbed the old v0.10.0 smoke item and the solo halves of v0.12.0/v0.13.0/
-  v0.15.0 below.
-
 ### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
 - [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
   *"Session ML A went quiet — closing the session view"* and the frames close (B isn't stuck).
@@ -82,6 +72,13 @@ Changed since the last in-game pass — verify on your next `/reload`, then tell
 
 ## Passed ✓  (regression reference)
 Verified in-game. Bullets document *what* was checked; re-run a section only if its code changes.
+
+### v0.17.0 — In-game self-test (`/lcex selftest`)
+- [x] First run 2026-07-02 (Bankrex-Dreamscythe, build 2.5.5/68101): **33/33 PASS**, 0 fail /
+  0 error / 0 skip; live GUILD echo 334ms; solo session E2E clean; zero DB residue. Env facts:
+  `GetLootMethod=nil`, `GuildRoster=nil` (→ shim fix), `C_Container` present,
+  `GetItemInfoInstant` global, `BackdropTemplateMixin` present. Re-run after any change —
+  report is read from SavedVariables automatically.
 
 ### Setup
 - [x] Folder symlinked into `World of Warcraft\_anniversary_\Interface\AddOns\LootCouncilEX`.
