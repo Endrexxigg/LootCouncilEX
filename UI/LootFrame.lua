@@ -25,6 +25,8 @@ function LCEX:EnsureLootFrame()
         width = 560, height = 320,
         title = self.L["LootCouncil EX — Respond"],
         savedKey = "lootFrame",
+        -- First-run: up-left of center so the Council window (down-right) never covers it.
+        defaultPos = { x = -280, y = 110 },
     })
     f.rows = {}
 

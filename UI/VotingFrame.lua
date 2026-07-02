@@ -37,6 +37,8 @@ function LCEX:EnsureVotingFrame()
         width = 520, height = 320,
         title = self.L["LootCouncil EX — Council"],
         savedKey = "votingFrame",
+        -- First-run: down-right of center, paired with the Respond window's up-left offset.
+        defaultPos = { x = 260, y = -70 },
     })
     f.candRows = {}
 

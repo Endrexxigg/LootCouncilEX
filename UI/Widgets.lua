@@ -21,8 +21,10 @@ LCEX.STYLE = {
 }
 
 -- Create a movable, ESC-closable titled window. `name` is the GLOBAL frame name (required
--- for UISpecialFrames). `opts` = { width, height, title, savedKey }. savedKey, if given,
--- persists the window position into db.profile.ui[savedKey].
+-- for UISpecialFrames). `opts` = { width, height, title, savedKey, defaultPos }. savedKey,
+-- if given, persists the window position into db.profile.ui[savedKey]. defaultPos = {x, y}
+-- offsets the first-run CENTER anchor so paired windows (Respond/Council) don't spawn
+-- stacked; a saved position always wins over it.
 function LCEX:CreateWindow(name, opts)
     opts = opts or {}
     local addon = self
@@ -31,7 +33,8 @@ function LCEX:CreateWindow(name, opts)
     -- skip the backdrop rather than erroring out of CreateFrame.
     local f = CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(opts.width or 360, opts.height or 280)
-    f:SetPoint("CENTER")
+    local def = opts.defaultPos
+    f:SetPoint("CENTER", UIParent, "CENTER", (def and def.x) or 0, (def and def.y) or 0)
     f:SetFrameStrata("DIALOG")
     if f.SetBackdrop then f:SetBackdrop(self.STYLE.backdrop) end
     f:EnableMouse(true)
