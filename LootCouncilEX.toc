@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.16.6
+## Version: 0.17.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -56,3 +56,6 @@ Core\council\Notes.lua
 Core\council\Marks.lua
 Core\council\History.lua
 Core\council\SelfReport.lua
+
+# In-game validation harness (/lcex selftest). Loads LAST — it exercises every module above.
+Core\SelfTest.lua

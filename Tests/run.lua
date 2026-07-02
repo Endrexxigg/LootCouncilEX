@@ -446,6 +446,91 @@ test("DataAPI: tier tokens", function()
     ok(not L:FindTokenForItem(30056), "a normal gear item is not a token")
 end)
 
+-- ── Self-test runner (Core/SelfTest.lua) ─────────────────────────────────────
+-- The in-game checks themselves need the real client; headless we verify the RUNNER: status
+-- classification, the always-runs cleanup contract, sync-completing async tests, the timeout
+-- path, and the persisted report shape.
+test("SelfTest runner: statuses, cleanup contract, report", function()
+    local realTests = L.selfTests
+    L.selfTests = {}
+    local cleaned, failCleaned = false, false
+    L:RegisterSelfTest("g", "passes", function(_, t) t:Ok(true, "fine") end)
+    L:RegisterSelfTest("g", "fails", function(_, t) t:Eq(1, 2, "one is two") end,
+        { cleanup = function() failCleaned = true end })
+    L:RegisterSelfTest("g", "errors", function() error("boom") end)
+    L:RegisterSelfTest("g", "skips", function(_, t) t:Skip("not here") end)
+    L:RegisterSelfTest("g", "async done synchronously", function(_, t) t:Ok(true, "y"); t:Done() end,
+        { async = true, cleanup = function() cleaned = true end })
+    L:CmdSelfTest()
+
+    local rep = L.db.global.selfTest
+    ok(rep ~= nil, "report written to db.global.selfTest")
+    eq(rep.pass, 2, "pass count")
+    eq(rep.fail, 1, "fail count")
+    eq(rep.error, 1, "error count")
+    eq(rep.skip, 1, "skip count")
+    eq(#rep.results, 5, "one result per test")
+    eq(rep.results[2].status, "FAIL", "fail status recorded")
+    ok(rep.results[2].msg:find("one is two"), "failure message recorded")
+    eq(rep.results[3].status, "ERROR", "error status recorded")
+    ok(rep.results[3].msg:find("boom"), "error message recorded")
+    eq(rep.results[4].msg, "not here", "skip reason recorded")
+    ok(cleaned and failCleaned, "cleanup ran for async AND failed tests")
+    ok(L.selfTestRun == nil, "run state cleared after finish")
+    eq(rep.ver, L:GetVersion(), "report stamps the addon version")
+    L.selfTests = realTests
+end)
+
+test("SelfTest runner: async timeout fails the test, the suite continues", function()
+    local realTests = L.selfTests
+    L.selfTests = {}
+    local timeoutFn
+    local origSchedule = L.ScheduleTimer
+    L.ScheduleTimer = function(_, fn) timeoutFn = fn; return {} end
+    local hungCleaned = false
+    L:RegisterSelfTest("g", "hangs", function() end,
+        { async = true, timeout = 2, cleanup = function() hungCleaned = true end })
+    L:RegisterSelfTest("g", "after the hang", function(_, t) t:Ok(true, "z") end)
+    L:CmdSelfTest()
+    ok(L.selfTestRun ~= nil, "runner parked waiting on the async test")
+    ok(type(timeoutFn) == "function", "timeout timer armed")
+    timeoutFn() -- the timeout fires
+    L.ScheduleTimer = origSchedule
+
+    local rep = L.db.global.selfTest
+    ok(L.selfTestRun == nil, "run finished after the timeout resumed it")
+    eq(rep.fail, 1, "hung test failed by timeout")
+    ok(rep.results[1].msg:find("timed out after 2s"), "timeout message recorded")
+    eq(rep.pass, 1, "the test after the hang still ran")
+    ok(hungCleaned, "cleanup ran for the timed-out test")
+    L.selfTests = realTests
+end)
+
+test("SelfTest runner: late Done() after a timeout is ignored", function()
+    local realTests = L.selfTests
+    L.selfTests = {}
+    local lateT
+    local origSchedule = L.ScheduleTimer
+    local timeoutFn
+    L.ScheduleTimer = function(_, fn) timeoutFn = fn; return {} end
+    L:RegisterSelfTest("g", "hangs then answers late", function(_, t) lateT = t end,
+        { async = true, timeout = 1 })
+    L:CmdSelfTest()
+    timeoutFn()
+    L.ScheduleTimer = origSchedule
+    local rep = L.db.global.selfTest
+    eq(rep.fail, 1, "timed out")
+    lateT:Done() -- a late item-load/echo callback fires afterwards
+    eq(L.db.global.selfTest, rep, "late Done neither re-finalizes nor restarts anything")
+    ok(L.selfTestRun == nil, "no phantom run resumed")
+    L.selfTests = realTests
+end)
+
+test("SelfTest suite: real registrations loaded and solo session E2E skips safely when grouped", function()
+    ok(#L.selfTests >= 20, "the real in-game suite registered (got " .. #L.selfTests .. ")")
+    ok(type(L.dispatch.tEcho) == "function", "tEcho loopback handler registered")
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

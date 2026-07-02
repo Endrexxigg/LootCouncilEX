@@ -6,18 +6,40 @@
 > reference). Everything under **Passed ✓** is already verified in-game; re-run a section only if
 > related code changes.
 >
-> **Most logic is auto-tested — you don't have to.** Sync merge, digests + directional pull,
-> council resolution, name normalization, command parsing, award logging, self-report caching,
-> the display builders, and the BiS class/spec resolution all run headlessly in `Tests/run.lua`
-> (`lua Tests/run.lua`, and on every push in CI). So this manual list is only for what genuinely
-> needs the game: no Lua errors on load, comms delivery, frame rendering, the trade API, and live
-> multi-client convergence. If a *logic* bug is suspected, add a case to `Tests/run.lua` first —
-> seconds, not a raid night.
+> **Three layers of testing — two of them are automatic:**
+>
+> 1. **Headless (`lua Tests/run.lua`, and on every push in CI).** Pure logic: sync merge,
+>    digests + directional pull, council resolution, name normalization, command parsing, award
+>    logging, self-report caching, the display builders, BiS resolution. If a *logic* bug is
+>    suspected, add a case here first — seconds, not a raid night.
+> 2. **In-game automated (`/lcex selftest`, Core/SelfTest.lua).** Everything that needs the real
+>    client but no second player: WoW API existence/signatures on the Anniversary client (the
+>    `GetTalentTabInfo`/`C_Container` class of bug), frame rendering + the FauxScrollFrame offset
+>    regression, the real AceComm receive path (+ a live GUILD echo when guilded), snapshots, and
+>    the full solo session pipeline (start → respond → vote → award → end). **Run it solo**, wait
+>    for the chat summary, then `/reload` — that writes the full report to SavedVariables, where
+>    Claude reads it directly (`WTF\Account\*\SavedVariables\LootCouncilEX.lua`) and updates this
+>    file. You never need to transcribe results.
+> 3. **Manual (this list).** Only what neither harness can reach: two-client convergence, real
+>    trades/loot events, `/reload`-persistence flows, and how things *look*.
+>
+> **When a new feature lands, its in-game checks are added to `Core/SelfTest.lua` in the same
+> commit** — so the manual list only ever grows by genuinely-manual items.
 
 ---
 
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
+
+### v0.17.0 — In-game self-test (`/lcex selftest`) — **solo, one command**
+- [ ] Log in **solo** (not grouped), run **`/lcex selftest`**, wait ~5s for the chat summary,
+  then **`/reload`** and tell me "selftest done" — I read the full report out of SavedVariables
+  and update this file myself. That one run now automatically covers: load/API-contract checks
+  (`GetTalentTabInfo` signature, `C_Container`, Item mixin, tooltip-scan plumbing), frame
+  rendering + the FauxScrollFrame offset regression, snapshots, the comm receive path + a live
+  GUILD echo, and the whole solo session pipeline (start → respond → vote toggle → award → end,
+  self-cleaning). It absorbed the old v0.10.0 smoke item and the solo halves of v0.12.0/v0.13.0/
+  v0.15.0 below.
 
 ### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
 - [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
@@ -27,46 +49,34 @@ Changed since the last in-game pass — verify on your next `/reload`, then tell
 - [ ] **Heartbeat:** with A's session left open and untouched, B does **not** time out past 95s
   (the 30s `sPing` keeps it alive). End normally → B closes.
 
-### v0.15.0 — Real P2 loot content (SSC + Tempest Keep)
-- [ ] `/lcex loot` → P2 shows **Serpentshrine Cavern** and **Tempest Keep** with their real bosses
-  in kill order, each listing real item **names + icons** (not `item:NNNNN`). The five Tier-5
-  token drops (Vashj=helm, Leotheras=gloves, Karathress=legs, Void Reaver=shoulder, Kael=chest)
-  show a `(token)` annotation.
-- [ ] **FauxScrollFrame (now a real long list):** scroll P2 to the bottom, click an empty phase
-  tab (P1/P3…), then back to P2 → the list **never renders empty** (offset reset).
-- [ ] Spot-check a couple of item names against what you expect (e.g. Lady Vashj drops *Vestments
-  of the Sea-Witch*); flag any wrong name so I can fix the CSV.
+### v0.15.0 — Real P2 loot content — *rendering now auto-tested; one manual spot-check left*
+- [ ] Spot-check a couple of P2 item names in `/lcex loot` against what you expect (e.g. Lady
+  Vashj drops *Vestments of the Sea-Witch*); flag any wrong name so I can fix the CSV.
 
-### v0.14.0 — Real trade-timer (DL-9) — **verify the tooltip parse on Anniversary**
+### v0.14.0 — Real trade-timer (DL-9) — *needs a real BoP drop; selftest only proves the plumbing*
 - [ ] Loot a BoP item, `/reload`, then `/lcex scan` → the item now shows **"~Nm left to trade"**
   (a real countdown), not "looted before reload, no trade timer". If it still says no timer, the
   `BIND_TRADE_TIME_REMAINING` tooltip line didn't parse — tell me the exact tooltip wording.
 - [ ] Award that pre-reload item → its owed record carries a real expiry (the "N minutes left"
   warning fires on the true window, and an expired one is pruned).
 
-### v0.13.0 — Stale-cache indicator
-- [ ] Open a peer's **Gear** (and **Professions**) tab → a grey **"cached Nh ago"** line shows at
-  the bottom of the panel. Open **your own** → it reads **"(your live snapshot)"**. The line is
-  hidden on the History/BiS/Notes tabs.
+### v0.13.0 — Stale-cache indicator — *own-snapshot half now auto-tested*
+- [ ] Open a **peer's** Gear (and Professions) tab → a grey **"cached Nh ago"** line shows at the
+  bottom of the panel (needs a cached `pReport` from a second client).
 
-### v0.12.0 — BiS auto-resolves spec
+### v0.12.0 — BiS auto-resolves spec — *own-class half now auto-tested; 2-client half left*
 - [ ] Open a **grouped** player who has the addon (e.g. a Fury warrior) → **BiS** tab. The **Spec**
-  now auto-selects *their* spec (Fury), not just defaulting to the first. Cycling Class away and
-  back re-resolves sensibly.
+  auto-selects *their* spec (Fury). Cycling Class away and back re-resolves sensibly.
 - [ ] Open a council member who's **online but not grouped** with you → their class **and** spec
   still resolve (from their last self-report cached in `gearCache`). `/lcex report` on them first
   if their cache is empty.
 
-### v0.11.0 — Owed-trade persistence (DL-6)
+### v0.11.0 — Owed-trade persistence (DL-6) — *needs a real `/reload` mid-flow*
 - [ ] Award an item to someone (`/lcex test 1` → `/lcex award 1 <name>`), then **`/reload`**. Open
   a trade with that player → the awarded item **still auto-fills** (the owed list survived the
   reload). A second never-awarded item does not.
 - [ ] Owed item still in its 2h window after reload → the "N minutes left" warning still fires; an
   item whose window already lapsed during the reload is silently dropped (no false auto-fill).
-
-### v0.10.0 — DB versioning (invisible)
-- [ ] Pure smoke: `/reload` with an existing `LootCouncilEXDB` → no Lua errors, all prior data
-  (notes/marks/history) intact. (Migration is a no-op stamp; just confirm nothing breaks.)
 
 ---
 

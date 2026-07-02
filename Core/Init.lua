@@ -196,7 +196,9 @@ function LCEX:HandleSlash(input)
         self:CmdSession()
     elseif cmd == "test" then
         self:CmdTest(rest)
+    elseif cmd == "selftest" then
+        self:CmdSelfTest()
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"])
     end
 end

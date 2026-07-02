@@ -64,6 +64,9 @@ _G.GetNumRaidMembers = function() return H.inRaid and #H.group or 0 end
 _G.GetRaidRosterInfo = function(i) local m = H.group[i]; return m end
 _G.GetInstanceInfo = function() return "Test Zone" end
 _G.LE_PARTY_CATEGORY_INSTANCE = 2
+_G.GetRealmName = function() return "TestRealm" end
+_G.GetBuildInfo = function() return "2.5.5", "99999", "Jan 1 2026", 20505 end
+_G.GetLocale = function() return "enUS" end
 
 -- ── WoW item/loot/skill API (enough to load; returns benign values) ──────────
 _G.GetInventoryItemLink = function() return nil end
@@ -163,6 +166,7 @@ local FILES = {
     "Core/council/History.lua", "Core/council/SelfReport.lua",
     "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
     "UI/LootBrowser.lua", "UI/PlayerDetail.lua",
+    "Core/SelfTest.lua", -- last, like the .toc; only its RUNNER is exercised headlessly
 }
 for _, f in ipairs(FILES) do
     local chunk, err = loadfile(f)

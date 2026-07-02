@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -159,6 +159,14 @@ L["Class %s · Spec %s · %s"]                = "Class %s · Spec %s · %s"
 L["No BiS data for this class/spec/phase."] = "No BiS data for this class/spec/phase."
 L["Class: %s"]                              = "Class: %s"
 L["Spec: %s"]                               = "Spec: %s"
+
+-- Phase 7 — in-game self-test (/lcex selftest).
+L["Self-test: running %d checks…"]          = "Self-test: running %d checks…"
+L["Self-test already running."]             = "Self-test already running."
+L["Self-test: %d passed, %d failed, %d errors, %d skipped (v%s, %.1fs)"] =
+    "Self-test: %d passed, %d failed, %d errors, %d skipped (v%s, %.1fs)"
+L["Self-test report saved. /reload to write it to disk, then tell Claude to read it."] =
+    "Self-test report saved. /reload to write it to disk, then tell Claude to read it."
 
 -- Phase 7 — data-freshness (stale-cache indicators).
 L["cached %s"]                              = "cached %s"

@@ -97,13 +97,24 @@ English, and don't assume the user will run git by hand.
 
 ## Testing
 
-- **In-game:** after a change, the user `/reload`s. Lua errors surface via **BugSack** or
-  `/console scriptErrors 1`.
+- **In-game (automated): `/lcex selftest`** (`Core/SelfTest.lua`) runs the full in-game
+  validation suite solo — API-contract checks against the live client, frame rendering, comm
+  loopback, and the solo session pipeline — then persists the report to
+  `LootCouncilEXDB.global.selfTest`. After the user `/reload`s, read the report yourself from
+  `C:\Program Files (x86)\World of Warcraft\_anniversary_\WTF\Account\*\SavedVariables\LootCouncilEX.lua`
+  (pick the newest) and update `docs/TESTING.md`. **When a feature needs in-game validation,
+  register its checks in `Core/SelfTest.lua` in the same commit** — tests must clean up every
+  DB/frame/timer side effect (ground rules in that file's header).
+- **In-game (manual):** only what the self-test can't reach — two-client convergence, real
+  trades/loot, `/reload` persistence, visuals. Tracked in `docs/TESTING.md`. After a change,
+  the user `/reload`s; Lua errors surface via **BugSack** or `/console scriptErrors 1`.
 - When the user pastes an error, **fix the root cause — don't paper over it with defensive
   `nil` checks** to silence the symptom.
 - **Lint:** `luacheck .` (config in `.luacheckrc`, Lua 5.1 std, `Libs/` and `References/`
   excluded). WoW ships **Lua 5.1** — avoid 5.1-incompatible idioms in shipped code even if
   your local Lua is newer.
+- **Headless:** `lua Tests/run.lua` (mock harness in `Tests/harness.lua`) — pure logic plus
+  the self-test *runner* mechanics. Runs in CI on every push.
 
 ## TBC Classic API gotchas
 

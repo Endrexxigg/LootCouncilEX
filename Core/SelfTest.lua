@@ -1,0 +1,808 @@
+-- ── LootCouncil EX — Core/SelfTest.lua ───────────────────────────────────────
+-- /lcex selftest — the in-game validation harness. Runs every registered check inside the
+-- live client, prints a summary, and persists the full report to db.global.selfTest so a
+-- /reload flushes it to SavedVariables where Claude can read it off disk. This automates the
+-- half of testing that Tests/run.lua (headless) can't reach: real WoW API existence and
+-- signatures on the Anniversary client, real frame rendering, the real AceComm wire, and the
+-- solo end-to-end session pipeline.
+--
+-- HOW TO EXTEND (do this in the same commit as any feature needing in-game validation):
+--   LCEX:RegisterSelfTest(group, name, function(self, t) ... end, opts)
+--     t:Ok(cond, label) / t:Eq(got, want, label)  — accumulate assertions (never throw)
+--     t:Skip(reason)                              — mark skipped (return afterwards)
+--     t:Done()                                    — finish an async test (opts.async = true,
+--                                                   opts.timeout seconds, default 3)
+--     t.info = "..."                              — informational note kept on a PASS
+--   opts.cleanup = function(self) ... end         — ALWAYS runs (even after FAIL/ERROR);
+--                                                   must remove every DB key / frame / timer
+--                                                   the test created. Tests must leave zero
+--                                                   residue in LootCouncilEXDB.
+--
+-- Ground rules (from the module gotchas — see docs/TESTING.md):
+--   • Never SetRecord/SetNote/SetMark here (they broadcast pSet to the guild); use MergeRecord.
+--   • The session E2E hard-skips when grouped — solo, GroupChannel() is nil so nothing sends.
+--   • History is a union sync dataset: delete any test award record in the SAME synchronous
+--     step (cleanup), before yielding to timers, or it propagates to guild peers forever.
+--
+-- Loads LAST in the .toc (it exercises every other module).
+
+local LCEX = LootCouncilEX
+
+-- Real TBC item for item-API checks (Robe of Hateful Echoes, SSC — INVTYPE_ROBE).
+local TEST_ITEM_ID = 30055
+-- Session E2E pads (same set CmdTest uses); GetItemInfo may be uncached → "item:<id>" fallback.
+local TEST_LINK_IDS = { 32837, 30055 }
+-- Award target that can never collide with a real trade partner (ShortKey → "lcextestdummy").
+local AWARD_DUMMY = "LCEXTestDummy"
+
+local ALL_DATASETS = { "dummy", "notes", "marks", "history", "gearCache", "profCache" }
+
+-- ── Registry ─────────────────────────────────────────────────────────────────
+LCEX.selfTests = LCEX.selfTests or {}
+
+function LCEX:RegisterSelfTest(group, name, fn, opts)
+    opts = opts or {}
+    tinsert(self.selfTests, {
+        group   = group,
+        name    = name,
+        fn      = fn,
+        async   = opts.async or false,
+        timeout = opts.timeout or 3,
+        cleanup = opts.cleanup,
+    })
+end
+
+-- ── Test context ─────────────────────────────────────────────────────────────
+-- Assertions accumulate into t.fails instead of throwing, so one bad check doesn't hide the
+-- rest of a test's findings; a real Lua error still aborts the test and reports ERROR.
+local ContextMT = {}
+ContextMT.__index = ContextMT
+
+function ContextMT:Ok(cond, label)
+    if not cond then self.fails[#self.fails + 1] = tostring(label) end
+    return cond and true or false
+end
+
+function ContextMT:Eq(got, want, label)
+    if got ~= want then
+        self.fails[#self.fails + 1] = string.format("%s — expected %s, got %s",
+            tostring(label), tostring(want), tostring(got))
+        return false
+    end
+    return true
+end
+
+function ContextMT:Skip(reason)
+    self.skipReason = tostring(reason or "skipped")
+end
+
+-- Finish an async test. Safe to call more than once (late item-load / echo callbacks after a
+-- timeout are ignored). When the runner is already parked waiting on us, resume it.
+function ContextMT:Done()
+    if self.finished then return end
+    self.finished = true
+    if self.timer then
+        LCEX:CancelTimer(self.timer)
+        self.timer = nil
+    end
+    if self.waiting then
+        LCEX:_SelfTestFinalize(self)
+        LCEX:_SelfTestAdvance()
+    end
+end
+
+local function NewContext(test)
+    return setmetatable({
+        test = test, fails = {}, finished = false, waiting = false,
+        startedAt = GetTime(),
+    }, ContextMT)
+end
+
+-- ── Runner ───────────────────────────────────────────────────────────────────
+-- Sequential (state isolation beats speed here): each test runs under pcall, async tests park
+-- the runner until t:Done() or the timeout, and the test's cleanup ALWAYS runs before the next
+-- test starts.
+function LCEX:CmdSelfTest()
+    if self.selfTestRun then
+        self:Msg(self.L["Self-test already running."])
+        return
+    end
+    self.selfTestRun = {
+        i = 0, results = {}, pass = 0, fail = 0, err = 0, skip = 0,
+        startedAt = GetTime(),
+    }
+    self:Msg(string.format(self.L["Self-test: running %d checks…"], #self.selfTests))
+    self:_SelfTestAdvance()
+end
+
+function LCEX:_SelfTestAdvance()
+    local run = self.selfTestRun
+    if not run then return end
+    while true do
+        run.i = run.i + 1
+        local test = self.selfTests[run.i]
+        if not test then
+            return self:_SelfTestFinish()
+        end
+        local t = NewContext(test)
+        local ok, err = pcall(test.fn, self, t)
+        if not ok then
+            t.errored = err
+            self:_SelfTestFinalize(t)
+        elseif test.async and not t.finished then
+            t.waiting = true
+            t.timer = self:ScheduleTimer(function() self:_SelfTestTimeout(t) end, test.timeout)
+            return -- parked; t:Done() or the timeout resumes the loop
+        else
+            self:_SelfTestFinalize(t)
+        end
+    end
+end
+
+function LCEX:_SelfTestTimeout(t)
+    if t.finished then return end
+    t.timer = nil
+    t.finished = true
+    t.fails[#t.fails + 1] = string.format("timed out after %ds", t.test.timeout)
+    self:_SelfTestFinalize(t)
+    self:_SelfTestAdvance()
+end
+
+function LCEX:_SelfTestFinalize(t)
+    if t.finalized then return end
+    t.finalized = true
+    local run = self.selfTestRun
+    if not run then return end
+
+    local status, msg
+    if t.errored then
+        status, msg = "ERROR", tostring(t.errored)
+    elseif t.skipReason then
+        status, msg = "SKIP", t.skipReason
+    elseif #t.fails > 0 then
+        status, msg = "FAIL", table.concat(t.fails, "; ")
+    else
+        status, msg = "PASS", t.info
+    end
+
+    -- The cleanup contract: runs no matter how the test ended; a cleanup error means residue,
+    -- which downgrades even a PASS.
+    if t.test.cleanup then
+        local ok, cerr = pcall(t.test.cleanup, self)
+        if not ok then
+            if status == "PASS" then status = "FAIL" end
+            msg = (msg and (msg .. "; ") or "") .. "cleanup error: " .. tostring(cerr)
+        end
+    end
+
+    if status == "PASS" then run.pass = run.pass + 1
+    elseif status == "FAIL" then run.fail = run.fail + 1
+    elseif status == "ERROR" then run.err = run.err + 1
+    else run.skip = run.skip + 1 end
+
+    run.results[#run.results + 1] = {
+        group  = t.test.group,
+        name   = t.test.name,
+        status = status,
+        msg    = msg,
+        ms     = math.floor((GetTime() - t.startedAt) * 1000),
+    }
+end
+
+function LCEX:_SelfTestFinish()
+    local run = self.selfTestRun
+    self.selfTestRun = nil
+    if not run then return end
+
+    local duration = GetTime() - run.startedAt
+    -- The persisted report — what Claude reads out of SavedVariables after the /reload.
+    self.db.global.selfTest = {
+        ver     = self:GetVersion(),
+        when    = date("%Y-%m-%d %H:%M:%S"),
+        ts      = time(),
+        player  = UnitName("player"),
+        realm   = GetRealmName(),
+        build   = string.format("%s (%s, toc %s)",
+            tostring((GetBuildInfo())), tostring(select(2, GetBuildInfo())),
+            tostring(select(4, GetBuildInfo()))),
+        locale  = GetLocale(),
+        grouped = IsInGroup() and true or false,
+        guilded = IsInGuild() and true or false,
+        pass    = run.pass,
+        fail    = run.fail,
+        error   = run.err,
+        skip    = run.skip,
+        durationMs = math.floor(duration * 1000),
+        results = run.results,
+    }
+
+    self:Msg(string.format(self.L["Self-test: %d passed, %d failed, %d errors, %d skipped (v%s, %.1fs)"],
+        run.pass, run.fail, run.err, run.skip, self:GetVersion(), duration))
+    for _, r in ipairs(run.results) do
+        if r.status ~= "PASS" then
+            local color = (r.status == "SKIP") and "999999" or "ff5555"
+            self:Msg(string.format("  |cff%s%s|r %s/%s — %s",
+                color, r.status, r.group, r.name, tostring(r.msg)))
+        end
+    end
+    self:Msg(self.L["Self-test report saved. /reload to write it to disk, then tell Claude to read it."])
+end
+
+-- ── Shared helpers for the checks below ──────────────────────────────────────
+-- A wire item for the fake session; prefers a real cached link so icons render, falls back to
+-- the bare "item:<id>" string exactly like CmdTest's pad path.
+local function FakeWireItem(i)
+    local id = TEST_LINK_IDS[i] or TEST_LINK_IDS[1]
+    local _, link, q = GetItemInfo(id)
+    return { link = link or ("item:" .. id), itemID = id, quality = q or 4 }
+end
+
+local function ContainerAPI(name)
+    return (C_Container and C_Container[name]) or _G[name]
+end
+
+-- First occupied bag slot, or nil — several API checks need a real item to poke at.
+local function FirstOccupiedSlot()
+    local numSlots, itemLink = ContainerAPI("GetContainerNumSlots"), ContainerAPI("GetContainerItemLink")
+    for bag = 0, 4 do
+        for slot = 1, (numSlots(bag) or 0) do
+            if itemLink(bag, slot) then return bag, slot end
+        end
+    end
+    return nil
+end
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- The checks. Grouped: env → load → api → data → council → ui → comm → session.
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- ── env: informational facts about the live client (always PASS) ─────────────
+LCEX:RegisterSelfTest("env", "client environment facts", function(self, t)
+    local gii = _G.GetItemInfoInstant and "global" or (C_Item and C_Item.GetItemInfoInstant and "C_Item")
+    t.info = table.concat({
+        "toc=" .. tostring(select(4, GetBuildInfo())),
+        "locale=" .. tostring(GetLocale()),
+        "GetLootMethod=" .. (GetLootMethod and "present" or "nil"),
+        "C_Container=" .. (C_Container and "present" or "nil"),
+        "GetItemInfoInstant=" .. tostring(gii or "MISSING"),
+        "BackdropTemplateMixin=" .. (BackdropTemplateMixin and "present" or "nil"),
+        "GuildRoster=" .. (GuildRoster and "present" or "nil"),
+    }, ", ")
+end)
+
+-- ── load: everything the .toc promised actually exists ───────────────────────
+LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
+    local fns = {
+        -- Comms / roster
+        "NormalizeName", "IsSelf", "Send", "BuildEnvelope", "OnCommReceived", "DebouncedSend",
+        "GroupChannel", "RecordVersion", "BroadcastVCheck", "PrintKnownVersions",
+        -- Session plane
+        "ResolveCouncil", "GetCouncil", "IsCouncil", "InGroupWith", "StartSession", "EndSession",
+        "EnterSession", "LeaveSession", "ResumeSession", "RestoreSession", "SaveSession",
+        "OnResponseChosen", "CompetingGear", "SendVote", "ApplyCUpdate",
+        "AwardItem", "LogAward", "ForgetAward", "ScanBags", "BuildCouncilableList",
+        "WithItemQuality", "WithItemID", "ItemTradeTimeRemaining", "ParseTradeDuration",
+        "FormatDuration", "TradeExpiry", "SaveOwedTrades", "RestoreOwedTrades",
+        "EnsureTradeTicker", "StopTradeTickerIfIdle",
+        -- Council plane
+        "RegisterDataset", "SetRecord", "MergeRecord", "BuildDigest", "SyncHello",
+        "SetNote", "SetMark", "HistoryForPlayer", "BuildHistoryRecord",
+        "SnapshotGear", "SnapshotSpec", "SnapshotProfs", "SendSelfReport",
+        -- Data + display builders
+        "MigrateDB", "GetVersion", "RelTime", "CacheMetaText", "ResolveBiSContext",
+        "BuildGearDisplay", "BuildProfsDisplay", "BuildBiSDisplay", "BuildHistoryDisplay",
+        "BuildBrowserDisplay", "GetLootPhases", "GetRaidsForPhase", "GetBossesForRaid",
+        "GetItemsForBoss", "GetBiSSpecs", "GetBiSForSpecPhase", "GetTierToken",
+        "GetTierPieceForClass", "FindTokenForItem", "SpecsForClass", "IsKnownClass",
+        -- UI
+        "CreateWindow", "CreateButton", "CreateLabel", "CreateItemIcon", "CreateTabStrip",
+        "CreateScrollList", "CreateEditBox",
+        "ShowLootFrame", "HideLootFrame", "ShowVotingFrame", "HideVotingFrame",
+        "RefreshVotingItem", "ToggleSessionFrame", "RefreshSessionFrame",
+        "ToggleLootBrowser", "ShowLootPhase", "OpenPlayerDetail", "RenderDetailTab",
+    }
+    for _, name in ipairs(fns) do
+        t:Ok(type(self[name]) == "function", "missing function: " .. name)
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "comm dispatch handlers registered", function(self, t)
+    local cmds = { "vCheck", "vReply", "sStart", "sEnd", "sPing", "cResp", "cUpdate", "vVote",
+                   "award", "pHello", "pSyncReq", "pSyncData", "pSet", "pReport", "tEcho" }
+    for _, cmd in ipairs(cmds) do
+        t:Ok(type(self.dispatch[cmd]) == "function", "missing dispatch handler: " .. cmd)
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "datasets registered over the live stores", function(self, t)
+    for _, name in ipairs(ALL_DATASETS) do
+        local ds = self.datasets[name]
+        if t:Ok(ds ~= nil, "dataset not registered: " .. name) then
+            t:Ok(ds.store() == self.db.global[name],
+                "dataset store detached from db.global: " .. name)
+        end
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "RESPONSES table well-formed (UI is data-driven from it)", function(self, t)
+    t:Ok(#self.RESPONSES >= 2, "need at least two responses")
+    local sawPass = false
+    for i, r in ipairs(self.RESPONSES) do
+        t:Eq(r.id, i, "RESPONSES[" .. i .. "].id")
+        t:Ok(type(r.key) == "string" and type(r.text) == "string", "RESPONSES[" .. i .. "] key/text")
+        t:Ok(type(r.color) == "table" and #r.color == 3, "RESPONSES[" .. i .. "].color")
+        if r.key == "PASS" then sawPass = true end
+    end
+    t:Ok(sawPass, "built-in PASS response missing")
+    for name, s in pairs(self.STATUS) do
+        t:Ok(s > #self.RESPONSES, "STATUS." .. name .. " overlaps response ids")
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "db schema + migration stamp", function(self, t)
+    for _, key in ipairs({ "notes", "marks", "history", "gearCache", "profCache",
+                           "pendingTrades", "session", "dummy" }) do
+        t:Ok(type(self.db.global[key]) == "table", "db.global." .. key .. " missing")
+    end
+    t:Eq(self.db.global.dbVersion, self.DB_VERSION, "dbVersion stamp")
+    t:Ok(type(self.db.profile.council) == "table", "profile.council missing")
+    for _, key in ipairs({ "lootFrame", "votingFrame", "sessionFrame", "playerDetail", "lootBrowser" }) do
+        t:Ok(type(self.db.profile.ui[key]) == "table", "profile.ui." .. key .. " missing")
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "locale table degrades missing keys to English", function(self, t)
+    t:Eq(self.L["__lcex_selftest_missing__"], "__lcex_selftest_missing__", "L metatable echo")
+end)
+
+LCEX:RegisterSelfTest("load", "embedded Ace3 libraries present", function(self, t)
+    for _, lib in ipairs({ "AceAddon-3.0", "AceEvent-3.0", "AceComm-3.0", "AceSerializer-3.0",
+                           "AceConsole-3.0", "AceDB-3.0", "AceTimer-3.0", "CallbackHandler-1.0" }) do
+        t:Ok(LibStub(lib, true) ~= nil, "LibStub missing: " .. lib)
+    end
+end)
+
+LCEX:RegisterSelfTest("load", "addon metadata readable (## Version)", function(self, t)
+    t:Ok(self:GetVersion() ~= "dev", "GetAddOnMetadata returned nothing — version reads as 'dev'")
+end)
+
+-- ── api: the WoW client contract the code depends on ─────────────────────────
+LCEX:RegisterSelfTest("api", "container API resolvable + callable", function(self, t)
+    for _, name in ipairs({ "GetContainerNumSlots", "GetContainerItemLink",
+                            "GetContainerItemInfo", "UseContainerItem" }) do
+        t:Ok(ContainerAPI(name) ~= nil, name .. " missing from both C_Container and _G")
+    end
+    if #t.fails > 0 then return end
+    t:Ok(type(ContainerAPI("GetContainerNumSlots")(0)) == "number",
+        "GetContainerNumSlots(0) did not return a number")
+end)
+
+LCEX:RegisterSelfTest("api", "container item info shape (SlotInfo contract)", function(self, t)
+    local bag, slot = FirstOccupiedSlot()
+    if not bag then return t:Skip("bags are empty — nothing to scan") end
+    local link = ContainerAPI("GetContainerItemLink")(bag, slot)
+    t:Ok(type(link) == "string" and link:find("|Hitem:", 1, true) ~= nil,
+        "container link is not an item link")
+    local info = ContainerAPI("GetContainerItemInfo")(bag, slot)
+    if type(info) == "table" then -- C_Container form (Anniversary)
+        t:Ok(info.hyperlink ~= nil, "C_Container info table lacks .hyperlink")
+        t:Ok(type(info.quality) == "number", "C_Container info table lacks numeric .quality")
+    else -- legacy flat multi-return: 4th = quality, 7th = link
+        local q = select(4, ContainerAPI("GetContainerItemInfo")(bag, slot))
+        t:Ok(type(q) == "number", "flat GetContainerItemInfo 4th return (quality) not a number")
+    end
+end)
+
+LCEX:RegisterSelfTest("api", "talent API signature (SnapshotSpec contract)", function(self, t)
+    t:Ok(type(GetNumTalentTabs) == "function", "GetNumTalentTabs missing")
+    t:Ok(type(GetTalentTabInfo) == "function", "GetTalentTabInfo missing")
+    if #t.fails > 0 then return end
+    local tabs = GetNumTalentTabs()
+    t:Ok(type(tabs) == "number" and tabs >= 1, "GetNumTalentTabs not a positive number")
+    local class = select(2, UnitClass("player"))
+    local specs = self.CLASS_SPECS[class] or {}
+    for tab = 1, math.min(tonumber(tabs) or 0, 3) do
+        local _, name, _, _, pointsSpent = GetTalentTabInfo(tab)
+        t:Ok(type(name) == "string" and name ~= "",
+            "tab " .. tab .. ": 2nd return (name) not a string — signature drift")
+        t:Ok(tonumber(pointsSpent) ~= nil,
+            "tab " .. tab .. ": 5th return (pointsSpent) not numeric — signature drift")
+        local known = false
+        for _, s in ipairs(specs) do if s == name then known = true end end
+        t:Ok(known, "tab " .. tab .. " name '" .. tostring(name) .. "' not a CLASS_SPECS."
+            .. tostring(class) .. " tree — BiS auto-resolve would break")
+    end
+end)
+
+LCEX:RegisterSelfTest("api", "unit / instance / realm basics", function(self, t)
+    local n = UnitName("player")
+    t:Ok(type(n) == "string" and n ~= "", "UnitName('player') empty")
+    t:Ok(self:IsKnownClass(select(2, UnitClass("player"))), "UnitClass 2nd return not a known class token")
+    t:Ok(type(GetInstanceInfo()) == "string", "GetInstanceInfo 1st return not a string")
+    t:Ok(type(GetRealmName()) == "string", "GetRealmName not a string")
+end)
+
+LCEX:RegisterSelfTest("api", "Item mixin present (async item loads)", function(self, t)
+    if not t:Ok(type(Item) == "table", "Item mixin missing") then return end
+    t:Ok(type(Item.CreateFromItemID) == "function", "Item.CreateFromItemID missing")
+    t:Ok(type(Item.CreateFromItemLink) == "function", "Item.CreateFromItemLink missing")
+    local obj = Item:CreateFromItemID(TEST_ITEM_ID)
+    if t:Ok(type(obj) == "table", "CreateFromItemID did not return an object") then
+        for _, m in ipairs({ "IsItemEmpty", "IsItemDataCached", "ContinueOnItemLoad" }) do
+            t:Ok(type(obj[m]) == "function", "item object missing :" .. m)
+        end
+    end
+end)
+
+LCEX:RegisterSelfTest("api", "GetItemInfoInstant shape (icon + equipLoc)", function(self, t)
+    local gii = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
+    if not t:Ok(gii ~= nil, "GetItemInfoInstant missing from both _G and C_Item") then return end
+    local id, _, _, equipLoc, icon = gii(TEST_ITEM_ID)
+    t:Eq(id, TEST_ITEM_ID, "1st return (itemID)")
+    t:Ok(type(equipLoc) == "string" and equipLoc:find("^INVTYPE_") ~= nil,
+        "4th return (equipLoc) not an INVTYPE_ token — CompetingGear would break")
+    t:Ok(icon ~= nil, "5th return (icon) nil")
+end)
+
+LCEX:RegisterSelfTest("api", "item data loads (WithItemID round-trip)", function(self, t)
+    self:WithItemID(TEST_ITEM_ID, function(name)
+        t:Ok(type(name) == "string" and name ~= "",
+            "WithItemID resolved no name (item load / 0.5s fallback both failed)")
+        t:Done()
+    end)
+end, { async = true, timeout = 4 })
+
+LCEX:RegisterSelfTest("api", "trade + loot global strings, tooltip scan", function(self, t)
+    t:Ok(type(BIND_TRADE_TIME_REMAINING) == "string" and BIND_TRADE_TIME_REMAINING:find("%%s") ~= nil,
+        "BIND_TRADE_TIME_REMAINING missing/odd — trade-timer scan dead")
+    t:Ok(type(_G.ERR_TRADE_COMPLETE) == "string",
+        "ERR_TRADE_COMPLETE missing — trade completion undetectable")
+    t:Ok(type(LOOT_ITEM_SELF) == "string" and LOOT_ITEM_SELF:find("%%s") ~= nil,
+        "LOOT_ITEM_SELF missing/odd — passive loot tracking dead")
+    local bag, slot = FirstOccupiedSlot()
+    if bag then
+        local rem = self:ItemTradeTimeRemaining(bag, slot)
+        t:Ok(rem == nil or type(rem) == "number",
+            "ItemTradeTimeRemaining returned a " .. type(rem))
+    end
+end)
+
+LCEX:RegisterSelfTest("api", "FauxScrollFrame + frame plumbing globals", function(self, t)
+    t:Ok(type(FauxScrollFrame_Update) == "function", "FauxScrollFrame_Update missing")
+    t:Ok(type(FauxScrollFrame_GetOffset) == "function", "FauxScrollFrame_GetOffset missing")
+    t:Ok(type(FauxScrollFrame_OnVerticalScroll) == "function", "FauxScrollFrame_OnVerticalScroll missing")
+    t:Ok(type(CreateFrame) == "function", "CreateFrame missing")
+    t:Ok(type(UISpecialFrames) == "table", "UISpecialFrames missing")
+    t:Ok(GameTooltip ~= nil, "GameTooltip missing")
+end)
+
+LCEX:RegisterSelfTest("api", "inventory + skill-line APIs", function(self, t)
+    local headSlot = GetInventorySlotInfo("HeadSlot")
+    t:Ok(type(headSlot) == "number", "GetInventorySlotInfo('HeadSlot') not a number")
+    local link = GetInventoryItemLink("player", headSlot or 1)
+    t:Ok(link == nil or type(link) == "string", "GetInventoryItemLink returned a " .. type(link))
+    local n = GetNumSkillLines()
+    t:Ok(type(n) == "number", "GetNumSkillLines not a number")
+    if type(n) == "number" and n > 0 then
+        t:Ok(type((GetSkillLineInfo(1))) == "string", "GetSkillLineInfo 1st return not a string")
+    end
+end)
+
+-- ── data: static content intact on the live client ───────────────────────────
+LCEX:RegisterSelfTest("data", "loot phases + tier tokens resolve", function(self, t)
+    local phases = self:GetLootPhases()
+    t:Ok(#phases >= 1, "no loot phases carry data")
+    for _, phase in ipairs(phases) do
+        local d = self:BuildBrowserDisplay(phase)
+        t:Ok(#d > 0, "empty browser display for " .. phase)
+        t:Eq(d[1] and d[1].kind, "raid", phase .. " display should start with a raid header")
+    end
+    t:Ok(self:GetTierToken(30243) ~= nil, "T5 token 30243 missing")
+    local pieces = self:GetTierPieceForClass(30243, "WARRIOR")
+    t:Ok(type(pieces) == "table" and #pieces > 0, "no warrior pieces for token 30243")
+end)
+
+-- ── council: Plane B against the real client (no broadcasts) ─────────────────
+LCEX:RegisterSelfTest("council", "own snapshots (gear / spec / professions)", function(self, t)
+    local gear = self:SnapshotGear()
+    t:Ok(type(gear) == "table", "SnapshotGear not a table")
+    for slot, link in pairs(gear) do
+        t:Ok(type(slot) == "number" and slot >= 1 and slot <= 18, "gear slot key out of range")
+        t:Ok(type(link) == "string" and link:find("|Hitem:", 1, true) ~= nil,
+            "gear slot " .. tostring(slot) .. " value not an item link")
+    end
+    local class, spec = self:SnapshotSpec()
+    t:Ok(self:IsKnownClass(class), "SnapshotSpec class not a known token")
+    if spec ~= nil then
+        local known = false
+        for _, s in ipairs(self:SpecsForClass(class)) do if s == spec then known = true end end
+        t:Ok(known, "SnapshotSpec spec '" .. tostring(spec) .. "' not a " .. tostring(class) .. " tree")
+    end
+    local profs = self:SnapshotProfs()
+    t:Ok(type(profs) == "table", "SnapshotProfs not a table")
+    for pname, rank in pairs(profs) do
+        t:Ok(type(pname) == "string" and type(rank) == "number", "profession entry shape")
+    end
+end)
+
+local MERGE_KEY = "__lcex_selftest__"
+LCEX:RegisterSelfTest("council", "dataset merge hits the live store (no broadcast)", function(self, t)
+    -- MergeRecord (not SetRecord!) — SetRecord would broadcast pSet to the guild.
+    local store = self.db.global.dummy
+    store[MERGE_KEY] = nil
+    t:Ok(self:MergeRecord("dummy", MERGE_KEY, { text = "a", mod = 10, by = "SelfTest" }), "first merge inserts")
+    t:Ok(not self:MergeRecord("dummy", MERGE_KEY, { text = "b", mod = 9, by = "SelfTest" }), "older mod rejected")
+    t:Ok(self:MergeRecord("dummy", MERGE_KEY, { text = "c", mod = 11, by = "SelfTest" }), "newer mod wins")
+    t:Eq(store[MERGE_KEY] and store[MERGE_KEY].text, "c", "stored text after LWW")
+end, { cleanup = function(self) self.db.global.dummy[MERGE_KEY] = nil end })
+
+LCEX:RegisterSelfTest("council", "digest covers every dataset", function(self, t)
+    local digest = self:BuildDigest()
+    for _, name in ipairs(ALL_DATASETS) do
+        local d = digest[name]
+        if t:Ok(type(d) == "table", "digest missing dataset: " .. name) then
+            t:Ok(type(d.n) == "number" and type(d.maxMod) == "number", "digest shape for " .. name)
+        end
+    end
+end)
+
+-- ── ui: real frame rendering ──────────────────────────────────────────────────
+LCEX:RegisterSelfTest("ui", "respond frame renders data-driven rows", function(self, t)
+    if self.activeSession then return t:Skip("a session is open — not stomping the live respond frame") end
+    local items = { FakeWireItem(1), FakeWireItem(2) }
+    self:ShowLootFrame(items, self.RESPONSES)
+    local f = self.lootFrame
+    if not t:Ok(f and f:IsShown(), "respond frame not shown") then return end
+    for i = 1, 2 do
+        local row = f.rows[i]
+        if t:Ok(row and row:IsShown(), "row " .. i .. " not shown") then
+            t:Ok(row.icon.tex:GetTexture() ~= nil, "row " .. i .. " icon texture not set")
+            for ri, resp in ipairs(self.RESPONSES) do
+                local b = row.buttons[ri]
+                if t:Ok(b and b:IsShown(), "row " .. i .. " missing response button " .. ri) then
+                    t:Eq(b:GetText(), resp.text, "row " .. i .. " button " .. ri .. " text")
+                end
+            end
+        end
+    end
+    t:Ok(not (f.rows[3] and f.rows[3]:IsShown()), "stale pooled row 3 still visible")
+end, { cleanup = function(self) self:HideLootFrame() end })
+
+LCEX:RegisterSelfTest("ui", "council frame empty-state", function(self, t)
+    if self.activeSession then return t:Skip("a session is open") end
+    self:ShowVotingFrame({})
+    local f = self.votingFrame
+    if t:Ok(f and f:IsShown(), "council frame not shown") then
+        t:Ok(f.empty:IsShown(), "'No responses yet.' empty-state not shown")
+    end
+end, { cleanup = function(self) self:HideVotingFrame() end })
+
+LCEX:RegisterSelfTest("ui", "session panel opens over a live bag scan", function(self, t)
+    local f = self:EnsureSessionFrame()
+    local wasShown = f:IsShown()
+    if not wasShown then self:ToggleSessionFrame() end
+    t:Ok(f:IsShown(), "session panel not shown")
+    local status = f.status:GetText()
+    t:Ok(type(status) == "string" and status ~= "", "status line empty")
+    t:Ok(type(f.list.items) == "table", "bag-preview list missing")
+    t:Eq(f.list.scroll.offset, 0, "scroll offset after SetData")
+    if not wasShown then f:Hide() end
+end)
+
+LCEX:RegisterSelfTest("ui", "loot browser renders + scroll-offset regression", function(self, t)
+    local f = self:EnsureLootBrowser()
+    local wasShown = f:IsShown()
+    local prevPhase = self.browserPhase
+    if not wasShown then self:ToggleLootBrowser() end
+    t:Ok(f:IsShown(), "browser not shown")
+    local phase = self.browserPhase
+    if not t:Ok(phase ~= nil, "no phase selected") then return end
+    t:Eq(#f.list.items, #self:BuildBrowserDisplay(phase), "browser row count for " .. tostring(phase))
+    t:Ok(f.list.rows[1] and f.list.rows[1]:IsShown(), "first browser row not rendered")
+    -- The CLAUDE.md FauxScrollFrame gotcha, exercised for real: poison the offset, repopulate —
+    -- the list must render from the top, never empty.
+    f.list.scroll.offset = 500
+    f.list:SetData(self:BuildBrowserDisplay(phase))
+    t:Eq(f.list.scroll.offset, 0, "SetData did not reset the poisoned scroll offset")
+    t:Ok(f.list.rows[1] and f.list.rows[1]:IsShown(), "list rendered empty after offset poison")
+    if not wasShown then f:Hide() end
+    self.browserPhase = prevPhase or self.browserPhase
+end)
+
+LCEX:RegisterSelfTest("ui", "player detail tabs render for self", function(self, t)
+    local me = UnitName("player")
+    self.detailTab = nil -- deterministic start on the gear tab
+    -- Force a fresh BiS resolve: OpenPlayerDetail only resets these when the player CHANGES,
+    -- so a manually-cycled class from an earlier look at ourselves would false-fail the assert.
+    self.bisClass, self.bisSpec = nil, nil
+    self:OpenPlayerDetail(me)
+    local f = self.playerDetail
+    if not t:Ok(f and f:IsShown(), "player detail not shown") then return end
+    t:Eq(f.header:GetText(), me, "header shows the player")
+    t:Ok(#f.list.items >= 1, "gear tab display empty (needs at least the info row)")
+    t:Eq(f.cacheMeta:GetText(), self.L["(your live snapshot)"], "self gear meta line")
+    t:Ok(f.cacheMeta:IsShown(), "cacheMeta hidden on the gear tab")
+    f.tabs:Select("bis")
+    t:Ok(f.bisBar:IsShown(), "BiS cycle bar hidden on the BiS tab")
+    t:Eq(self.bisClass, select(2, UnitClass("player")), "BiS class auto-resolved to own class")
+    f.tabs:Select("history")
+    t:Ok(not f.cacheMeta:IsShown(), "cacheMeta should hide on the history tab")
+    t:Ok(#f.list.items >= 1, "history tab display empty (needs at least the info row)")
+end, { cleanup = function(self)
+    self.bisClass, self.bisSpec = nil, nil
+    self.detailTab = nil
+    if self.playerDetail then self.playerDetail:Hide() end
+end })
+
+LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
+    self:EnsureLootFrame(); self:EnsureVotingFrame(); self:EnsureSessionFrame()
+    self:EnsureLootBrowser(); self:EnsurePlayerDetail()
+    for _, name in ipairs({ "LCEX_LootFrame", "LCEX_VotingFrame", "LCEX_SessionFrame",
+                            "LCEX_LootBrowser", "LCEX_PlayerDetail" }) do
+        t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
+        local found = false
+        for _, n in ipairs(UISpecialFrames) do
+            if n == name then found = true end
+        end
+        t:Ok(found, name .. " not in UISpecialFrames")
+    end
+end)
+
+-- ── comm: the real receive path + the real wire ───────────────────────────────
+-- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
+-- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so
+-- another player's tEcho (or one arriving outside a run) is ignored without side effects.
+LCEX.dispatch.tEcho = function(self, msg, sender)
+    local pending = self._selfTestEcho
+    if not pending or not self:IsSelf(sender) or msg.nonce ~= pending.nonce then return end
+    self._selfTestEcho = nil
+    pending.cb(msg)
+end
+
+LCEX:RegisterSelfTest("comm", "receive path + serializer fidelity (in-process)", function(self, t)
+    local got
+    self._selfTestEcho = { nonce = "inproc", cb = function(msg) got = msg end }
+    local wire = self:Serialize(self:BuildEnvelope("tEcho", "sid-selftest", {
+        nonce = "inproc", probe = { 1, "two", { three = true } },
+    }))
+    t:Ok(type(wire) == "string", "Serialize did not return a string")
+    local ok = pcall(self.OnCommReceived, self, "LCEX", wire, "WHISPER", UnitName("player"))
+    t:Ok(ok, "OnCommReceived errored on a valid envelope")
+    if t:Ok(got ~= nil, "valid envelope was not dispatched") then
+        t:Eq(got.sid, "sid-selftest", "sid survived the round-trip")
+        t:Ok(type(got.probe) == "table" and got.probe[1] == 1 and got.probe[2] == "two"
+            and type(got.probe[3]) == "table" and got.probe[3].three == true,
+            "nested payload corrupted through Serialize/Deserialize")
+    end
+end, { cleanup = function(self) self._selfTestEcho = nil end })
+
+LCEX:RegisterSelfTest("comm", "malformed + future-version envelopes dropped", function(self, t)
+    self._selfTestEcho = { nonce = "drop", cb = function() end }
+    t:Ok(pcall(self.OnCommReceived, self, "LCEX", "not a serialized table", "GUILD", UnitName("player")),
+        "garbage payload errored the receive path")
+    t:Ok(self._selfTestEcho ~= nil, "garbage payload was dispatched")
+    local msg = self:BuildEnvelope("tEcho", nil, { nonce = "drop" })
+    msg.v = self.PROTOCOL_VERSION + 1
+    t:Ok(pcall(self.OnCommReceived, self, "LCEX", self:Serialize(msg), "GUILD", UnitName("player")),
+        "future-version envelope errored the receive path")
+    t:Ok(self._selfTestEcho ~= nil, "future-version envelope must be dropped, not dispatched")
+end, { cleanup = function(self) self._selfTestEcho = nil end })
+
+LCEX:RegisterSelfTest("comm", "live wire loopback (GUILD echo)", function(self, t)
+    if not IsInGuild() then return t:Skip("not in a guild — no addon channel to echo over") end
+    local nonce = UnitName("player") .. ":" .. tostring(GetTime())
+    self._selfTestEcho = {
+        nonce = nonce,
+        cb = function(msg)
+            t:Eq(msg.v, self.PROTOCOL_VERSION, "protocol version on the wire")
+            t:Eq(msg.ver, self:GetVersion(), "addon version stamp on the wire")
+            t:Ok(type(msg.probe) == "table" and msg.probe.deep and msg.probe.deep[2] == "two",
+                "payload corrupted over the real wire")
+            t:Done()
+        end,
+    }
+    self:Send("tEcho", nil, { nonce = nonce, probe = { deep = { 1, "two" } } }, "GUILD")
+end, { async = true, timeout = 8, cleanup = function(self) self._selfTestEcho = nil end })
+
+-- ── session: the solo end-to-end pipeline ─────────────────────────────────────
+-- Automates TESTING.md section A: start → respond → vote (incl. the toggle) → award → end,
+-- through the SAME entry points the buttons use. Solo only: with a group, sStart/award would
+-- broadcast to real players (and every present client would log the fake award to history).
+LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote → award → end", function(self, t)
+    if self.session or self.activeSession then return t:Skip("a session is already open") end
+    if self.recoverableSession then return t:Skip("an unfinished session is pending /lcex resume") end
+    if self:GroupChannel() then return t:Skip("grouped — run the self-test solo so nothing broadcasts") end
+
+    local meName = UnitName("player")
+    local me = self:NormalizeName(meName)
+    local items = { FakeWireItem(1), FakeWireItem(2) }
+    -- StartSession alone doesn't set sessionItems (CmdTest/CmdStartFromBags do) — AwardItem
+    -- reads it, so build the ML-side records the same way CmdTest does.
+    self.sessionItems = {}
+    for i, it in ipairs(items) do
+        self.sessionItems[i] = { link = it.link, itemID = it.itemID, quality = it.quality,
+                                 boss = "Self-Test", lootedAt = time() }
+    end
+    self:StartSession({ { link = items[1].link, quality = items[1].quality },
+                        { link = items[2].link, quality = items[2].quality } })
+    local s = self.session
+    if not t:Ok(s ~= nil, "StartSession did not open a session") then return end
+    self._selfTestSid = s.sid -- cleanup key: the uids to purge even if we error below
+
+    t:Eq(#s.items, 2, "session item count")
+    t:Ok(self.activeSession and self.activeSession.sid == s.sid, "ML did not enter its own session")
+    t:Ok(self.activeSession and self.activeSession.amCouncil, "runner not on the session council (council-of-one)")
+    t:Ok(self.lootFrame and self.lootFrame:IsShown(), "respond frame did not open")
+    t:Ok(self.votingFrame and self.votingFrame:IsShown(), "council frame did not open")
+    t:Ok(self.db.global.session[me] ~= nil, "session not mirrored to the DB (resume support)")
+
+    -- Respond to both items through the button path (ML fast-path dispatches cResp in-process).
+    self:OnResponseChosen(1, self.RESPONSES[1])
+    self:OnResponseChosen(2, self.RESPONSES[2])
+    local row = s.rows[1] and s.rows[1][me]
+    if t:Ok(row ~= nil, "own response did not aggregate into session.rows") then
+        t:Eq(row.resp, self.RESPONSES[1].id, "aggregated response id")
+    end
+    t:Ok(self.voteRows and self.voteRows[1] and self.voteRows[1][me] ~= nil,
+        "voting view did not mirror the response")
+    t:Ok(self.votingFrame and self.votingFrame.candRows[1]
+        and self.votingFrame.candRows[1]:IsShown(),
+        "council row did not render for the response")
+
+    -- Gates: a non-group candidate and a non-council voter must both be dropped, silently.
+    self.dispatch.cResp(self, { sid = s.sid, item = 1, resp = 5 }, "Lcexfakecand")
+    t:Ok(s.rows[1]["lcexfakecand"] == nil, "cResp from a non-group sender was accepted")
+    self.dispatch.vVote(self, { sid = s.sid, item = 1, candidate = me, vote = 1 }, "Lcexfakecand")
+    t:Eq(row and row.votes, 0, "vVote from a non-council sender was tallied")
+
+    -- Vote through the button path: +1, re-cast toggles off, +1 again sticks.
+    self:SendVote(1, me, 1)
+    t:Eq(row and row.votes, 1, "vote tally after +1")
+    self:SendVote(1, me, 1)
+    t:Eq(row and row.votes, 0, "re-casting the same vote should toggle it off")
+    self:SendVote(1, me, 1)
+    t:Eq(row and row.votes, 1, "vote tally after re-vote")
+
+    -- Award item 1 to a dummy who never responded (→ STATUS.ANNOUNCED), item 2 to ourselves
+    -- (→ carries our own response id). Solo: no channel, so no award broadcast.
+    local uid1, uid2 = s.sid .. ":1", s.sid .. ":2"
+    t:Ok(self:AwardItem(1, AWARD_DUMMY), "AwardItem(1) failed")
+    t:Ok(self:AwardItem(2, meName), "AwardItem(2) failed")
+    local h1, h2 = self.db.global.history[uid1], self.db.global.history[uid2]
+    if t:Ok(h1 ~= nil, "award 1 did not log to history") then
+        t:Eq(h1.player, AWARD_DUMMY, "history winner")
+        t:Eq(h1.resp, self.STATUS.ANNOUNCED, "non-responder award should carry ANNOUNCED")
+    end
+    if t:Ok(h2 ~= nil, "award 2 did not log to history") then
+        t:Eq(h2.resp, self.RESPONSES[2].id, "history should carry the winner's response")
+    end
+    local owed = self.pendingTrades[AWARD_DUMMY:lower()]
+    t:Ok(owed and owed[1] and owed[1].uid == uid1, "owed-trade record missing for the award")
+    t:Ok(owed and owed[1] and owed[1].expireAt ~= nil, "owed trade lacks its 2h expiry anchor")
+    t:Ok(self.db.global.pendingTrades[me] ~= nil, "owed trades not persisted to the DB")
+
+    -- End: both frames close, all session state (incl. the DB mirror) clears.
+    self:EndSession()
+    t:Ok(self.session == nil and self.activeSession == nil, "session state not cleared")
+    t:Ok(not (self.lootFrame and self.lootFrame:IsShown()), "respond frame still open after end")
+    t:Ok(not (self.votingFrame and self.votingFrame:IsShown()), "council frame still open after end")
+    t:Ok(self.db.global.session[me] == nil, "persisted session not cleared")
+end, { cleanup = function(self)
+    -- Unwind every side effect no matter where the test stopped: live/persisted session, both
+    -- fake awards (owed trades + the history records — history is a union SYNC dataset, so a
+    -- leftover fake record would propagate to guild peers), and the 60s trade ticker.
+    local sid = self._selfTestSid
+    self._selfTestSid = nil
+    if self.session and sid and self.session.sid == sid then self:EndSession() end
+    if sid then
+        for i = 1, 2 do
+            local uid = sid .. ":" .. i
+            self:ForgetAward(uid)
+            self.db.global.history[uid] = nil
+        end
+    end
+    -- No live session ⇒ sessionItems must be nil (EndSession's invariant). Covers the edge
+    -- where StartSession threw after the fake records were staged but before a sid existed.
+    if not self.session then self.sessionItems = nil end
+    self:StopTradeTickerIfIdle()
+end })
