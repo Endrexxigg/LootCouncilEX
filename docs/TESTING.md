@@ -150,5 +150,5 @@ Verified in-game. Bullets document *what* was checked; re-run a section only if 
 
 ## Known rough edges (expected, not bugs)
 - `/lcex test` on the *first* `/reload` may show `item:NNNNN` for the **pad** items (uncached); real bag items and a second run render correctly.
-- The Respond and Council windows both open centered (overlap) until dragged apart once.
-- Council names aren't class-colored yet.
+- ~~The Respond and Council windows both open centered (overlap) until dragged apart once.~~ Fixed v0.18.2 (first-run offsets; saved positions unaffected).
+- ~~Council names aren't class-colored yet.~~ Fixed v0.18.1.
