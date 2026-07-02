@@ -764,6 +764,14 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Ok(self.votingFrame and self.votingFrame.candRows[1]
         and self.votingFrame.candRows[1]:IsShown(),
         "council row did not render for the response")
+    -- Own row must be class-colored (live ClassOf path; solo, we are always resolvable).
+    local myClass = select(2, UnitClass("player"))
+    local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[myClass]
+    if cc and self.votingFrame and self.votingFrame.candRows[1] then
+        local r, g, b = self.votingFrame.candRows[1].name:GetTextColor()
+        t:Ok(math.abs(r - cc.r) < 0.02 and math.abs(g - cc.g) < 0.02 and math.abs(b - cc.b) < 0.02,
+            "council row name not class-colored (got " .. string.format("%.2f/%.2f/%.2f", r, g, b) .. ")")
+    end
 
     -- Gates: a non-group candidate and a non-council voter must both be dropped, silently.
     self.dispatch.cResp(self, { sid = s.sid, item = 1, resp = 5 }, "Lcexfakecand")

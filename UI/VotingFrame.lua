@@ -111,6 +111,17 @@ function LCEX:FillCandRow(row, itemIndex, candKey, data)
     row.candKey = candKey
     row.name:SetText(DisplayName(data, candKey))
 
+    -- Class-color the name: live class while grouped, else the class from their last cached
+    -- self-report (PlayerDetail's resolvers). Rows are pooled — reset to the default highlight
+    -- white when no class resolves, or a reused row keeps the previous candidate's color.
+    local class = self:ClassOf(data.name or candKey) or self:CachedClass(data.name or candKey)
+    local cc = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if cc then
+        row.name:SetTextColor(cc.r, cc.g, cc.b)
+    else
+        row.name:SetTextColor(1, 1, 1)
+    end
+
     local resp = ResponseEntry(self, data.resp)
     if resp then
         row.resp:SetText(resp.text)
