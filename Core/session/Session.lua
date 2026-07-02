@@ -10,6 +10,10 @@
 local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
+-- Guild-roster refresh nudge. The GuildRoster global is REMOVED on Anniversary (selftest env
+-- fact: GuildRoster=nil); it lives under C_GuildInfo there. Either form, or nil — callers guard.
+local RequestGuildRoster = GuildRoster or (C_GuildInfo and C_GuildInfo.GuildRoster)
+
 -- Per-session monotonic counter, combined with the ML name + unixtime into the sid
 -- (PROJECT.md §6.1: "<MLname>-<unixtime>-<counter>").
 local counter = 0
@@ -37,7 +41,7 @@ function LCEX:ResolveCouncil(forceSelf)
     end
     if forceSelf then set[self:NormalizeName(UnitName("player"))] = true end
     if p.byRank and IsInGuild() then
-        if GuildRoster then GuildRoster() end -- nudge a roster refresh (may be stale this frame)
+        if RequestGuildRoster then RequestGuildRoster() end -- nudge a roster refresh (may be stale this frame)
         for i = 1, (GetNumGuildMembers() or 0) do
             local gname, _, rankIndex = GetGuildRosterInfo(i)
             if gname and rankIndex and rankIndex <= (p.rank or 1) then

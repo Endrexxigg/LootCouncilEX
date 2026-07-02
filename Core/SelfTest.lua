@@ -266,7 +266,8 @@ LCEX:RegisterSelfTest("env", "client environment facts", function(self, t)
         "C_Container=" .. (C_Container and "present" or "nil"),
         "GetItemInfoInstant=" .. tostring(gii or "MISSING"),
         "BackdropTemplateMixin=" .. (BackdropTemplateMixin and "present" or "nil"),
-        "GuildRoster=" .. (GuildRoster and "present" or "nil"),
+        "GuildRoster=" .. (GuildRoster and "global"
+            or (C_GuildInfo and C_GuildInfo.GuildRoster) and "C_GuildInfo" or "MISSING"),
     }, ", ")
 end)
 
@@ -474,6 +475,18 @@ LCEX:RegisterSelfTest("api", "FauxScrollFrame + frame plumbing globals", functio
     t:Ok(type(CreateFrame) == "function", "CreateFrame missing")
     t:Ok(type(UISpecialFrames) == "table", "UISpecialFrames missing")
     t:Ok(GameTooltip ~= nil, "GameTooltip missing")
+end)
+
+LCEX:RegisterSelfTest("api", "guild roster APIs (byRank council contract)", function(self, t)
+    t:Ok((GuildRoster or (C_GuildInfo and C_GuildInfo.GuildRoster)) ~= nil,
+        "no guild-roster refresh API (global or C_GuildInfo) — byRank council may go stale")
+    t:Ok(type(GetNumGuildMembers) == "function", "GetNumGuildMembers missing")
+    t:Ok(type(GetGuildRosterInfo) == "function", "GetGuildRosterInfo missing")
+    if IsInGuild() and (GetNumGuildMembers() or 0) > 0 then
+        local gname, _, rankIndex = GetGuildRosterInfo(1)
+        t:Ok(type(gname) == "string", "GetGuildRosterInfo 1st return (name) not a string")
+        t:Ok(type(rankIndex) == "number", "GetGuildRosterInfo 3rd return (rankIndex) not a number")
+    end
 end)
 
 LCEX:RegisterSelfTest("api", "inventory + skill-line APIs", function(self, t)

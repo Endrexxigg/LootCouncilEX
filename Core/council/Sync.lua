@@ -19,6 +19,10 @@ local LCEX = LootCouncilEX
 LCEX.dispatch  = LCEX.dispatch  or {}
 LCEX.datasets  = LCEX.datasets  or {}
 
+-- Guild-roster refresh nudge — GuildRoster is removed on Anniversary; C_GuildInfo has it
+-- (same shim as Session.lua).
+local RequestGuildRoster = GuildRoster or (C_GuildInfo and C_GuildInfo.GuildRoster)
+
 -- ── Council membership (Plane B) ─────────────────────────────────────────────
 -- Plane-B council set, cached and rebuilt lazily (invalidated on guild-roster change / council
 -- edit). Unlike the Plane-A session council it does NOT force-add self: you sync only if you
@@ -142,7 +146,7 @@ end
 
 function LCEX:SetupSync()
     self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
-    if GuildRoster then GuildRoster() end
+    if RequestGuildRoster then RequestGuildRoster() end
     self:ScheduleTimer("SyncHello", 6) -- announce once the guild roster has settled after login
 end
 
