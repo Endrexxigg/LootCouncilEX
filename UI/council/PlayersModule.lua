@@ -1,0 +1,291 @@
+-- ── LootCouncil EX — UI/council/PlayersModule.lua ────────────────────────────
+-- Council module: per-player detail. Left inner column = the player picker (everyone we know
+-- about: caches, notes, history, guild roster — filterable); right = sub-tabs over the
+-- relocated display builders (Core/Display.lua): Gear / History / Professions / BiS / Notes,
+-- with the data-freshness line on the self-reported tabs.
+--
+-- LCEX:OpenPlayerDetail(name) is the public verb (candidate-name clicks, /lcex player) —
+-- it opens the council window on this module with the name as ctx.
+--
+-- Loads after UI/CouncilWindow.lua; self-registers.
+
+local LCEX = LootCouncilEX
+
+local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
+
+local LIST_W = 170
+local SUBTABS = {
+    { key = "gear",    text = "Gear" },
+    { key = "history", text = "History" },
+    { key = "profs",   text = "Professions" },
+    { key = "bis",     text = "BiS" },
+    { key = "notes",   text = "Notes" },
+}
+
+-- ── Detail rows (typed display arrays from Core/Display.lua) ─────────────────
+local function BuildDetailRow(panel)
+    local row = CreateFrame("Frame", nil, panel)
+    row.icon = LCEX:CreateItemIcon(row, 18)
+    row.icon:SetPoint("LEFT", 4, 0)
+    row.text = row:CreateFontString(nil, "OVERLAY")
+    LCEX:ThemeText(row.text, "body", "ink")
+    row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+    row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.text:SetJustifyH("LEFT"); row.text:SetWordWrap(false)
+    return row
+end
+
+local function FillDetailRow(row, entry)
+    row.loadingID = nil
+    if entry.kind == "gearitem" then
+        row.icon:SetItem(entry.link, GetItemInfoInstant and select(5, GetItemInfoInstant(entry.link)))
+        row.icon:Show()
+        LCEX:ThemeText(row.text, "body", "ink")
+        row.text:SetText(string.format(LCEX.L["  slot %d: %s"], entry.slot, entry.link))
+    elseif entry.kind == "histitem" then
+        local rec = entry.rec
+        row.icon:SetItem(rec.itemLink, GetItemInfoInstant and select(5, GetItemInfoInstant(rec.itemLink)))
+        row.icon:Show()
+        LCEX:ThemeText(row.text, "body", "ink")
+        row.text:SetText(string.format("%s  |cff888888%s, %s|r",
+            tostring(rec.itemLink), tostring(rec.boss or "?"), date("%m/%d", rec.ts or 0)))
+    elseif entry.kind == "bisitem" then
+        local id = entry.itemID
+        row.loadingID = id
+        row.icon:SetItem(nil, GetItemInfoInstant and select(5, GetItemInfoInstant(id)))
+        row.icon:Show()
+        local token = LCEX:FindTokenForItem(id)
+        local suffix = token and ("  |cff888888" .. LCEX.L["(token)"] .. "|r") or ""
+        LCEX:ThemeText(row.text, "body", "dim")
+        row.text:SetText(entry.slot .. ":  item:" .. id .. suffix)
+        LCEX:WithItemID(id, function(name, link)
+            if row.loadingID ~= id then return end -- row reused while loading
+            LCEX:ThemeText(row.text, "body", "ink")
+            row.text:SetText(entry.slot .. ":  " .. tostring(link or name or ("item:" .. id)) .. suffix)
+            row.icon:SetItem(link, GetItemInfoInstant and select(5, GetItemInfoInstant(id)))
+        end)
+    else -- info
+        row.icon:Hide()
+        LCEX:ThemeText(row.text, "body", "dim")
+        row.text:SetText(entry.text or "")
+    end
+end
+
+-- ── Sub-tab rendering ────────────────────────────────────────────────────────
+local function SelectSubTab(panel, key)
+    panel.subTab = key
+    for _, b in ipairs(panel.subTabs) do
+        local fs = b:GetFontString()
+        if fs then
+            if b.subKey == key then
+                fs:SetTextColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3])
+            else
+                fs:SetTextColor(LCEX.Theme.text.dim[1], LCEX.Theme.text.dim[2], LCEX.Theme.text.dim[3])
+            end
+        end
+    end
+
+    local player = panel.player
+    if key == "gear" then
+        panel.cacheMeta:SetText(LCEX:CacheMetaText(player, "gearCache")); panel.cacheMeta:Show()
+    elseif key == "profs" then
+        panel.cacheMeta:SetText(LCEX:CacheMetaText(player, "profCache")); panel.cacheMeta:Show()
+    else
+        panel.cacheMeta:Hide()
+    end
+
+    if key == "notes" then
+        panel.detailList:Hide(); panel.bisBar:Hide(); panel.notes:Show()
+        local rec = LCEX.db.global.notes[LCEX:NormalizeName(player)]
+        panel.notes.edit:SetText((rec and rec.text) or "")
+        panel.notes.meta:SetText(rec and string.format(LCEX.L["by %s, %s"],
+            tostring(rec.by), date("%m/%d %H:%M", rec.mod or 0)) or "")
+        return
+    end
+
+    panel.notes:Hide()
+    panel.detailList:Show()
+    panel.detailList:ClearAllPoints()
+    if key == "bis" then
+        panel.bisBar:Show()
+        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT", 8, -88)
+    else
+        panel.bisBar:Hide()
+        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT", 8, -60)
+    end
+    panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 24)
+
+    local data
+    if key == "gear" then data = LCEX:BuildGearDisplay(player)
+    elseif key == "history" then data = LCEX:BuildHistoryDisplay(player)
+    elseif key == "profs" then data = LCEX:BuildProfsDisplay(player)
+    else
+        data = LCEX:BuildBiSDisplay(player)
+        panel.bisBar.classBtn:SetText(string.format(LCEX.L["Class: %s"], tostring(LCEX.bisClass or "?")))
+        panel.bisBar.specBtn:SetText(string.format(LCEX.L["Spec: %s"], tostring(LCEX.bisSpec or "?")))
+        panel.bisBar.phaseBtn:SetText(tostring(LCEX.bisPhase or "?"))
+    end
+    panel.detailList:SetData(data)
+end
+
+local function SelectPlayer(panel, name)
+    if LCEX:NormalizeName(name) ~= LCEX:NormalizeName(panel.player or "") then
+        LCEX.bisClass, LCEX.bisSpec = nil, nil -- a new player re-resolves BiS to THEIR class
+    end
+    panel.player = name
+    panel.header:SetText(name)
+    panel.playerList:Refresh() -- move the selection bar
+    SelectSubTab(panel, panel.subTab or "gear")
+end
+
+LCEX:RegisterCouncilModule({
+    key = "players", title = LCEX.L["Players"], order = 20,
+
+    build = function(panel)
+        -- Player picker column.
+        local picker = CreateFrame("Frame", nil, panel)
+        picker:SetPoint("TOPLEFT", 0, 0)
+        picker:SetPoint("BOTTOMLEFT", 0, 0)
+        picker:SetWidth(LIST_W)
+        LCEX:Surface(picker, "base")
+        panel.picker = picker
+
+        panel.filterBox = LCEX:CreateEditBox(picker, {
+            width = LIST_W - 20,
+            onCommit = function() panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText())) end,
+        })
+        panel.filterBox:SetPoint("TOPLEFT", 12, -8)
+        panel.filterBox:SetScript("OnTextChanged", function()
+            panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText()))
+        end)
+
+        panel.playerList = LCEX:CreateScrollList(picker, {
+            rowHeight = 22, fillHeight = true,
+            buildRow = function(parent)
+                local row = CreateFrame("Button", nil, parent)
+                LCEX:Surface(row, "base")
+                row.sel = row:CreateTexture(nil, "ARTWORK")
+                row.sel:SetTexture("Interface\\Buttons\\WHITE8X8")
+                row.sel:SetWidth(2)
+                row.sel:SetPoint("TOPLEFT", 0, 0)
+                row.sel:SetPoint("BOTTOMLEFT", 0, 0)
+                row.sel:SetVertexColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3], 1)
+                row.fs = row:CreateFontString(nil, "OVERLAY")
+                LCEX:ThemeText(row.fs, "body", "dim")
+                row.fs:SetPoint("LEFT", 10, 0)
+                row:SetScript("OnClick", function(r) SelectPlayer(panel, r.playerName) end)
+                return row
+            end,
+            fillRow = function(row, entry)
+                row.playerName = entry.name
+                row.fs:SetText(entry.name)
+                local cc = LCEX:ClassColor(LCEX:ClassOf(entry.name) or LCEX:CachedClass(entry.name))
+                row.fs:SetTextColor(cc[1], cc[2], cc[3])
+                if LCEX:NormalizeName(panel.player or "") == entry.key then
+                    LCEX:Surface(row, "overlay"); row.sel:Show()
+                else
+                    LCEX:Surface(row, "base"); row.sel:Hide()
+                end
+            end,
+        })
+        panel.playerList:SetPoint("TOPLEFT", 2, -34)
+        panel.playerList:SetPoint("BOTTOMRIGHT", -2, 2)
+
+        -- Detail area: header row, then the sub-tab row, then list/notes below.
+        panel.header = panel:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(panel.header, "section", "ink")
+        panel.header:SetPoint("TOPLEFT", picker, "TOPRIGHT", 12, -8)
+
+        panel.subTabs = {}
+        local x = 0
+        for _, tabDef in ipairs(SUBTABS) do
+            local w = math.max(52, #tabDef.text * 8)
+            local b = LCEX:CreateFlatButton(panel, tabDef.text, w, 20)
+            b:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8 + x, -32)
+            b.subKey = tabDef.key
+            b:SetScript("OnClick", function() SelectSubTab(panel, tabDef.key) end)
+            panel.subTabs[#panel.subTabs + 1] = b
+            x = x + w + 4
+        end
+
+        panel.detailList = LCEX:CreateScrollList(panel, {
+            rowHeight = 22, fillHeight = true,
+            buildRow = function() return BuildDetailRow(panel) end,
+            fillRow = function(row, entry) FillDetailRow(row, entry) end,
+        })
+        panel.detailList:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8, -60)
+        panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 24)
+
+        -- BiS cycle bar (shown only on the BiS sub-tab).
+        local bisBar = CreateFrame("Frame", nil, panel)
+        bisBar:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8, -60)
+        bisBar:SetSize(400, 22)
+        bisBar.classBtn = LCEX:CreateFlatButton(bisBar, "", 120, 20)
+        bisBar.classBtn:SetPoint("LEFT", 0, 0)
+        bisBar.classBtn:SetScript("OnClick", function()
+            LCEX.bisClass = LCEX:_CycleNext(LCEX.CLASSES, LCEX.bisClass)
+            LCEX.bisSpec = nil -- re-resolve to the new class's first spec
+            SelectSubTab(panel, "bis")
+        end)
+        bisBar.specBtn = LCEX:CreateFlatButton(bisBar, "", 150, 20)
+        bisBar.specBtn:SetPoint("LEFT", bisBar.classBtn, "RIGHT", 4, 0)
+        bisBar.specBtn:SetScript("OnClick", function()
+            LCEX.bisSpec = LCEX:_CycleNext(LCEX:SpecsForClass(LCEX.bisClass), LCEX.bisSpec)
+            SelectSubTab(panel, "bis")
+        end)
+        bisBar.phaseBtn = LCEX:CreateFlatButton(bisBar, "", 50, 20)
+        bisBar.phaseBtn:SetPoint("LEFT", bisBar.specBtn, "RIGHT", 4, 0)
+        bisBar.phaseBtn:SetScript("OnClick", function()
+            LCEX.bisPhase = LCEX:_CycleNext(LCEX.PHASES, LCEX.bisPhase)
+            SelectSubTab(panel, "bis")
+        end)
+        bisBar:Hide()
+        panel.bisBar = bisBar
+
+        -- Notes editor (replaces the list on the Notes sub-tab).
+        local notes = CreateFrame("Frame", nil, panel)
+        notes:SetPoint("TOPLEFT", picker, "TOPRIGHT", 12, -64)
+        notes:SetPoint("TOPRIGHT", -12, -64)
+        notes:SetHeight(80)
+        notes.label = notes:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(notes.label, "caption", "dim")
+        notes.label:SetPoint("TOPLEFT", 0, 0)
+        notes.label:SetText(LCEX.L["Note:"])
+        notes.edit = LCEX:CreateEditBox(notes, {
+            width = 380,
+            onCommit = function(text)
+                if panel.player then
+                    LCEX:SetNote(panel.player, text)
+                    SelectSubTab(panel, "notes")
+                end
+            end,
+        })
+        notes.edit:SetPoint("TOPLEFT", notes.label, "BOTTOMLEFT", 4, -6)
+        notes.meta = notes:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(notes.meta, "caption", "faint")
+        notes.meta:SetPoint("TOPLEFT", notes.edit, "BOTTOMLEFT", -4, -10)
+        notes:Hide()
+        panel.notes = notes
+
+        -- Data-freshness line (gear/profs sub-tabs only).
+        panel.cacheMeta = panel:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(panel.cacheMeta, "caption", "faint")
+        panel.cacheMeta:SetPoint("BOTTOMLEFT", picker, "BOTTOMRIGHT", 12, 8)
+    end,
+
+    show = function(panel, ctx)
+        panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText()))
+        SelectPlayer(panel, (ctx and ctx ~= "" and ctx) or panel.player or UnitName("player"))
+    end,
+})
+
+-- The public verb: open the dashboard on this module for `name` (self when blank). Kept as
+-- the stable entry point for candidate-name clicks and /lcex player.
+function LCEX:OpenPlayerDetail(name)
+    if not name or name == "" then name = UnitName("player") end
+    self:OpenCouncilModule("players", name)
+end
+
+function LCEX:CmdPlayerDetail(rest)
+    self:OpenPlayerDetail(strtrim(rest or ""))
+end

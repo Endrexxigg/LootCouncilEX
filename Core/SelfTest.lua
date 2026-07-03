@@ -299,8 +299,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "GetItemsForBoss", "GetBiSSpecs", "GetBiSForSpecPhase", "GetTierToken",
         "GetTierPieceForClass", "FindTokenForItem", "SpecsForClass", "IsKnownClass",
         -- UI
-        "CreateWindow", "CreateButton", "CreateLabel", "CreateItemIcon", "CreateTabStrip",
-        "CreateScrollList", "CreateEditBox",
+        "CreateItemIcon", "CreateScrollList", "CreateEditBox",
         -- UI v2 (Theme + themed primitives)
         "ApplyGradient", "Surface", "SoftEdge", "ThemeText", "QualityColor", "ClassColor",
         "CreateWindowV2", "CreateFlatButton", "CreateNavRail", "CreateCheckbox", "CreateSliderV2",
@@ -311,7 +310,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "LootStageScan", "LootStageAdd", "LootStageRemove", "LootStartStaged",
         "RegisterCouncilModule", "EnsureCouncilWindow", "ToggleCouncilWindow",
         "OpenCouncilModule", "CouncilShowModule", "BrowserSelectItem",
-        "OpenPlayerDetail", "RenderDetailTab",
+        "OpenPlayerDetail", "BuildPlayerIndex", "BuildHistoryLog",
     }
     for _, name in ipairs(fns) do
         t:Ok(type(self[name]) == "function", "missing function: " .. name)
@@ -358,8 +357,11 @@ LCEX:RegisterSelfTest("load", "db schema + migration stamp", function(self, t)
     end
     t:Eq(self.db.global.dbVersion, self.DB_VERSION, "dbVersion stamp")
     t:Ok(type(self.db.profile.council) == "table", "profile.council missing")
-    for _, key in ipairs({ "lootFrame", "votingFrame", "sessionFrame", "playerDetail", "lootBrowser" }) do
+    for _, key in ipairs({ "poll", "loot", "council", "config" }) do
         t:Ok(type(self.db.profile.ui[key]) == "table", "profile.ui." .. key .. " missing")
+    end
+    for _, key in ipairs({ "lootFrame", "votingFrame", "sessionFrame", "playerDetail", "lootBrowser" }) do
+        t:Ok(self.db.profile.ui[key] == nil, "orphaned profile.ui." .. key .. " not cleaned up")
     end
 end)
 
@@ -678,36 +680,62 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
-LCEX:RegisterSelfTest("ui", "player detail tabs render for self", function(self, t)
+LCEX:RegisterSelfTest("ui", "players module renders for self (gear/BiS/history sub-tabs)", function(self, t)
     local me = UnitName("player")
-    self.detailTab = nil -- deterministic start on the gear tab
-    -- Force a fresh BiS resolve: OpenPlayerDetail only resets these when the player CHANGES,
-    -- so a manually-cycled class from an earlier look at ourselves would false-fail the assert.
+    -- Force a fresh BiS resolve: it only resets when the viewed player CHANGES, so a manually
+    -- cycled class from an earlier look at ourselves would false-fail the assert.
     self.bisClass, self.bisSpec = nil, nil
     self:OpenPlayerDetail(me)
-    local f = self.playerDetail
-    if not t:Ok(f and f:IsShown(), "player detail not shown") then return end
-    t:Eq(f.header:GetText(), me, "header shows the player")
-    t:Ok(#f.list.items >= 1, "gear tab display empty (needs at least the info row)")
-    t:Eq(f.cacheMeta:GetText(), self.L["(your live snapshot)"], "self gear meta line")
-    t:Ok(f.cacheMeta:IsShown(), "cacheMeta hidden on the gear tab")
-    f.tabs:Select("bis")
-    t:Ok(f.bisBar:IsShown(), "BiS cycle bar hidden on the BiS tab")
+    local f = self.councilWindow
+    if not t:Ok(f and f:IsShown(), "council window not shown") then return end
+    t:Eq(f.activeModule, "players", "players module not active")
+    local panel = f.panels and f.panels.players
+    if not t:Ok(panel and panel:IsShown(), "players panel not shown") then return end
+    t:Eq(self:NormalizeName(panel.player or ""), self:NormalizeName(me), "own player not selected")
+    t:Ok(#panel.playerList.items >= 1, "player picker empty")
+
+    local function subtab(key)
+        for _, b in ipairs(panel.subTabs) do
+            if b.subKey == key then b:Click(); return true end
+        end
+        return false
+    end
+    t:Ok(subtab("gear"), "no gear sub-tab")
+    t:Ok(#panel.detailList.items >= 1, "gear display empty (needs at least the info row)")
+    t:Eq(panel.cacheMeta:GetText(), self.L["(your live snapshot)"], "self gear meta line")
+    t:Ok(panel.cacheMeta:IsShown(), "cacheMeta hidden on the gear sub-tab")
+    t:Ok(subtab("bis"), "no BiS sub-tab")
+    t:Ok(panel.bisBar:IsShown(), "BiS cycle bar hidden on the BiS sub-tab")
     t:Eq(self.bisClass, select(2, UnitClass("player")), "BiS class auto-resolved to own class")
-    f.tabs:Select("history")
-    t:Ok(not f.cacheMeta:IsShown(), "cacheMeta should hide on the history tab")
-    t:Ok(#f.list.items >= 1, "history tab display empty (needs at least the info row)")
+    t:Ok(subtab("history"), "no history sub-tab")
+    t:Ok(not panel.cacheMeta:IsShown(), "cacheMeta should hide on the history sub-tab")
+    t:Ok(#panel.detailList.items >= 1, "history display empty (needs at least the info row)")
 end, { cleanup = function(self)
     self.bisClass, self.bisSpec = nil, nil
-    self.detailTab = nil
-    if self.playerDetail then self.playerDetail:Hide() end
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
+
+LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(self, t)
+    self:OpenCouncilModule("history")
+    local f = self.councilWindow
+    local hp = f and f.panels and f.panels.history
+    if t:Ok(hp and hp:IsShown(), "history panel not shown") then
+        t:Eq(#hp.list.items, #self:BuildHistoryLog(""), "history rows mismatch the log builder")
+    end
+    self:OpenCouncilModule("sessioncfg")
+    local sp = f and f.panels and f.panels.sessioncfg
+    if t:Ok(sp and sp:IsShown(), "session-config panel not shown") then
+        t:Ok(sp.timeout ~= nil and sp.rosterList ~= nil and sp.byRank ~= nil,
+            "session-config controls missing")
+        t:Ok(type(sp.rosterList.items) == "table", "council roster failed to resolve")
+    end
+end, { cleanup = function(self)
+    if self.councilWindow then self.councilWindow:Hide() end
 end })
 
 LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
-    self:EnsurePoll(); self:EnsureLootWindow()
-    self:EnsureCouncilWindow(); self:EnsurePlayerDetail()
-    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow",
-                            "LCEX_CouncilWindow", "LCEX_PlayerDetail" }) do
+    self:EnsurePoll(); self:EnsureLootWindow(); self:EnsureCouncilWindow()
+    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow", "LCEX_CouncilWindow" }) do
         t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
         local found = false
         for _, n in ipairs(UISpecialFrames) do

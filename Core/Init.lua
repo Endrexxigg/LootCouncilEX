@@ -37,12 +37,10 @@ local DB_DEFAULTS = {
         minQuality         = 4,
         selfReport         = true,
         ui                 = {
-            lootFrame    = {},
-            votingFrame  = {},
-            sessionFrame = {},
-            playerDetail = {},
-            lootBrowser  = {},
-            poll         = {},
+            poll    = {},
+            loot    = {},
+            council = {},
+            config  = {},
         },
         -- Poll response deadline in seconds (0 = none). Set by the ML in Session Config;
         -- rides sStart so every candidate's poll counts down.
@@ -104,6 +102,13 @@ end
 function LCEX:OnInitialize()
     self.db = LibStub("AceDB-3.0"):New("LootCouncilEXDB", DB_DEFAULTS, true)
     self:MigrateDB() -- normalize the schema before any reader touches db.global
+
+    -- One-shot profile cleanup: the pre-v0.22 five-frame position keys. Profile data is NOT
+    -- covered by MigrateDB (global-only), and AceDB keeps non-default keys forever — so the
+    -- orphans are dropped here (idempotent; nil-ing an absent key is a no-op).
+    local ui = self.db.profile.ui
+    ui.lootFrame, ui.votingFrame, ui.sessionFrame = nil, nil, nil
+    ui.playerDetail, ui.lootBrowser = nil, nil
 
     -- Inbound comms route to LCEX:OnCommReceived (Comms.lua), the default handler name.
     self:RegisterComm("LCEX")

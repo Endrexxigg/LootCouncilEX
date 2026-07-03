@@ -126,6 +126,52 @@ function LCEX:CachedSpec(name)
     return rec and rec.spec
 end
 
+-- ── Player index (the Players module's picker) ───────────────────────────────
+-- Everyone we know about: self, gear/prof caches, notes keys, history winners, the guild
+-- roster. Returns { {key=<normalized>, name=<display>}, ... } sorted by key, optionally
+-- prefix/substring-filtered. Pure/testable.
+function LCEX:BuildPlayerIndex(filter)
+    local seen, all = {}, {}
+    local function add(name)
+        if type(name) ~= "string" or name == "" then return end
+        local key = self:NormalizeName(name)
+        if not key or seen[key] then return end
+        seen[key] = true
+        local display = name:match("^[^%-]+")
+        -- Dataset keys arrive pre-normalized (lowercase) — re-capitalize for display.
+        if display == key then display = key:gsub("^%l", string.upper) end
+        all[#all + 1] = { key = key, name = display }
+    end
+    add(UnitName("player"))
+    for key, rec in pairs(self.db.global.gearCache) do add(rec.by or key) end
+    for key, rec in pairs(self.db.global.profCache) do add(rec.by or key) end
+    for key in pairs(self.db.global.notes) do add(key) end
+    for _, rec in pairs(self.db.global.history) do add(rec.player) end
+    for i = 1, (GetNumGuildMembers() or 0) do add((GetGuildRosterInfo(i))) end
+
+    filter = (filter and filter ~= "" and filter:lower()) or nil
+    local out = {}
+    for _, e in ipairs(all) do
+        if not filter or e.key:find(filter, 1, true) then out[#out + 1] = e end
+    end
+    table.sort(out, function(a, b) return a.key < b.key end)
+    return out
+end
+
+-- ── History log (the History module) ─────────────────────────────────────────
+-- All award records newest-first, optionally filtered by a winner-name substring.
+-- Pure/testable.
+function LCEX:BuildHistoryLog(filter)
+    filter = (filter and filter ~= "" and filter:lower()) or nil
+    local rows = {}
+    for _, rec in pairs(self.db.global.history) do
+        local key = self:NormalizeName(rec.player) or ""
+        if not filter or key:find(filter, 1, true) then rows[#rows + 1] = rec end
+    end
+    table.sort(rows, function(a, b) return (a.ts or 0) > (b.ts or 0) end)
+    return rows
+end
+
 -- ── BiS display ──────────────────────────────────────────────────────────────
 -- Resolve the current BiS class/spec/phase. Class defaults to the player's class on first view
 -- (when unset/invalid) — their LIVE class if grouped, else their last self-reported class, else

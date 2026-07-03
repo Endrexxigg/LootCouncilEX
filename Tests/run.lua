@@ -530,6 +530,32 @@ test("OnResponseChosen carries the per-card note into the aggregated row", funct
     L:EndSession()
 end)
 
+-- ── Council-module builders (Core/Display.lua) ───────────────────────────────
+test("BuildPlayerIndex unions sources + filters", function()
+    L.db.global.gearCache.bob = { items = {}, by = "Bob", mod = 1 }
+    L.db.global.notes.carol = { text = "x", mod = 1, by = "T" }
+    L.db.global.history["s:1"] = { player = "Dave", ts = 1 }
+    H.guild = { { name = "Erin", rankIndex = 1 } }
+    local idx = L:BuildPlayerIndex()
+    local keys = {}
+    for _, e in ipairs(idx) do keys[#keys + 1] = e.key end
+    eq(table.concat(keys, ","), "bob,carol,dave,erin,tester", "sorted union incl. self")
+    eq(idx[2].name, "Carol", "normalized keys re-capitalized for display")
+    eq(#L:BuildPlayerIndex("bo"), 1, "filter narrows to bob")
+    eq(L:BuildPlayerIndex("bo")[1].key, "bob", "filtered hit")
+end)
+
+test("BuildHistoryLog: newest-first + winner filter", function()
+    L.db.global.history["s:1"] = { player = "Bob", ts = 100 }
+    L.db.global.history["s:2"] = { player = "Amy", ts = 300 }
+    L.db.global.history["s:3"] = { player = "Bobby", ts = 200 }
+    local all = L:BuildHistoryLog("")
+    eq(#all, 3, "all records")
+    eq(all[1].ts, 300, "newest first")
+    eq(#L:BuildHistoryLog("bob"), 2, "substring filter matches Bob + Bobby")
+    eq(#L:BuildHistoryLog("zzz"), 0, "unmatched filter -> empty")
+end)
+
 -- ── Self-test runner (Core/SelfTest.lua) ─────────────────────────────────────
 -- The in-game checks themselves need the real client; headless we verify the RUNNER: status
 -- classification, the always-runs cleanup contract, sync-completing async tests, the timeout

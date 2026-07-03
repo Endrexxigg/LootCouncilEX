@@ -174,7 +174,8 @@ local FILES = {
     "Core/council/History.lua", "Core/council/SelfReport.lua",
     "Core/Usable.lua",
     "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/LootWindow.lua",
-    "UI/CouncilWindow.lua", "UI/council/BrowserModule.lua", "UI/PlayerDetail.lua",
+    "UI/CouncilWindow.lua", "UI/council/BrowserModule.lua", "UI/council/PlayersModule.lua",
+    "UI/council/HistoryModule.lua", "UI/council/SessionConfigModule.lua",
     "Core/SelfTest.lua", -- last, like the .toc; only its RUNNER is exercised headlessly
 }
 for _, f in ipairs(FILES) do

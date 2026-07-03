@@ -160,12 +160,20 @@ L["  %s: %d"]                               = "  %s: %d"
 -- The council dashboard + its modules.
 L["Council"]                                = "Council"
 L["Loot Browser"]                           = "Loot Browser"
+L["Players"]                                = "Players"
+L["History"]                                = "History"
+L["Session Config"]                         = "Session Config"
 L["(token)"]                                = "(token)"
 L["Mark — %s:"]                             = "Mark — %s:"
 L["Mark — click an item:"]                  = "Mark — click an item:"
-
--- Phase 6 — viewer UIs.
-L["LootCouncil EX — Player"]                = "LootCouncil EX — Player"
+L["Winner:"]                                = "Winner:"
+L["Poll response deadline"]                 = "Poll response deadline"
+L["Off"]                                    = "Off"
+L["Include guild ranks at or above:"]       = "Include guild ranks at or above:"
+L["Rank cutoff (0 = GM)"]                   = "Rank cutoff (0 = GM)"
+L["Extra members (any guild rank):"]        = "Extra members (any guild rank):"
+L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
+    "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
 L["No award history."]                      = "No award history."
 L["Note:"]                                  = "Note:"
 L["by %s, %s"]                              = "by %s, %s"
