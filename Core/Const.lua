@@ -96,9 +96,10 @@ L["Trade window for %s (%s) has expired."]  = "Trade window for %s (%s) has expi
 L["Test session: broadcasting %d sample item(s)."] =
     "Test session: broadcasting %d sample item(s)."
 
--- Phase 3 — session UI (candidate response loop).
-L["LootCouncil EX — Respond"]              = "LootCouncil EX — Respond"
-L["Note (sent with your response):"]       = "Note (sent with your response):"
+-- Session UI — the poll (candidate response cards).
+L["Loot Drop"]                             = "Loot Drop"
+L["Nothing for you this round."]           = "Nothing for you this round."
+L["%ds left"]                              = "%ds left"
 L["Responded %s to %s."]                   = "Responded %s to %s."
 L["%s responded %s to %s."]                = "%s responded %s to %s."
 L["No active loot session to respond to."] = "No active loot session to respond to."

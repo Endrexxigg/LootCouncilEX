@@ -58,8 +58,9 @@ function LCEX:CompetingGear(link)
     return gear
 end
 
--- A response button was clicked for item #index: send a cResp to the session ML.
-function LCEX:OnResponseChosen(index, resp)
+-- A response button was clicked for item #index: send a cResp to the session ML. `note` is
+-- the card's note text (per-item, passed by the poll window — Core never reads UI widgets).
+function LCEX:OnResponseChosen(index, resp, note)
     local a = self.activeSession
     if not a then return end
     local item = a.items[index]
@@ -68,7 +69,7 @@ function LCEX:OnResponseChosen(index, resp)
     local payload = {
         item = index,
         resp = resp.id,
-        note = (self.lootFrame and self.lootFrame.noteBox:GetText()) or "",
+        note = note or "",
         gear = self:CompetingGear(item.link),
     }
     if self:IsSelf(a.ml) then
@@ -82,34 +83,44 @@ function LCEX:OnResponseChosen(index, resp)
     self:Msg(string.format(self.L["Responded %s to %s."], resp.text, item.link))
 end
 
--- /lcex respond — reopen the response frame for the active session (e.g. after closing it).
+-- /lcex respond — reopen the poll for the active session (e.g. after closing it). A running
+-- deadline re-arms with whatever time is actually left.
 function LCEX:CmdRespond()
     local a = self.activeSession
     if not a then
         self:Msg(self.L["No active loot session to respond to."])
         return
     end
-    self:ShowLootFrame(a.items, a.responses)
+    local left = a.deadlineAt and (a.deadlineAt - GetTime()) or nil
+    if left and left <= 0 then
+        self:Msg(self.L["No active loot session to respond to."])
+        return
+    end
+    self:ShowPoll(a.items, a.responses, left)
 end
 
 -- Enter a session — as the receiver of sStart, or locally as the ML that opened it. Records
--- the session, resolves whether WE are on the council, opens the candidate LootFrame (everyone
--- responds) and, if we vote, the council VotingFrame. Centralizes the comms path and the ML's
--- own local path (solo or grouped), so the frames appear without depending on the echo.
-function LCEX:EnterSession(sid, ml, items, responses, council)
+-- the session, resolves whether WE are on the council, opens the candidate poll (everyone
+-- responds) and, if we vote, the council view. Centralizes the comms path and the ML's own
+-- local path (solo or grouped), so the frames appear without depending on the echo.
+-- `timeout` (optional seconds, from sStart) arms the poll's response deadline.
+function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
     local set = {}
     for _, n in ipairs(council or {}) do
         local nn = self:NormalizeName(n)
         if nn then set[nn] = true end
     end
     local amCouncil = set[self:NormalizeName(UnitName("player"))] == true
+    timeout = tonumber(timeout)
+    if timeout and timeout <= 0 then timeout = nil end
     self.activeSession = {
         sid = sid, ml = ml, items = items,
         responses = responses or self.RESPONSES,
         council = set, amCouncil = amCouncil, myVotes = {},
+        deadlineAt = timeout and (GetTime() + timeout) or nil,
     }
     self.voteRows = {}
-    self:ShowLootFrame(items, self.activeSession.responses)
+    self:ShowPoll(items, self.activeSession.responses, timeout)
     if amCouncil then
         self:ShowVotingFrame(items)
     end
@@ -148,7 +159,7 @@ function LCEX:LeaveSession(sid)
         self.activeSession = nil
         self.voteRows = nil
         self:ClearSessionTimeout()
-        self:HideLootFrame()
+        self:HidePoll()
         self:HideVotingFrame()
     end
 end
@@ -160,7 +171,7 @@ end
 LCEX.dispatch.sStart = function(self, msg, sender)
     if type(msg.items) ~= "table" or #msg.items == 0 then return end
     if self.activeSession and self.activeSession.sid == msg.sid and self:IsSelf(sender) then return end
-    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council)
+    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council, msg.timeout)
 end
 
 -- The session ended: only the ML that opened THIS sid can close it (DL-11).

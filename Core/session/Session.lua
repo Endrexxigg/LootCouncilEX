@@ -128,10 +128,16 @@ function LCEX:StartSession(items)
         rows = {}, voters = {}, startedAt = time(),
     }
 
+    -- Optional response deadline (Session Config): rides sStart as a DURATION so receivers
+    -- compute a local expiry (no clock-skew risk). Old clients simply ignore the field.
+    local timeout = tonumber(self.db.profile.pollTimeout) or 0
+    if timeout <= 0 then timeout = nil end
+
     local channel = self:GroupChannel()
     if channel then
         self:Send("sStart", sid, {
             items = items, council = council, responses = self:ResponseSet(),
+            timeout = timeout,
         }, channel)
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
     else
@@ -141,7 +147,7 @@ function LCEX:StartSession(items)
 
     -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
     -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
-    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council)
+    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council, timeout)
 
     self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
     self:StartHeartbeat() -- tell candidates we're alive
@@ -215,13 +221,16 @@ function LCEX:ResumeSession()
     }
     self.sessionItems = saved.sessionItems
 
+    local timeout = tonumber(self.db.profile.pollTimeout) or 0
+    if timeout <= 0 then timeout = nil end
     local channel = self:GroupChannel()
     if channel then
         self:Send("sStart", saved.sid, {
             items = saved.items, council = saved.council, responses = self:ResponseSet(),
+            timeout = timeout,
         }, channel)
     end
-    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council)
+    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout)
     self:SaveSession()
     self:StartHeartbeat()
     self:Msg(string.format(self.L["Resumed session (%s) — %d item(s)."], saved.sid, #saved.items))

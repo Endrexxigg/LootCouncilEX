@@ -115,7 +115,14 @@ _G.FauxScrollFrame_Update = function() end
 _G.FauxScrollFrame_GetOffset = function() return 0 end
 _G.FauxScrollFrame_OnVerticalScroll = function() end
 _G.FauxScrollFrame_SetOffset = function() end
-_G.GetItemInfoInstant = function() return nil end
+-- Driveable at call time: tests set H.instant = {id, type, subType, equipLoc, icon, classID,
+-- subClassID} to exercise the Core/Usable.lua proficiency matrix (file-locals capture this
+-- FUNCTION at load; it reads H per call).
+_G.GetItemInfoInstant = function()
+    local i = H.instant
+    if not i then return nil end
+    return i[1], i[2], i[3], i[4], i[5], i[6], i[7]
+end
 
 -- ── LibStub + the Ace3 mixins the addon embeds ───────────────────────────────
 local function deepcopy(t)
@@ -165,7 +172,8 @@ local FILES = {
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
-    "UI/Theme.lua", "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
+    "Core/Usable.lua",
+    "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
     "UI/LootBrowser.lua", "UI/PlayerDetail.lua",
     "Core/SelfTest.lua", -- last, like the .toc; only its RUNNER is exercised headlessly
 }
@@ -183,8 +191,8 @@ function LCEX:Msg(text) H.msgs[#H.msgs + 1] = tostring(text) end
 
 -- The session Show/Hide frame plumbing is pure UI; stub it so the session lifecycle (start /
 -- enter / leave / resume) can be exercised headlessly without rendering.
-function LCEX:ShowLootFrame() end
-function LCEX:HideLootFrame() end
+function LCEX:ShowPoll() end
+function LCEX:HidePoll() end
 function LCEX:ShowVotingFrame() end
 function LCEX:HideVotingFrame() end
 function LCEX:RefreshVotingItem() end
@@ -196,6 +204,7 @@ function H.reset()
     H.guild, H.group = {}, {}
     H.playerName, H.tradePartner = "Tester", nil
     H.itemCached, H.itemEmpty = true, false
+    H.instant = nil
     H.class = "MAGE"
     H.talentPoints = { 0, 41, 20 } -- Fire mage by default (tab 2 wins)
     LCEX._councilSet = nil

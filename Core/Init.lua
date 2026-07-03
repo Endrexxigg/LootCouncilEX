@@ -42,7 +42,11 @@ local DB_DEFAULTS = {
             sessionFrame = {},
             playerDetail = {},
             lootBrowser  = {},
+            poll         = {},
         },
+        -- Poll response deadline in seconds (0 = none). Set by the ML in Session Config;
+        -- rides sStart so every candidate's poll counts down.
+        pollTimeout        = 0,
         useWhisperFallback = false,
     },
     global = {

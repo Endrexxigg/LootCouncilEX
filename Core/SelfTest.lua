@@ -30,8 +30,9 @@ local LCEX = LootCouncilEX
 
 -- Real TBC item for item-API checks (Robe of Hateful Echoes, SSC — INVTYPE_ROBE).
 local TEST_ITEM_ID = 30055
--- Session E2E pads (same set CmdTest uses); GetItemInfo may be uncached → "item:<id>" fallback.
-local TEST_LINK_IDS = { 32837, 30055 }
+-- Session E2E items: MUST be usable by every class so the poll filter never hides them on
+-- any test character — a trinket (28830 Dragonspine Trophy) and a cloth robe (30055).
+local TEST_LINK_IDS = { 28830, 30055 }
 -- Award target that can never collide with a real trade partner (ShortKey → "lcextestdummy").
 local AWARD_DUMMY = "LCEXTestDummy"
 
@@ -282,6 +283,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "ResolveCouncil", "GetCouncil", "IsCouncil", "InGroupWith", "StartSession", "EndSession",
         "EnterSession", "LeaveSession", "ResumeSession", "RestoreSession", "SaveSession",
         "OnResponseChosen", "CompetingGear", "SendVote", "ApplyCUpdate",
+        "PlayerCanUse", "ClassCanUse",
         "AwardItem", "LogAward", "ForgetAward", "ScanBags", "BuildCouncilableList",
         "WithItemQuality", "WithItemID", "ItemTradeTimeRemaining", "ParseTradeDuration",
         "FormatDuration", "TradeExpiry", "SaveOwedTrades", "RestoreOwedTrades",
@@ -302,7 +304,9 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         -- UI v2 (Theme + themed primitives)
         "ApplyGradient", "Surface", "SoftEdge", "ThemeText", "QualityColor", "ClassColor",
         "CreateWindowV2", "CreateFlatButton", "CreateNavRail", "CreateCheckbox", "CreateSliderV2",
-        "ShowLootFrame", "HideLootFrame", "ShowVotingFrame", "HideVotingFrame",
+        "ShowPoll", "HidePoll", "EnsurePoll", "RenderPollCards", "PollCardAnswered",
+        "_PollQueueRemove", "_BuildPollQueue",
+        "ShowVotingFrame", "HideVotingFrame",
         "RefreshVotingItem", "ToggleSessionFrame", "RefreshSessionFrame",
         "ToggleLootBrowser", "ShowLootPhase", "OpenPlayerDetail", "RenderDetailTab",
     }
@@ -567,26 +571,54 @@ LCEX:RegisterSelfTest("council", "digest covers every dataset", function(self, t
 end)
 
 -- ── ui: real frame rendering ──────────────────────────────────────────────────
-LCEX:RegisterSelfTest("ui", "respond frame renders data-driven rows", function(self, t)
-    if self.activeSession then return t:Skip("a session is open — not stomping the live respond frame") end
-    local items = { FakeWireItem(1), FakeWireItem(2) }
-    self:ShowLootFrame(items, self.RESPONSES)
-    local f = self.lootFrame
-    if not t:Ok(f and f:IsShown(), "respond frame not shown") then return end
-    for i = 1, 2 do
-        local row = f.rows[i]
-        if t:Ok(row and row:IsShown(), "row " .. i .. " not shown") then
-            t:Ok(row.icon.tex:GetTexture() ~= nil, "row " .. i .. " icon texture not set")
+LCEX:RegisterSelfTest("ui", "poll renders usable-item cards + queue advance", function(self, t)
+    if self.activeSession then return t:Skip("a session is open — not stomping the live poll") end
+    local items = { FakeWireItem(1), FakeWireItem(2) } -- trinket + cloth robe: universal
+    self:ShowPoll(items, self.RESPONSES, 0)
+    local f = self.pollFrame
+    if not t:Ok(f and f:IsShown(), "poll not shown") then return end
+    t:Eq(#(self.pollQueue or {}), 2, "both universal items pass the class filter")
+    for slot = 1, 2 do
+        local card = f.cards[slot]
+        if t:Ok(card and card:IsShown(), "card " .. slot .. " not shown") then
+            t:Ok(card.icon.tex:GetTexture() ~= nil, "card " .. slot .. " icon texture not set")
             for ri, resp in ipairs(self.RESPONSES) do
-                local b = row.buttons[ri]
-                if t:Ok(b and b:IsShown(), "row " .. i .. " missing response button " .. ri) then
-                    t:Eq(b:GetText(), resp.text, "row " .. i .. " button " .. ri .. " text")
+                local b = card.buttons[ri]
+                if t:Ok(b and b:IsShown(), "card " .. slot .. " missing response button " .. ri) then
+                    t:Eq(b:GetText(), resp.text, "card " .. slot .. " button " .. ri .. " text")
                 end
             end
         end
     end
-    t:Ok(not (f.rows[3] and f.rows[3]:IsShown()), "stale pooled row 3 still visible")
-end, { cleanup = function(self) self:HideLootFrame() end })
+    t:Ok(not (f.cards[3] and f.cards[3]:IsShown()), "phantom third card")
+    -- Queue advance: answer the TOP card — the next item must shift into slot 1.
+    self:PollCardAnswered(self.pollQueue[1])
+    t:Eq(self.pollQueue and self.pollQueue[1], 2, "queue advanced to the next item")
+    t:Ok(f.cards[1] and f.cards[1]:IsShown() and f.cards[1].itemIndex == 2,
+        "top slot re-filled after answering")
+    t:Ok(not (f.cards[2] and f.cards[2]:IsShown()), "second slot emptied")
+    self:PollCardAnswered(2)
+    t:Ok(not f:IsShown(), "poll auto-closes when the queue drains")
+end, { cleanup = function(self) self:HidePoll() end })
+
+LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", function(self, t)
+    local class = select(2, UnitClass("player"))
+    local onToken, offToken
+    for id, tok in pairs(self.TierTokens) do
+        if tok.pieces then
+            if tok.pieces[class] and not onToken then onToken = id end
+            if not tok.pieces[class] and not offToken then offToken = id end
+        end
+    end
+    if t:Ok(onToken ~= nil, "no own-class token in TierTokens data") then
+        t:Ok(self:PlayerCanUse(onToken), "own-class token was filtered out")
+    end
+    if t:Ok(offToken ~= nil, "no off-class token in TierTokens data") then
+        t:Ok(not self:PlayerCanUse(offToken), "off-class token was NOT filtered")
+    end
+    t:Ok(self:PlayerCanUse(28830), "trinket must be universal")
+    t:Ok(self:PlayerCanUse(30055), "cloth armor is wearable by every class")
+end)
 
 LCEX:RegisterSelfTest("ui", "council frame empty-state", function(self, t)
     if self.activeSession then return t:Skip("a session is open") end
@@ -655,9 +687,9 @@ end, { cleanup = function(self)
 end })
 
 LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
-    self:EnsureLootFrame(); self:EnsureVotingFrame(); self:EnsureSessionFrame()
+    self:EnsurePoll(); self:EnsureVotingFrame(); self:EnsureSessionFrame()
     self:EnsureLootBrowser(); self:EnsurePlayerDetail()
-    for _, name in ipairs({ "LCEX_LootFrame", "LCEX_VotingFrame", "LCEX_SessionFrame",
+    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_VotingFrame", "LCEX_SessionFrame",
                             "LCEX_LootBrowser", "LCEX_PlayerDetail" }) do
         t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
         local found = false
@@ -752,16 +784,19 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Eq(#s.items, 2, "session item count")
     t:Ok(self.activeSession and self.activeSession.sid == s.sid, "ML did not enter its own session")
     t:Ok(self.activeSession and self.activeSession.amCouncil, "runner not on the session council (council-of-one)")
-    t:Ok(self.lootFrame and self.lootFrame:IsShown(), "respond frame did not open")
+    t:Ok(self.pollFrame and self.pollFrame:IsShown(), "poll did not open")
+    t:Eq(#(self.pollQueue or {}), 2, "poll queue should hold both universal items")
     t:Ok(self.votingFrame and self.votingFrame:IsShown(), "council frame did not open")
     t:Ok(self.db.global.session[me] ~= nil, "session not mirrored to the DB (resume support)")
 
-    -- Respond to both items through the button path (ML fast-path dispatches cResp in-process).
-    self:OnResponseChosen(1, self.RESPONSES[1])
-    self:OnResponseChosen(2, self.RESPONSES[2])
+    -- Respond to both items through the button path (ML fast-path dispatches cResp in-process),
+    -- carrying a per-card note like the poll buttons do.
+    self:OnResponseChosen(1, self.RESPONSES[1], "selftest note")
+    self:OnResponseChosen(2, self.RESPONSES[2], "")
     local row = s.rows[1] and s.rows[1][me]
     if t:Ok(row ~= nil, "own response did not aggregate into session.rows") then
         t:Eq(row.resp, self.RESPONSES[1].id, "aggregated response id")
+        t:Eq(row.note, "selftest note", "per-card note did not ride the response")
     end
     t:Ok(self.voteRows and self.voteRows[1] and self.voteRows[1][me] ~= nil,
         "voting view did not mirror the response")
@@ -812,7 +847,7 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     -- End: both frames close, all session state (incl. the DB mirror) clears.
     self:EndSession()
     t:Ok(self.session == nil and self.activeSession == nil, "session state not cleared")
-    t:Ok(not (self.lootFrame and self.lootFrame:IsShown()), "respond frame still open after end")
+    t:Ok(not (self.pollFrame and self.pollFrame:IsShown()), "poll still open after end")
     t:Ok(not (self.votingFrame and self.votingFrame:IsShown()), "council frame still open after end")
     t:Ok(self.db.global.session[me] == nil, "persisted session not cleared")
 end, { cleanup = function(self)

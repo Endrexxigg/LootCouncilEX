@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.18.4
+## Version: 0.19.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -26,6 +26,8 @@ Core\Data\DataAPI.lua
 
 # Pure display-array builders over the datasets (no frames) — the UI renders these.
 Core\Display.lua
+# Class-usability filter for the poll (tier-token lines + armor/weapon proficiency).
+Core\Usable.lua
 
 # Plane A — live loot session (ML authority). Session holds state + sStart/sEnd;
 # Award tracks looted/bag items and hands them off by trade, so Session precedes Award.
@@ -36,7 +38,7 @@ Core\session\Award.lua
 # Widgets builds the primitives on it; the frame modules build on both.
 UI\Theme.lua
 UI\Widgets.lua
-UI\LootFrame.lua
+UI\PollWindow.lua
 UI\VotingFrame.lua
 UI\SessionFrame.lua
 

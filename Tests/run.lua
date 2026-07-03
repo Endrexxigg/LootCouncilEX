@@ -459,6 +459,77 @@ test("DataAPI: tier tokens", function()
     ok(L:FindTokenForItem(29753) and L:FindTokenForItem(29758), "T4 chest + gloves tokens resolve")
 end)
 
+-- ── Class-usability filter (Core/Usable.lua) ─────────────────────────────────
+test("ClassCanUse: tier-token class lines (no item APIs needed)", function()
+    -- 29767 = Leggings of the Fallen Defender (Druid/Priest/Warrior); 29765 = Hero (Hun/Mage/Wlk).
+    ok(L:ClassCanUse(29767, "WARRIOR"), "warrior on the Defender line")
+    ok(not L:ClassCanUse(29767, "MAGE"), "mage NOT on the Defender line")
+    ok(L:ClassCanUse(29765, "MAGE"), "mage on the Hero line")
+    ok(not L:ClassCanUse(29765, "ROGUE"), "rogue NOT on the Hero line")
+    ok(L:ClassCanUse("|cffa335ee|Hitem:29767::::::::70|h[Leggings]|h|r", "PRIEST"),
+        "token check works from a link too")
+end)
+
+test("ClassCanUse: armor/weapon proficiency matrix", function()
+    local function instant(classID, subClassID, equipLoc)
+        H.instant = { 12345, "t", "st", equipLoc or "INVTYPE_CHEST", 135, classID, subClassID }
+    end
+    instant(4, 4) -- plate chest
+    ok(L:ClassCanUse(12345, "WARRIOR"), "warrior wears plate")
+    ok(not L:ClassCanUse(12345, "PRIEST"), "priest does not wear plate")
+    instant(4, 3) -- mail
+    ok(L:ClassCanUse(12345, "SHAMAN"), "shaman wears mail")
+    ok(not L:ClassCanUse(12345, "ROGUE"), "rogue does not wear mail")
+    instant(4, 1, "INVTYPE_CLOAK") -- cloak: 'cloth' but universal
+    ok(L:ClassCanUse(12345, "WARRIOR"), "cloaks are universal")
+    instant(4, 0) -- misc armor: rings/trinkets/necks
+    ok(L:ClassCanUse(12345, "MAGE"), "misc armor is universal")
+    instant(4, 6) -- shield
+    ok(L:ClassCanUse(12345, "PALADIN"), "paladin uses shields")
+    ok(not L:ClassCanUse(12345, "DRUID"), "druid does not use shields")
+    instant(2, 1) -- 2H axe
+    ok(L:ClassCanUse(12345, "SHAMAN"), "shaman swings 2H axes")
+    ok(not L:ClassCanUse(12345, "ROGUE"), "rogue cannot use axes in TBC")
+    instant(2, 19) -- wand
+    ok(L:ClassCanUse(12345, "PRIEST"), "priest uses wands")
+    ok(not L:ClassCanUse(12345, "WARRIOR"), "warrior cannot use wands")
+    instant(9, 0) -- recipe: unknown class of item -> never hide
+    ok(L:ClassCanUse(12345, "ROGUE"), "non-equipment defaults to SHOW")
+    H.instant = nil
+    ok(L:ClassCanUse(12345, "ROGUE"), "no item info -> default SHOW")
+end)
+
+-- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
+test("Poll queue: filtered build + value-remove advance", function()
+    local function instant(classID, subClassID)
+        H.instant = { 1, "t", "st", "INVTYPE_CHEST", 135, classID, subClassID }
+    end
+    instant(4, 1) -- everything reads as a cloth chest: usable by the mock MAGE
+    local items = { { link = "item:1", quality = 4 }, { link = "item:2", quality = 4 },
+                    { link = "item:3", quality = 4 } }
+    local q = L:_BuildPollQueue(items)
+    eq(#q, 3, "all usable -> all queued")
+    eq(q[1], 1, "queue preserves session order")
+    L:_PollQueueRemove(q, 2) -- answer the MIDDLE card
+    eq(table.concat(q, ","), "1,3", "value-remove keeps the others' indices intact")
+    L:_PollQueueRemove(q, 1)
+    L:_PollQueueRemove(q, 3)
+    eq(#q, 0, "queue drains")
+    instant(4, 4) -- plate: the mock MAGE can't use any of them
+    eq(#L:_BuildPollQueue(items), 0, "fully-filtered queue is empty")
+    H.instant = nil
+end)
+
+test("OnResponseChosen carries the per-card note into the aggregated row", function()
+    L:StartSession({ { link = "[Axe]", quality = 4 } })
+    L:OnResponseChosen(1, L.RESPONSES[1], "per-card note")
+    local row = L.session.rows[1] and L.session.rows[1]["tester"]
+    ok(row ~= nil, "own response aggregated")
+    eq(row and row.note, "per-card note", "note parameter rode the cResp")
+    eq(row and row.resp, 1, "response id recorded")
+    L:EndSession()
+end)
+
 -- ── Self-test runner (Core/SelfTest.lua) ─────────────────────────────────────
 -- The in-game checks themselves need the real client; headless we verify the RUNNER: status
 -- classification, the always-runs cleanup contract, sync-completing async tests, the timeout
