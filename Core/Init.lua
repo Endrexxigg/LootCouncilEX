@@ -178,11 +178,16 @@ function LCEX:HandleSlash(input)
     elseif cmd == "gear" then
         self:CmdGear(rest)
     elseif cmd == "loot" or cmd == "browser" then
-        self:ToggleLootBrowser()
+        self:OpenCouncilModule("browser")
+    elseif cmd == "council" then
+        -- Bare = the council window; with args = the roster editor (add|remove|list).
+        if rest == "" then
+            self:ToggleCouncilWindow()
+        else
+            self:CmdCouncil(rest)
+        end
     elseif cmd == "player" or cmd == "detail" then
         self:CmdPlayerDetail(rest)
-    elseif cmd == "council" then
-        self:CmdCouncil(rest)
     elseif cmd == "sync" then
         self:CmdSync()
     elseif cmd == "dummy" then

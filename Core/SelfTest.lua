@@ -309,7 +309,9 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "ShowLootWindow", "HideLootWindow", "ToggleLootWindow", "EnsureLootWindow",
         "RefreshLootWindow", "RefreshLootItem", "LootRailItems", "LootSelectItem",
         "LootStageScan", "LootStageAdd", "LootStageRemove", "LootStartStaged",
-        "ToggleLootBrowser", "ShowLootPhase", "OpenPlayerDetail", "RenderDetailTab",
+        "RegisterCouncilModule", "EnsureCouncilWindow", "ToggleCouncilWindow",
+        "OpenCouncilModule", "CouncilShowModule", "BrowserSelectItem",
+        "OpenPlayerDetail", "RenderDetailTab",
     }
     for _, name in ipairs(fns) do
         t:Ok(type(self[name]) == "function", "missing function: " .. name)
@@ -651,25 +653,30 @@ end, { cleanup = function(self)
     if self.lootWindow then self.lootWindow:Hide() end
 end })
 
-LCEX:RegisterSelfTest("ui", "loot browser renders + scroll-offset regression", function(self, t)
-    local f = self:EnsureLootBrowser()
-    local wasShown = f:IsShown()
+LCEX:RegisterSelfTest("ui", "council window: browser module + resize + offset regression", function(self, t)
     local prevPhase = self.browserPhase
-    if not wasShown then self:ToggleLootBrowser() end
-    t:Ok(f:IsShown(), "browser not shown")
+    self:OpenCouncilModule("browser")
+    local f = self.councilWindow
+    if not t:Ok(f and f:IsShown(), "council window not shown") then return end
+    t:Ok(f:IsResizable(), "council window not resizable")
+    t:Ok((f.SetResizeBounds or f.SetMinResize) ~= nil, "no resize-bounds API on this client")
+    t:Eq(f.activeModule, "browser", "browser module not active")
+    local panel = f.panels and f.panels.browser
+    if not t:Ok(panel and panel:IsShown(), "browser panel not shown") then return end
     local phase = self.browserPhase
     if not t:Ok(phase ~= nil, "no phase selected") then return end
-    t:Eq(#f.list.items, #self:BuildBrowserDisplay(phase), "browser row count for " .. tostring(phase))
-    t:Ok(f.list.rows[1] and f.list.rows[1]:IsShown(), "first browser row not rendered")
+    t:Eq(#panel.list.items, #self:BuildBrowserDisplay(phase), "browser row count for " .. tostring(phase))
+    t:Ok(panel.list.rows[1] and panel.list.rows[1]:IsShown(), "first browser row not rendered")
     -- The CLAUDE.md FauxScrollFrame gotcha, exercised for real: poison the offset, repopulate —
     -- the list must render from the top, never empty.
-    f.list.scroll.offset = 500
-    f.list:SetData(self:BuildBrowserDisplay(phase))
-    t:Eq(f.list.scroll.offset, 0, "SetData did not reset the poisoned scroll offset")
-    t:Ok(f.list.rows[1] and f.list.rows[1]:IsShown(), "list rendered empty after offset poison")
-    if not wasShown then f:Hide() end
+    panel.list.scroll.offset = 500
+    panel.list:SetData(self:BuildBrowserDisplay(phase))
+    t:Eq(panel.list.scroll.offset, 0, "SetData did not reset the poisoned scroll offset")
+    t:Ok(panel.list.rows[1] and panel.list.rows[1]:IsShown(), "list rendered empty after offset poison")
     self.browserPhase = prevPhase or self.browserPhase
-end)
+end, { cleanup = function(self)
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
 
 LCEX:RegisterSelfTest("ui", "player detail tabs render for self", function(self, t)
     local me = UnitName("player")
@@ -698,9 +705,9 @@ end })
 
 LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
     self:EnsurePoll(); self:EnsureLootWindow()
-    self:EnsureLootBrowser(); self:EnsurePlayerDetail()
+    self:EnsureCouncilWindow(); self:EnsurePlayerDetail()
     for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow",
-                            "LCEX_LootBrowser", "LCEX_PlayerDetail" }) do
+                            "LCEX_CouncilWindow", "LCEX_PlayerDetail" }) do
         t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
         local found = false
         for _, n in ipairs(UISpecialFrames) do

@@ -157,8 +157,14 @@ L["Gear/profs — %s %s"]                     = "Gear/profs — %s %s"
 L["  slot %d: %s"]                          = "  slot %d: %s"
 L["  %s: %d"]                               = "  %s: %d"
 
+-- The council dashboard + its modules.
+L["Council"]                                = "Council"
+L["Loot Browser"]                           = "Loot Browser"
+L["(token)"]                                = "(token)"
+L["Mark — %s:"]                             = "Mark — %s:"
+L["Mark — click an item:"]                  = "Mark — click an item:"
+
 -- Phase 6 — viewer UIs.
-L["LootCouncil EX — Loot Browser"]          = "LootCouncil EX — Loot Browser"
 L["LootCouncil EX — Player"]                = "LootCouncil EX — Player"
 L["No award history."]                      = "No award history."
 L["Note:"]                                  = "Note:"
