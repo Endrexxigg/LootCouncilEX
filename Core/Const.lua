@@ -50,8 +50,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], sync"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -174,6 +174,18 @@ L["Rank cutoff (0 = GM)"]                   = "Rank cutoff (0 = GM)"
 L["Extra members (any guild rank):"]        = "Extra members (any guild rank):"
 L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
     "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
+
+-- The config window.
+L["Configuration"]                          = "Configuration"
+L["Appearance"]                             = "Appearance"
+L["Window scale"]                           = "Window scale"
+L["Council window opacity"]                 = "Council window opacity"
+L["Minimap"]                                = "Minimap"
+L["Show the minimap button"]                = "Show the minimap button"
+L["Loot"]                                   = "Loot"
+L["Loot quality threshold"]                 = "Loot quality threshold"
+L["Broadcast my gear/professions (self-report)"] =
+    "Broadcast my gear/professions (self-report)"
 L["No award history."]                      = "No award history."
 L["Note:"]                                  = "Note:"
 L["by %s, %s"]                              = "by %s, %s"

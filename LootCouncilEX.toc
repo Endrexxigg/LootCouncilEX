@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.22.0
+## Version: 0.23.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -47,6 +47,9 @@ UI\council\BrowserModule.lua
 UI\council\PlayersModule.lua
 UI\council\HistoryModule.lua
 UI\council\SessionConfigModule.lua
+
+# User-level settings (schema-driven).
+UI\ConfigWindow.lua
 
 # Plane A — candidate side: receives sStart, opens the frames, sends cResp. Loads after its
 # UI frames and after Session (the ML aggregator it talks to).

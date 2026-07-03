@@ -311,6 +311,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "RegisterCouncilModule", "EnsureCouncilWindow", "ToggleCouncilWindow",
         "OpenCouncilModule", "CouncilShowModule", "BrowserSelectItem",
         "OpenPlayerDetail", "BuildPlayerIndex", "BuildHistoryLog",
+        "EnsureConfigWindow", "ToggleConfigWindow", "ApplyAppearance",
     }
     for _, name in ipairs(fns) do
         t:Ok(type(self[name]) == "function", "missing function: " .. name)
@@ -733,9 +734,30 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
+LCEX:RegisterSelfTest("ui", "config window renders its schema + appearance plumbing", function(self, t)
+    self:ToggleConfigWindow()
+    local f = self.configWindow
+    if not t:Ok(f and f:IsShown(), "config window not shown") then return end
+    t:Ok(#f.controls >= 8, "schema controls missing (got " .. tostring(f and #f.controls) .. ")")
+    -- Appearance round-trip: opacity reaches the council window (the opted-in one).
+    local a = self.db.profile.appearance
+    local prevOpacity = a.opacity
+    a.opacity = 0.7
+    self:EnsureCouncilWindow()
+    self:ApplyAppearance()
+    local alpha = self.councilWindow:GetAlpha()
+    t:Ok(math.abs(alpha - 0.7) < 0.02, "council opacity not applied (alpha " .. string.format("%.2f", alpha) .. ")")
+    a.opacity = prevOpacity
+    self:ApplyAppearance()
+end, { cleanup = function(self)
+    if self.configWindow then self.configWindow:Hide() end
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
+
 LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
-    self:EnsurePoll(); self:EnsureLootWindow(); self:EnsureCouncilWindow()
-    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow", "LCEX_CouncilWindow" }) do
+    self:EnsurePoll(); self:EnsureLootWindow(); self:EnsureCouncilWindow(); self:EnsureConfigWindow()
+    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow", "LCEX_CouncilWindow",
+                            "LCEX_ConfigWindow" }) do
         t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
         local found = false
         for _, n in ipairs(UISpecialFrames) do
