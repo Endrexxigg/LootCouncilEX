@@ -83,8 +83,10 @@ function LCEX:OnResponseChosen(index, resp, note)
     self:Msg(string.format(self.L["Responded %s to %s."], resp.text, item.link))
 end
 
--- /lcex respond — reopen the poll for the active session (e.g. after closing it). A running
--- deadline re-arms with whatever time is actually left.
+-- /lcex respond — reopen the poll for the active session (e.g. after closing it). Shows ALL
+-- items again ON PURPOSE, including ones already answered: re-clicking is the DL-3 re-respond
+-- mechanism (the ML aggregate is last-write-wins). A running deadline re-arms with whatever
+-- time is actually left.
 function LCEX:CmdRespond()
     local a = self.activeSession
     if not a then

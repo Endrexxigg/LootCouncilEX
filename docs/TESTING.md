@@ -31,6 +31,38 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.19–0.24 — THE FOUR-FRAME UI (full rearchitecture) — **selftest + a visual pass**
+The five old frames are gone; poll/loot/council/config replace them, plus a minimap button.
+Mechanics are covered by `/lcex selftest` (now ~40 checks); the visual/feel items below need
+eyes. **Old window positions were reset once** (new layout keys).
+
+- [ ] **Selftest first**: solo, `/lcex selftest`, `/reload`, tell me — I read the report.
+- [ ] **Minimap button** (gold coin icon): left-click opens **loot**, right-click **council**,
+  ctrl+click **config**; it drags around the minimap; the config checkbox hides/shows it.
+- [ ] **Loot window** (`/lcex` or minimap): flat dark look, gold accents. Staging: [Scan bags]
+  fills the rail; type an itemID (or shift-click a bag link into the box) + Enter adds it;
+  × removes. [Start session] → poll opens, rail badges count responses, click an item → its
+  candidate table fills; +/− votes; Award (gold button) records; ✓ badge appears. [End] closes.
+- [ ] **Poll** (as any raider): cards stack (max 3), item names quality-colored, response
+  buttons per card, note box per card; clicking a response advances the queue INTO the top
+  slot (mash one spot to pass all). Items your class can't use never show (check with an
+  off-class token in a test session). With a deadline set (council → Session Config), the
+  countdown shows and the poll closes at zero.
+- [ ] **Council window** (right-click minimap / `/lcex council`): resizes by the corner grip
+  (min size respected, no stuck-sizing), remembers size+position; opacity slider (config)
+  works. Rail: Loot Browser / Players / History / Session Config, gold bar on the active one.
+- [ ] **Browser module**: gold raid bars, indented bosses, quality-colored item names; click
+  an item → bottom mark editor targets it; committing a mark shows inline + syncs.
+- [ ] **Players module**: picker filters as you type, names class-colored; sub-tabs render
+  gear ("(your live snapshot)" for self) / history / profs / BiS (auto-resolves your class) /
+  notes (edit + meta line).
+- [ ] **History module**: award log newest-first; winner filter box narrows it.
+- [ ] **Session Config**: poll-deadline slider ("Off" at 0); council roster — byRank +
+  rank cutoff rebuild the list, extras add via box / remove via ×.
+- [ ] **Config window** (ctrl+click minimap / `/lcex config`): scale slider rescales the
+  windows live; council opacity slider works; loot threshold + self-report toggles persist
+  across `/reload`.
+
 ### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
 - [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
   *"Session ML A went quiet — closing the session view"* and the frames close (B isn't stuck).
