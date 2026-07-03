@@ -140,6 +140,9 @@ function LCEX:OnEnable()
     -- Plane B — gear/profession self-report (council/SelfReport.lua): snapshot + login report.
     self:SetupSelfReport()
 
+    -- The minimap launcher (Core/Minimap.lua): left=loot, right=council, ctrl=config.
+    self:SetupMinimapButton()
+
     self:Msg(string.format(self.L["v%s loaded."], self:GetVersion()))
 end
 

@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.23.0
+## Version: 0.24.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -16,6 +16,7 @@ Core\Init.lua
 Core\Const.lua
 Core\Comms.lua
 Core\Roster.lua
+Core\Minimap.lua
 
 # Static reference data (stub samples; Phase 7 fills real content) + pure accessors. Inert
 # tables, so they load early; DataAPI reads them at call time so it goes last of the four.

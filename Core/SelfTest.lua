@@ -312,6 +312,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "OpenCouncilModule", "CouncilShowModule", "BrowserSelectItem",
         "OpenPlayerDetail", "BuildPlayerIndex", "BuildHistoryLog",
         "EnsureConfigWindow", "ToggleConfigWindow", "ApplyAppearance",
+        "SetupMinimapButton", "UpdateMinimapButton",
     }
     for _, name in ipairs(fns) do
         t:Ok(type(self[name]) == "function", "missing function: " .. name)
@@ -379,6 +380,19 @@ end)
 
 LCEX:RegisterSelfTest("load", "addon metadata readable (## Version)", function(self, t)
     t:Ok(self:GetVersion() ~= "dev", "GetAddOnMetadata returned nothing — version reads as 'dev'")
+end)
+
+LCEX:RegisterSelfTest("load", "minimap libs embedded + button registered", function(self, t)
+    local ldb = LibStub("LibDataBroker-1.1", true)
+    local dbi = LibStub("LibDBIcon-1.0", true)
+    t:Ok(ldb ~= nil, "LibDataBroker-1.1 missing (embeds.xml order?)")
+    t:Ok(dbi ~= nil, "LibDBIcon-1.0 missing (embeds.xml order?)")
+    if ldb then
+        t:Ok(ldb:GetDataObjectByName("LootCouncilEX") ~= nil, "launcher data object not registered")
+    end
+    if dbi then
+        t:Ok(dbi:GetMinimapButton("LootCouncilEX") ~= nil, "minimap button not created")
+    end
 end)
 
 -- ── api: the WoW client contract the code depends on ─────────────────────────

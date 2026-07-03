@@ -38,7 +38,7 @@ read_globals = {
     "GetAddOnMetadata", "C_AddOns",
     -- Units / roster
     "UnitName", "UnitClass", "UnitExists", "UnitGUID", "UnitFullName", "UnitInRaid", "UnitIsUnit",
-    "UnitAffectingCombat",
+    "UnitAffectingCombat", "IsControlKeyDown",
     "GetNumGroupMembers", "GetNumRaidMembers", "GetRaidRosterInfo", "IsInRaid", "IsInGroup",
     "LE_PARTY_CATEGORY_INSTANCE", "GetInstanceInfo",
     "IsInGuild", "GuildRoster", "C_GuildInfo", "GetNumGuildMembers", "GetGuildRosterInfo",
