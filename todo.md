@@ -191,22 +191,216 @@ view to showcase total gold in the gbank."
 
 ---
 
+## Feature C — Council/officer access control + guild config inheritance
+
+**Status:** awaiting answers
+
+**The ask (user's words):** "add logic to separate council members from other guild members
+to prevent showing council-only settings to anyone in the raid. if there's an existing guild
+config set up, inherit it from another guild member, polling guild on first load. pop up a
+prompt like: inherit <Guild> loot council settings from <Player> ? Y/N. these settings will
+contain settings like officer rank, which is different for different guilds. if user is below
+officer rank, or not manually added to the loot council, grey out those settings in the addon.
+also make sure if someone quits the guild, they should no longer be able to see data for an old
+guild... however that needs to happen."
+
+**Grounding (what the code says today):**
+- Council roster is a **single local `profile.council = {byRank, rank, extra}`** (`Core/Init.lua:35`)
+  that double-duties for BOTH vote-gating (Plane A) and sync-gating (Plane B) — flagged unresolved
+  as **DL-1** (PROJECT.md:237). `ResolveCouncil` (`Core/session/Session.lua:35-54`): union of
+  `extra` (manual, any rank) + self (Plane A only) + guild members with `rankIndex <= rank`
+  (0 = GM; lower index = higher rank; `rank` is a "this rank or better" cutoff).
+- Predicates: `AmCouncil()` / `IsCouncil(name)` / `SyncSenderOk(sender)` (`Sync.lua:37-44`,
+  `Session.lua:66-70`). Today council membership **only gates sync + votes — never which settings
+  a user sees or edits.** There is **no council-vs-ordinary-guild-member distinction for settings.**
+- Guild rank is read **only** via `GetGuildRosterInfo(i)` 3rd return (`rankIndex`) inside
+  `ResolveCouncil`. **`GetGuildInfo` is never called** — the addon does not read the player's OWN
+  rank directly, and **never reads the guild NAME.** `GuildControlGetRankName` never called (no
+  rank-name strings). `GUILD_ROSTER_UPDATE` is hooked (`Sync.lua:148`) but only invalidates the
+  cached council set; **`PLAYER_GUILD_UPDATE` is never registered.**
+- Two settings UIs, **neither role-gated:** `UI/ConfigWindow.lua` (personal: scale, opacity,
+  minimap, `minQuality`, self-report) and `UI/council/SessionConfigModule.lua` (officer-ish:
+  poll deadline, **council roster editor + rank cutoff**). The latter is reachable by anyone —
+  `CouncilWindow.lua:60-67` registers every module unconditionally, no role check.
+- **No disabled/greyed control state exists** in Widgets — only a `faint` "disabled" text *color*
+  (`Theme.lua:34`); greying would need manual `EnableMouse(false)`/`SetAlpha` (net-new helper).
+- **All data is account-wide `global`, keyed by player name — never guild-scoped.** No `char`/
+  `realm`/`factionrealm`/guild namespace. **No purge/hide-on-leave mechanism anywhere.** Owner-keyed
+  maps (`pendingTrades`, `session`) are the only keying precedent, keyed by CHARACTER not guild.
+- **No config broadcast/inherit exists.** Config is 100% local per-install; nothing on the wire
+  carries `profile.council`, `rank`, `minQuality`, `pollTimeout`, or the response set. `sStart`
+  carries the resolved council LIST + response set for one session only — not config replication.
+  DL-8 (PROJECT.md:244) notes a shared response set "will need to be carried in sStart or a synced
+  config" — i.e. **no synced config yet.**
+
+**Open questions — Decisions:**
+- **C1.** Config-sharing model — the crux. Is the inherited guild config a **one-time bootstrap
+  copy** on first load (then local, re-inheritable), or a **continuously-synced shared config**
+  (officer-authored, LWW, replicated like a dataset)? The "inherit from <Player>? Y/N" wording
+  reads as a bootstrap copy, but that lets officer-rank/roster drift out of sync across the guild.
+  (Recommend a synced officer-authored guild-config record — keeps everyone consistent, resolves
+  DL-1/DL-8 — with the Y/N prompt as the first-run onboarding on top of it. Bigger build. Fork is real.)
+- **C2.** What "officer rank" means vs the existing model. Is the settings-gate simply the existing
+  **`AmCouncil()`** predicate (byRank cutoff OR `extra`), or a NEW separate "officer" tier distinct
+  from the voting council (e.g. officers *configure*, a broader council *votes*)? (Recommend reuse
+  `AmCouncil()` — "officer rank" = the `council.rank` cutoff, manual adds = `extra` — to avoid a
+  parallel concept. Confirm, or define officers ≠ council.)
+- **C3.** Gate mechanics: which settings, and **hide vs grey**. Personal settings (ConfigWindow)
+  stay visible to everyone; the officer settings (SessionConfigModule: deadline, roster, rank)
+  get gated. The ask says both "prevent showing" AND "grey out" — do we **hide the officer module
+  from the rail** for non-council, or **show-but-disable (greyed)** so they see it exists?
+  (Recommend hide the officer module; keep personal settings visible.)
+- **C4.** Bootstrapping / escape hatch. If editing council config is itself gated, who sets it up
+  first? (Recommend: always editable when you're guild rank 0 / GM, OR no shared config exists yet,
+  OR solo/not-in-guild for testing — else the config is uneditable by everyone.)
+- **C5.** Inheritance source & trust. On first load with no local config, we broadcast a config
+  request to GUILD — whom do we adopt from? (Recommend: prefer the highest-ranked responder / an
+  officer, name them in "inherit <Guild> config from <Player>? Y/N". Confirm: auto-pick highest
+  rank vs user chooses among responders vs only accept from officer-rank senders.)
+- **C6.** Guild-leave data handling (the explicit "however that needs to happen"). Options:
+  (a) **guild-scope all council data by `guildKey` and HIDE** data not belonging to the current
+  guild; (b) **delete** on leave; (c) keep but **read-only**. And legacy records created before
+  guild-tagging — adopt into the current guild, or leave visible as untagged? (Recommend (a): tag
+  new records with `guildKey` going forward, hide non-matching; adopt pre-existing untagged records
+  into the first guild seen. This is a big data-model change that **overlaps Guild Bank B2** — see X4.)
+
+**Open questions — Defaults (veto if wrong):**
+- **Cd1.** The settings gate reuses the existing `AmCouncil()` predicate — no new membership
+  concept — unless C2 says otherwise.
+- **Cd2.** Personal settings (scale/opacity/minimap/self-report/`minQuality`) stay fully visible &
+  editable for everyone; only officer/session settings are gated.
+- **Cd3.** Where we grey rather than hide, it's the `faint` text tone + `EnableMouse(false)`/`SetAlpha`
+  (net-new minimal disabled helper, since Widgets has none).
+- **Cd4.** The inherit prompt is a themed Y/N popup, shown once on first load when no local config
+  exists and a guild peer offers one; "No" keeps defaults and stops asking this session.
+- **Cd5.** `guildKey` = normalized guild name from `GetGuildInfo` (realm-qualified), following the
+  owner-keyed precedent. (Requires calling `GetGuildInfo` — verify on live client, see X3.)
+- **Cd6.** Non-council players keep FULL loot-session participation (poll responses, loot window,
+  their own votes if on the session council) — gating is only about council SETTINGS/data, never
+  the raider flow.
+
+---
+
+## Feature V — Voting-frame award-readiness border (+ tally, anon voting, disenchanter)
+
+**Status:** awaiting answers
+
+**The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
+it's ready to be awarded. an item is ready when: nobody rolls on it and it's ready to be sent for
+d/e (do we have an intuitive way to set your preferred disenchanter so you don't have to choose
+who you're sending it to every time? if not we need that too.) OR when all council members present
+in the session have voted (do we have a way to indicate cleanly how many votes have been cast and
+by whom? do we have a setting for anonymous voting?) OR when only one person rolled on an item and
+everyone else passed. grey border = still waiting for responses, blue = d/e waiting (nobody rolled
+on it and all votes are in), dark green = awarded, gold = everyone has responded, voting in
+progress, light green = ready to be awarded."
+
+**Grounding (what the code says today):**
+- Header item icon: `CreateItemIcon(pane, 30)` (`UI/LootWindow.lua:99-100`), repainted in
+  `RefreshLootWindow` (`:394-407`). The icon widget (`Widgets.lua:17-36`) has **no border layer** —
+  an outline is new geometry. Best template: `CreateFlatButton`'s `SetBackdrop{edgeFile=WHITE8X8,
+  edgeSize=1}` + `SetBackdropBorderColor` colored by variant (`Widgets.lua:274-285`). Rail-row icons
+  are also `CreateItemIcon` (`LootWindow.lua:174`) so a border helper applies to both.
+- Theme colors (`Theme.lua:28-42`): **gold = `accent` exists.** grey/blue only approximable
+  (`text.faint`, `quality[3]` rare-blue) — not named status colors. **dark-green & light-green do
+  NOT exist** (only one `success` green). New named status colors needed.
+- Award state today: `activeSession.awarded[index]` → rail badge "✓ name" in `success` green
+  (`LootWindow.lua:220-224`). No per-item "status/readiness" field anywhere.
+- Responses vs votes are **separate & clean**: `RESPONSES` = BiS/Major/Minor/Greed/Pass
+  (`Const.lua:24-30`; "wants" = not PASS; **no "roll?" and no "Disenchant" response**). `cResp`
+  (candidate response, not council-gated) vs `vVote` (council vote — council-gated, a signed
+  ±1/0 toggle cast ON a responder). State: `session.rows[i][name]={resp,votes(net sum),…}`,
+  `session.voters[i][candKey][voter]=±1`, `councilSet`.
+- **Definitional trap:** the poll pre-filters to players who *can use* the item, and a
+  non-responder simply has **no row** — so "everyone passed" and "nobody responded / not eligible"
+  are indistinguishable, and the ML has no clean "expected responder" denominator. There IS a
+  `pollTimeout` deadline (`profile.pollTimeout`, 0 = off).
+- **All three "ready" conditions are computable but none is precomputed.** (a)/(c) from
+  `rows[i]` + the PASS id; (b) "all present council voted" needs the MOST new work — there's **no
+  "present council roster" and no per-item "who voted" set** (only per-candidate signed sums). Must
+  intersect `councilSet` with current group presence, then union voter keys across `voters[i]`.
+- **Vote tally / who-voted: does not exist.** `row.votes` is a net signed sum (can be 0 with votes
+  cast); the rail badge counts *responders*, not votes. No "3/5 council voted", no voter list.
+  Non-ML clients only receive aggregated net sums, never per-voter ballots (ML-only knowledge).
+- **Anonymous voting: does not exist** (no setting/flag anywhere).
+- **Disenchant / preferred disenchanter: do not exist.** No DE response, no DE award path, no
+  default-target setting; the "disenchanter path" is explicitly listed as consciously skipped
+  (docs/REFERENCE_STUDY.md — "implies a points model"). Award target is **always** named explicitly
+  by the ML (`AwardItem(index, name)`, `Award.lua:315`; UI Award button passes the row's candidate).
+
+**Open questions — Decisions:**
+- **V1.** State-machine / the denominator problem. Given the poll pre-filter + no-row-for-non-
+  responders, how is "everyone has responded" (gold) defined? (Recommend driving state off the
+  **deadline**: before deadline = grey collecting → gold once responses stop coming / deadline
+  approaches; after deadline evaluate the three ready conditions. If `pollTimeout` is Off, there's
+  no deadline — then what triggers "responses are in"? Needs an answer.)
+- **V2.** Condition (b) definitions: "**present** council" = intersect frozen `councilSet` with the
+  CURRENT group (vs the set frozen at session start)? "**has voted**" = a council member cast ≥1
+  non-zero vote on this item, OR require an explicit "done/abstain" click (else a deliberate
+  abstainer blocks "all voted" forever)? (Recommend present = frozen∩currentgroup; voted = any
+  non-zero in `voters[i]`; add an explicit **Abstain** so abstainers count as "voted".)
+- **V3.** Where readiness is computed/shown. Per-voter ballots live ONLY on the ML, so non-ML
+  clients can't fully compute (b). Do we **broadcast a per-item status from the ML in `cUpdate`**
+  (every client shows the same border), or compute locally per client (non-ML shows a reduced
+  border)? (Recommend ML computes + broadcasts status — consistent borders, sidesteps ML-only data.)
+- **V4.** Border scope: header icon only (current item), or **also each rail-row icon** for
+  at-a-glance readiness across all items? (Recommend both — rail borders are the real value to an
+  ML working a list; rows are the same widget.)
+- **V5.** Preferred disenchanter. How is it set — (a) a config setting naming a character,
+  (b) right-click a roster/candidate → "set as disenchanter", (c) auto-suggest guild Enchanters from
+  `profCache`? And is "send for d/e" just **awarding to that target via the existing `AwardItem`
+  path** (logged with a DE flag), with **NO points model** (per the out-of-scope note)? (Recommend
+  a+c: a stored preferred-disenchanter name suggested from Enchanters; DE = AwardItem flagged DE.)
+- **V6.** Vote tally / who-voted indicator (needed for (b) regardless). Add an "**X / Y council
+  voted**" readout (Y = present council count) plus a who-voted list. Where — the loot-window header
+  area? (Recommend header readout + a hover/expand voter list, subject to V7.)
+- **V7.** Anonymous voting setting. Add an officer/session toggle; when ON, hide "by whom" / per-
+  voter detail and show only aggregate counts. Scope: hide voter identities from **the ML too**, or
+  only from non-ML (who already get only aggregates)? (Recommend a session-level flag carried in
+  `sStart` so all clients agree; hides "by whom" everywhere incl. ML display; counts still shown.)
+
+**Open questions — Defaults (veto if wrong):**
+- **Vd1.** Border = a WHITE8X8 backdrop edge on the icon button colored per state (reusing the
+  `CreateFlatButton` border template), added as a reusable method on `CreateItemIcon`.
+- **Vd2.** New named theme colors added for the missing states: dark-green (awarded), light-green
+  (ready), a status blue (d/e), a neutral grey (waiting); gold reuses `accent`.
+- **Vd3.** State precedence: awarded (dark green) beats all; among the rest ready(light green) >
+  d/e(blue) > voting(gold) > waiting(grey).
+- **Vd4.** No border while staging (no active session).
+- **Vd5.** The tally readout uses existing Theme text tones; hidden entirely outside a session.
+- **Vd6.** Anonymous voting defaults **OFF**.
+- **Vd7.** Preferred disenchanter is stored per-profile; DE falls back to manual target selection
+  if it's unset or that character is offline / not in the raid.
+
+---
+
 ## Cross-cutting
 
 **Open questions — Decisions:**
-- **X1.** Spec-first vs build-first. Both features are absent from PROJECT.md and the Phase 7
+- **X1.** Spec-first vs build-first. All four features are absent from PROJECT.md and the Phase 7
   map. PROJECT.md is the repo's source of truth. Do we **update PROJECT.md first** (data-plane
   placement, new datasets/message types, §5 file layout, a phase/section for each) before
   implementing, or build then document? (Recommend spec-first per repo convention.)
-- **X2.** Build order. Feature G is a small bolt-on to an existing subsystem (Phase-5
-  self-report); Feature B is a large net-new module. Ship **G first, then B** as its own
-  mini-phase? (Recommend yes.)
-- **X3.** Live-client API verification. I can't run the game; guild-bank APIs and
-  `GetItemStats` socket behavior must be verified on the live Anniversary client. Plan:
-  build against warcraft.wiki.gg **BCC-tagged** signatures **plus** `/lcex selftest`
-  API-contract checks you run in-game, then I read the report from SavedVariables. Confirm.
+- **X2.** Build order across all four. G is a small bolt-on; V is self-contained session polish;
+  C introduces config replication + guild-scoping (foundational); B (guild bank) **depends on the
+  guild-scoping C introduces**. (Recommend **G → V → C → B**.)
+- **X3.** Live-client API verification. I can't run the game. New/unverified APIs across these
+  features: `GetItemStats` socket data (G), all guild-bank APIs (B), and **`GetGuildInfo`** for
+  guild name/`guildKey` (C). Plan: build against warcraft.wiki.gg **BCC-tagged** signatures **plus**
+  `/lcex selftest` API-contract checks you run in-game, then I read the report from SavedVariables.
+- **X4.** **Unify guild-scoping.** Both Guild Bank (B2) and Council-access (C6) need to key/scope
+  data by guild. Design ONE `guildKey` scoping mechanism (from `GetGuildInfo`) used by both, rather
+  than two schemes. (Recommend yes.)
+- **X5.** **Unify shared config.** Config inheritance (C1), anon-voting-in-`sStart` (V7), and the
+  deferred shared response set (DL-8) all point to a "synced/shared guild config" that doesn't exist.
+  Build ONE shared-config mechanism carrying council config + response set + anon flag, or bolt each
+  on separately? (Recommend one mechanism — also resolves DL-1/DL-8.)
+- **X6.** New message types / protocol. These add wire messages (config request/broadcast, gbank
+  sync, per-item readiness in `cUpdate`, DE-flagged award). Confirm whether they warrant a
+  `PROTOCOL_VERSION` bump and spec-first PROJECT.md §6 updates (ties to X1).
 
 **Defaults (veto if wrong):**
-- **Xd1.** Both features register `/lcex selftest` checks in `Core/SelfTest.lua` in the same
-  commit as the feature (repo rule) — gear issue-detection logic is headless-testable; the
-  guild-bank API contract + cache round-trip get in-game checks.
+- **Xd1.** Every feature registers `/lcex selftest` checks in `Core/SelfTest.lua` in the same commit
+  as the feature (repo rule) — headless-testable logic (gear issues, readiness computation) gets
+  runner checks; API contracts (gbank, `GetItemStats`, `GetGuildInfo`) + cache round-trips get
+  in-game checks.
