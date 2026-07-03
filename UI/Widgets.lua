@@ -156,16 +156,18 @@ end
 -- ── Scroll list (FauxScrollFrame) ────────────────────────────────────────────
 -- A virtualized list: a fixed pool of `visibleRows` rows re-filled from a windowed slice of the
 -- backing data as the user scrolls. `opts = { rowHeight, visibleRows, width, buildRow(list)->row,
--- fillRow(row, item, index) }`. The ONLY way to set data is `list:SetData(items)`, which resets
--- the scroll offset first — so a stale offset from a longer previous list can never render the
--- new (shorter) list empty (the classic FauxScrollFrame bug, CLAUDE.md).
+-- fillRow(row, item, index), fillHeight }`. The ONLY way to set data is `list:SetData(items)`,
+-- which resets the scroll offset first — so a stale offset from a longer previous list can never
+-- render the new (shorter) list empty (the classic FauxScrollFrame bug, CLAUDE.md).
+-- With `fillHeight = true` the list reflows for a RESIZABLE parent: anchor its top/bottom edges
+-- and the visible row count recomputes from the live height (rows are pooled and built lazily).
 function LCEX:CreateScrollList(parent, opts)
-    local rowHeight   = opts.rowHeight or self.STYLE.rowHeight
-    local visibleRows = opts.visibleRows or 10
-    local width       = opts.width or 320
+    local rowHeight = opts.rowHeight or self.STYLE.rowHeight
+    local width     = opts.width or 320
 
     local list = CreateFrame("Frame", nil, parent)
-    list:SetSize(width, visibleRows * rowHeight)
+    list.visibleRows = opts.visibleRows or 10
+    list:SetSize(width, list.visibleRows * rowHeight)
     list.rows, list.items = {}, {}
 
     local sf = CreateFrame("ScrollFrame", nil, list, "FauxScrollFrameTemplate")
@@ -173,9 +175,9 @@ function LCEX:CreateScrollList(parent, opts)
     list.scroll = sf
 
     local function Refresh()
-        FauxScrollFrame_Update(sf, #list.items, visibleRows, rowHeight)
+        FauxScrollFrame_Update(sf, #list.items, list.visibleRows, rowHeight)
         local offset = FauxScrollFrame_GetOffset(sf)
-        for i = 1, visibleRows do
+        for i = 1, list.visibleRows do
             local row = list.rows[i]
             if not row then
                 row = opts.buildRow(list)
@@ -192,12 +194,26 @@ function LCEX:CreateScrollList(parent, opts)
                 row:Hide()
             end
         end
+        -- Rows beyond the (possibly shrunken) window stay pooled but hidden.
+        for i = list.visibleRows + 1, #list.rows do
+            list.rows[i]:Hide()
+        end
     end
     list.Refresh = Refresh
 
     sf:SetScript("OnVerticalScroll", function(self2, delta)
         FauxScrollFrame_OnVerticalScroll(self2, delta, rowHeight, Refresh)
     end)
+
+    if opts.fillHeight then
+        list:SetScript("OnSizeChanged", function(l, _, height)
+            local rows = math.max(1, math.floor((height or l:GetHeight() or 0) / rowHeight))
+            if rows ~= l.visibleRows then
+                l.visibleRows = rows
+                Refresh()
+            end
+        end)
+    end
 
     function list.SetData(l, items)
         l.items = items or {}
@@ -222,4 +238,333 @@ function LCEX:CreateEditBox(parent, opts)
         self2:ClearFocus()
     end)
     return eb
+end
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- Widgets v2 — the themed primitives for the four-frame UI (UI/Theme.lua). The v1 factories
+-- above remain until the last legacy frame is replaced, then they retire.
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- Persist a v2 window's placement into db.profile.ui[savedKey] (creates the subtable — new
+-- keys need no DB_DEFAULTS entry). Size is saved only for resizable windows.
+local function SavePlacement(addon, f, savedKey, resizable)
+    if not (savedKey and addon.db) then return end
+    local p = addon.db.profile.ui[savedKey]
+    if not p then p = {}; addon.db.profile.ui[savedKey] = p end
+    local point, _, relPoint, x, y = f:GetPoint()
+    p.point, p.relPoint, p.x, p.y = point, relPoint, x, y
+    if resizable then p.w, p.h = f:GetWidth(), f:GetHeight() end
+end
+
+-- ── Window v2 ────────────────────────────────────────────────────────────────
+-- Themed, movable, ESC-closable window. `name` is the GLOBAL frame name (UISpecialFrames).
+-- opts = { width, height, title, savedKey, defaultPos={x,y}, resizable, minW, minH,
+--          useOpacity } — savedKey persists position (and size when resizable); useOpacity
+-- windows honor profile.appearance.opacity. Returns the frame; content anchors below f.bar.
+function LCEX:CreateWindowV2(name, opts)
+    opts = opts or {}
+    local addon = self
+
+    local f = CreateFrame("Frame", name, UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    f:SetSize(opts.width or 420, opts.height or 320)
+    local def = opts.defaultPos
+    f:SetPoint("CENTER", UIParent, "CENTER", (def and def.x) or 0, (def and def.y) or 0)
+    f:SetFrameStrata("DIALOG")
+    f:EnableMouse(true)
+    f:SetClampedToScreen(true)
+    self:Surface(f, "page")
+    self:SoftEdge(f)
+
+    -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right.
+    local bar = CreateFrame("Frame", nil, f)
+    bar:SetPoint("TOPLEFT", 2, -2)
+    bar:SetPoint("TOPRIGHT", -2, -2)
+    bar:SetHeight(28)
+    self:Surface(bar, "raised")
+    f.bar = bar
+
+    local tick = bar:CreateTexture(nil, "ARTWORK")
+    tick:SetTexture("Interface\\Buttons\\WHITE8X8")
+    tick:SetSize(3, 14)
+    tick:SetPoint("LEFT", 10, 0)
+    tick:SetVertexColor(self.Theme.accent[1], self.Theme.accent[2], self.Theme.accent[3], 1)
+
+    local title = bar:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(title, "section", "ink")
+    title:SetPoint("LEFT", tick, "RIGHT", 8, 0)
+    title:SetText(opts.title or "")
+    f.title = title
+
+    f:SetMovable(true)
+    bar:EnableMouse(true)
+    bar:RegisterForDrag("LeftButton")
+    bar:SetScript("OnDragStart", function() f:StartMoving() end)
+    bar:SetScript("OnDragStop", function()
+        f:StopMovingOrSizing()
+        SavePlacement(addon, f, opts.savedKey, opts.resizable)
+    end)
+
+    local close = CreateFrame("Button", nil, bar)
+    close:SetSize(22, 22)
+    close:SetPoint("RIGHT", -4, 0)
+    close.fs = close:CreateFontString(nil, "OVERLAY")
+    addon:ThemeText(close.fs, "section", "dim")
+    close.fs:SetPoint("CENTER", 0, 0)
+    close.fs:SetText("×")
+    close:SetScript("OnEnter", function(b)
+        b.fs:SetTextColor(addon.Theme.danger[1], addon.Theme.danger[2], addon.Theme.danger[3])
+    end)
+    close:SetScript("OnLeave", function(b) addon:ThemeText(b.fs, "section", "dim") end)
+    close:SetScript("OnClick", function() f:Hide() end)
+    f.closeButton = close
+
+    -- Resizable: bottom-right grip with the stuck-sizing guard (grip mouse-up alone can miss
+    -- when the cursor leaves the grip — also stop on the frame's own mouse-up and on hide).
+    if opts.resizable then
+        f:SetResizable(true)
+        local minW, minH = opts.minW or 480, opts.minH or 320
+        if f.SetResizeBounds then f:SetResizeBounds(minW, minH)
+        elseif f.SetMinResize then f:SetMinResize(minW, minH) end
+
+        local grip = CreateFrame("Button", nil, f)
+        grip:SetSize(16, 16)
+        grip:SetPoint("BOTTOMRIGHT", -3, 3)
+        grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+        grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+        local function stopSizing()
+            if f._sizing then
+                f._sizing = false
+                f:StopMovingOrSizing()
+                SavePlacement(addon, f, opts.savedKey, true)
+            end
+        end
+        grip:SetScript("OnMouseDown", function() f._sizing = true; f:StartSizing("BOTTOMRIGHT") end)
+        grip:SetScript("OnMouseUp", stopSizing)
+        f:HookScript("OnMouseUp", stopSizing)
+        f:HookScript("OnHide", stopSizing)
+        f.resizeGrip = grip
+    end
+
+    -- Restore saved placement (position always; size only when resizable).
+    if opts.savedKey and self.db then
+        local p = self.db.profile.ui[opts.savedKey]
+        if p and p.point then
+            f:ClearAllPoints()
+            f:SetPoint(p.point, UIParent, p.relPoint, p.x, p.y)
+        end
+        if opts.resizable and p and p.w and p.h then
+            f:SetSize(p.w, p.h)
+        end
+    end
+
+    -- Appearance plumbing (Config window writes profile.appearance; nil-safe before then).
+    function f.RefreshAppearance(win)
+        local a = addon.db and addon.db.profile.appearance
+        win:SetScale((a and a.scale) or 1)
+        if opts.useOpacity then win:SetAlpha((a and a.opacity) or 1) end
+    end
+    f:RefreshAppearance()
+
+    tinsert(UISpecialFrames, name) -- ESC closes it
+    f:Hide()
+    return f
+end
+
+-- ── Flat button ──────────────────────────────────────────────────────────────
+-- Themed push button. `variant` = nil (neutral) | "accent" | "danger" — tints border + text.
+-- Native SetText/GetText work (the font string is attached via SetFontString).
+function LCEX:CreateFlatButton(parent, text, width, height, variant)
+    local addon = self
+    local b = CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    b:SetSize(width or 90, height or 22)
+    self:Surface(b, "overlay")
+    if b.SetBackdrop then
+        b:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+    end
+
+    local edge = { 0, 0, 0, 0.9 }
+    local textTone = "ink"
+    if variant == "accent" then
+        edge = { addon.Theme.accent[1], addon.Theme.accent[2], addon.Theme.accent[3], 0.7 }
+    elseif variant == "danger" then
+        edge = { addon.Theme.danger[1], addon.Theme.danger[2], addon.Theme.danger[3], 0.7 }
+        textTone = "dim"
+    end
+    if b.SetBackdropBorderColor then b:SetBackdropBorderColor(edge[1], edge[2], edge[3], edge[4]) end
+
+    local fs = b:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(fs, "body", textTone)
+    fs:SetPoint("CENTER", 0, 0)
+    b:SetFontString(fs)
+    b:SetText(text or "")
+    b:SetPushedTextOffset(0, -1)
+
+    b:SetScript("OnEnter", function(btn) addon:Surface(btn, "float") end)
+    b:SetScript("OnLeave", function(btn) addon:Surface(btn, "overlay") end)
+    return b
+end
+
+-- ── Left nav rail ────────────────────────────────────────────────────────────
+-- Vertical module tabs for the council window. opts = { width, onSelect(key) }. Items are
+-- added with rail:AddItem(key, text) (order of addition = display order); rail:Select(key)
+-- drives the gold selection bar + onSelect. Reuses _TabSelect for the active-key logic.
+function LCEX:CreateNavRail(parent, opts)
+    opts = opts or {}
+    local addon = self
+    local rail = CreateFrame("Frame", nil, parent)
+    rail:SetWidth(opts.width or 170)
+    self:Surface(rail, "base")
+    rail.items = {}
+    rail.state = { active = nil, valid = {} }
+
+    local ROW_H = 26
+    function rail.AddItem(r, key, text)
+        r.state.valid[key] = true
+        local row = CreateFrame("Button", nil, r)
+        row:SetHeight(ROW_H)
+        row:SetPoint("TOPLEFT", 0, -(#r.items) * ROW_H - 6)
+        row:SetPoint("TOPRIGHT", 0, -(#r.items) * ROW_H - 6)
+        addon:Surface(row, "base")
+
+        row.bar = row:CreateTexture(nil, "ARTWORK")
+        row.bar:SetTexture("Interface\\Buttons\\WHITE8X8")
+        row.bar:SetWidth(2)
+        row.bar:SetPoint("TOPLEFT", 0, 0)
+        row.bar:SetPoint("BOTTOMLEFT", 0, 0)
+        row.bar:SetVertexColor(addon.Theme.accent[1], addon.Theme.accent[2], addon.Theme.accent[3], 1)
+        row.bar:Hide()
+
+        row.fs = row:CreateFontString(nil, "OVERLAY")
+        addon:ThemeText(row.fs, "body", "dim")
+        row.fs:SetPoint("LEFT", 14, 0)
+        row.fs:SetText(text)
+
+        row.key = key
+        row:SetScript("OnClick", function() r:Select(key) end)
+        row:SetScript("OnEnter", function(rw)
+            if r.state.active ~= rw.key then addon:Surface(rw, "raised") end
+        end)
+        row:SetScript("OnLeave", function(rw)
+            if r.state.active ~= rw.key then addon:Surface(rw, "base") end
+        end)
+        r.items[#r.items + 1] = row
+        return row
+    end
+
+    function rail.Select(r, key)
+        local active = addon:_TabSelect(r.state, key)
+        for _, row in ipairs(r.items) do
+            if row.key == active then
+                addon:Surface(row, "overlay")
+                row.bar:Show()
+                addon:ThemeText(row.fs, "body", "ink")
+            else
+                addon:Surface(row, "base")
+                row.bar:Hide()
+                addon:ThemeText(row.fs, "body", "dim")
+            end
+        end
+        if opts.onSelect then opts.onSelect(active) end
+        return active
+    end
+    return rail
+end
+
+-- ── Checkbox ─────────────────────────────────────────────────────────────────
+-- Flat checkbox bound to get/set closures. cb:Refresh() re-reads the value.
+function LCEX:CreateCheckbox(parent, label, get, set)
+    local addon = self
+    local cb = CreateFrame("Button", nil, parent)
+    cb:SetHeight(20)
+
+    local box = CreateFrame("Frame", nil, cb, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    box:SetSize(16, 16)
+    box:SetPoint("LEFT", 0, 0)
+    self:Surface(box, "overlay")
+    if box.SetBackdrop then
+        box:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        box:SetBackdropBorderColor(0, 0, 0, 0.9)
+    end
+    cb.tick = box:CreateTexture(nil, "OVERLAY")
+    cb.tick:SetTexture("Interface\\Buttons\\WHITE8X8")
+    cb.tick:SetSize(8, 8)
+    cb.tick:SetPoint("CENTER", 0, 0)
+    cb.tick:SetVertexColor(addon.Theme.accent[1], addon.Theme.accent[2], addon.Theme.accent[3], 1)
+
+    cb.fs = cb:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(cb.fs, "body", "ink")
+    cb.fs:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    cb.fs:SetText(label or "")
+    cb:SetWidth(24 + cb.fs:GetStringWidth() + 8)
+
+    function cb.Refresh(c)
+        if get() then c.tick:Show() else c.tick:Hide() end
+    end
+    cb:SetScript("OnClick", function(c)
+        set(not get())
+        c:Refresh()
+    end)
+    cb:Refresh()
+    return cb
+end
+
+-- ── Slider v2 ────────────────────────────────────────────────────────────────
+-- Flat labeled slider bound to get/set. opts = { width, min, max, step, label, fmt(v)->str }.
+-- Values quantize to `step` in OnValueChanged (SetObeyStepOnDrag is not classic-safe).
+function LCEX:CreateSliderV2(parent, opts)
+    local addon = self
+    local wrap = CreateFrame("Frame", nil, parent)
+    wrap:SetSize(opts.width or 200, 34)
+
+    wrap.label = wrap:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(wrap.label, "caption", "dim")
+    wrap.label:SetPoint("TOPLEFT", 0, 0)
+    wrap.label:SetText(opts.label or "")
+
+    wrap.value = wrap:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(wrap.value, "caption", "ink")
+    wrap.value:SetPoint("TOPRIGHT", 0, 0)
+
+    local s = CreateFrame("Slider", nil, wrap, BackdropTemplateMixin and "BackdropTemplate" or nil)
+    s:SetOrientation("HORIZONTAL")
+    s:SetPoint("BOTTOMLEFT", 0, 0)
+    s:SetPoint("BOTTOMRIGHT", 0, 0)
+    s:SetHeight(14)
+    self:Surface(s, "overlay")
+    if s.SetBackdrop then
+        s:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        s:SetBackdropBorderColor(0, 0, 0, 0.9)
+    end
+    s:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+    local thumb = s:GetThumbTexture()
+    thumb:SetSize(10, 14)
+    thumb:SetVertexColor(addon.Theme.accent[1], addon.Theme.accent[2], addon.Theme.accent[3], 1)
+    s:SetMinMaxValues(opts.min or 0, opts.max or 1)
+    s:EnableMouse(true)
+    wrap.slider = s
+
+    local step = opts.step or 0.05
+    local function fmt(v) return opts.fmt and opts.fmt(v) or string.format("%.2f", v) end
+    local settingUp = false
+
+    local function apply(v)
+        v = math.floor(v / step + 0.5) * step
+        wrap.value:SetText(fmt(v))
+        return v
+    end
+    s:SetScript("OnValueChanged", function(_, v)
+        if settingUp then return end
+        opts.set(apply(v))
+    end)
+
+    function wrap.Refresh(w)
+        settingUp = true
+        local v = opts.get()
+        w.slider:SetValue(v)
+        w.value:SetText(fmt(v))
+        settingUp = false
+    end
+    wrap:Refresh()
+    return wrap
 end

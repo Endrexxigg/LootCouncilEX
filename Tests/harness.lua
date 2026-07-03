@@ -165,7 +165,7 @@ local FILES = {
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
-    "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
+    "UI/Theme.lua", "UI/Widgets.lua", "UI/LootFrame.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
     "UI/LootBrowser.lua", "UI/PlayerDetail.lua",
     "Core/SelfTest.lua", -- last, like the .toc; only its RUNNER is exercised headlessly
 }

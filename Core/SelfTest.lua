@@ -265,6 +265,7 @@ LCEX:RegisterSelfTest("env", "client environment facts", function(self, t)
         "GetLootMethod=" .. (GetLootMethod and "present" or "nil"),
         "C_Container=" .. (C_Container and "present" or "nil"),
         "GetItemInfoInstant=" .. tostring(gii or "MISSING"),
+        "CreateColor=" .. (CreateColor and "present" or "nil"),
         "BackdropTemplateMixin=" .. (BackdropTemplateMixin and "present" or "nil"),
         "GuildRoster=" .. (GuildRoster and "global"
             or (C_GuildInfo and C_GuildInfo.GuildRoster) and "C_GuildInfo" or "MISSING"),
@@ -298,6 +299,9 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         -- UI
         "CreateWindow", "CreateButton", "CreateLabel", "CreateItemIcon", "CreateTabStrip",
         "CreateScrollList", "CreateEditBox",
+        -- UI v2 (Theme + themed primitives)
+        "ApplyGradient", "Surface", "SoftEdge", "ThemeText", "QualityColor", "ClassColor",
+        "CreateWindowV2", "CreateFlatButton", "CreateNavRail", "CreateCheckbox", "CreateSliderV2",
         "ShowLootFrame", "HideLootFrame", "ShowVotingFrame", "HideVotingFrame",
         "RefreshVotingItem", "ToggleSessionFrame", "RefreshSessionFrame",
         "ToggleLootBrowser", "ShowLootPhase", "OpenPlayerDetail", "RenderDetailTab",

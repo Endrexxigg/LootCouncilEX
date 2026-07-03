@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.18.3
+## Version: 0.18.4
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -32,8 +32,9 @@ Core\Display.lua
 Core\session\Session.lua
 Core\session\Award.lua
 
-# UI — native frames (no AceGUI). Widgets is the shared style layer; load it first so the
-# frame modules can build on it.
+# UI — native frames (no AceGUI). Theme is the design language (tones/fonts/paint helpers);
+# Widgets builds the primitives on it; the frame modules build on both.
+UI\Theme.lua
 UI\Widgets.lua
 UI\LootFrame.lua
 UI\VotingFrame.lua

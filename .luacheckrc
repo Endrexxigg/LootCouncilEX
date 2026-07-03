@@ -57,7 +57,7 @@ read_globals = {
     -- Talents (self-reported spec)
     "GetNumTalentTabs", "GetTalentTabInfo",
     -- Misc WoW
-    "GetTime", "GetServerTime", "GetRealmName", "GetBuildInfo", "GetLocale",
+    "GetTime", "GetServerTime", "GetRealmName", "GetBuildInfo", "GetLocale", "CreateColor",
     -- Lua 5.1 + WoW string/table extras
     "wipe", "strtrim", "strsplit", "strfind", "strmatch", "format",
     "tinsert", "tremove", "tContains", "time", "date",
