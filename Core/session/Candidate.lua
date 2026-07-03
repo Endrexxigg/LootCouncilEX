@@ -122,7 +122,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
     self.voteRows = {}
     self:ShowPoll(items, self.activeSession.responses, timeout)
     if amCouncil then
-        self:ShowVotingFrame(items)
+        self:ShowLootWindow()
     end
     -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself out).
     if not self:IsSelf(ml) then self:ResetSessionTimeout() end
@@ -160,7 +160,7 @@ function LCEX:LeaveSession(sid)
         self.voteRows = nil
         self:ClearSessionTimeout()
         self:HidePoll()
-        self:HideVotingFrame()
+        self:HideLootWindow()
     end
 end
 

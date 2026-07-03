@@ -22,7 +22,7 @@ function LCEX:ApplyCUpdate(sid, index, rows)
     if not a or sid ~= a.sid or not a.amCouncil then return end
     self.voteRows = self.voteRows or {}
     self.voteRows[index] = rows
-    self:RefreshVotingItem(index)
+    self:RefreshLootItem(index)
 end
 
 -- Cast (or toggle off) our vote for a candidate on an item. Sends vVote to the ML; if WE are
@@ -42,7 +42,7 @@ function LCEX:SendVote(index, candKey, vote)
     else
         self:Send("vVote", a.sid, payload, "WHISPER", a.ml)
     end
-    self:RefreshVotingItem(index) -- update our own-vote highlight immediately
+    self:RefreshLootItem(index) -- update our own-vote highlight immediately
 end
 
 -- ── Dispatch handlers ────────────────────────────────────────────────────────

@@ -306,8 +306,9 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "CreateWindowV2", "CreateFlatButton", "CreateNavRail", "CreateCheckbox", "CreateSliderV2",
         "ShowPoll", "HidePoll", "EnsurePoll", "RenderPollCards", "PollCardAnswered",
         "_PollQueueRemove", "_BuildPollQueue",
-        "ShowVotingFrame", "HideVotingFrame",
-        "RefreshVotingItem", "ToggleSessionFrame", "RefreshSessionFrame",
+        "ShowLootWindow", "HideLootWindow", "ToggleLootWindow", "EnsureLootWindow",
+        "RefreshLootWindow", "RefreshLootItem", "LootRailItems", "LootSelectItem",
+        "LootStageScan", "LootStageAdd", "LootStageRemove", "LootStartStaged",
         "ToggleLootBrowser", "ShowLootPhase", "OpenPlayerDetail", "RenderDetailTab",
     }
     for _, name in ipairs(fns) do
@@ -620,26 +621,35 @@ LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", func
     t:Ok(self:PlayerCanUse(30055), "cloth armor is wearable by every class")
 end)
 
-LCEX:RegisterSelfTest("ui", "council frame empty-state", function(self, t)
+LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", function(self, t)
     if self.activeSession then return t:Skip("a session is open") end
-    self:ShowVotingFrame({})
-    local f = self.votingFrame
-    if t:Ok(f and f:IsShown(), "council frame not shown") then
-        t:Ok(f.empty:IsShown(), "'No responses yet.' empty-state not shown")
-    end
-end, { cleanup = function(self) self:HideVotingFrame() end })
+    if #self.stagingItems > 0 then return t:Skip("staging list in use — not stomping it") end
+    self:ShowLootWindow()
+    local f = self.lootWindow
+    if not t:Ok(f and f:IsShown(), "loot window not shown") then return end
+    t:Ok(f.startBtn:IsShown() and not f.endBtn:IsShown(), "staging controls not in staging mode")
+    t:Eq(f.status:GetText(), self.L["Nothing staged — scan your bags or add items."],
+        "empty-staging status line")
 
-LCEX:RegisterSelfTest("ui", "session panel opens over a live bag scan", function(self, t)
-    local f = self:EnsureSessionFrame()
-    local wasShown = f:IsShown()
-    if not wasShown then self:ToggleSessionFrame() end
-    t:Ok(f:IsShown(), "session panel not shown")
-    local status = f.status:GetText()
-    t:Ok(type(status) == "string" and status ~= "", "status line empty")
-    t:Ok(type(f.list.items) == "table", "bag-preview list missing")
-    t:Eq(f.list.scroll.offset, 0, "scroll offset after SetData")
-    if not wasShown then f:Hide() end
-end)
+    -- Real bag scan populates the staging list (exercises the container APIs end-to-end).
+    self:LootStageScan()
+    t:Ok(type(self.stagingItems) == "table", "scan did not build a staging list")
+
+    -- Deterministic edits on a known list.
+    self.stagingItems = { FakeWireItem(1), FakeWireItem(2) }
+    self:RefreshLootWindow()
+    t:Eq(#f.railList.items, 2, "staged items in the rail")
+    t:Ok(f.railList.rows[1] and f.railList.rows[1]:IsShown(), "rail row not rendered")
+    t:Ok(f.railList.rows[1].remove:IsShown(), "staging rows must carry the remove ×")
+    t:Eq(f.railList.scroll.offset, 0, "rail scroll offset after SetData")
+    self:LootStageRemove(1)
+    t:Eq(#self.stagingItems, 1, "remove did not edit the staging list")
+    t:Eq(#f.railList.items, 1, "rail did not follow the edit")
+    t:Eq(f.status:GetText(), string.format(self.L["%d item(s) staged."], 1), "staged-count status")
+end, { cleanup = function(self)
+    self.stagingItems = {}
+    if self.lootWindow then self.lootWindow:Hide() end
+end })
 
 LCEX:RegisterSelfTest("ui", "loot browser renders + scroll-offset regression", function(self, t)
     local f = self:EnsureLootBrowser()
@@ -687,9 +697,9 @@ end, { cleanup = function(self)
 end })
 
 LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(self, t)
-    self:EnsurePoll(); self:EnsureVotingFrame(); self:EnsureSessionFrame()
+    self:EnsurePoll(); self:EnsureLootWindow()
     self:EnsureLootBrowser(); self:EnsurePlayerDetail()
-    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_VotingFrame", "LCEX_SessionFrame",
+    for _, name in ipairs({ "LCEX_PollWindow", "LCEX_LootWindow",
                             "LCEX_LootBrowser", "LCEX_PlayerDetail" }) do
         t:Ok(_G[name] ~= nil, "global frame missing: " .. name)
         local found = false
@@ -786,7 +796,9 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Ok(self.activeSession and self.activeSession.amCouncil, "runner not on the session council (council-of-one)")
     t:Ok(self.pollFrame and self.pollFrame:IsShown(), "poll did not open")
     t:Eq(#(self.pollQueue or {}), 2, "poll queue should hold both universal items")
-    t:Ok(self.votingFrame and self.votingFrame:IsShown(), "council frame did not open")
+    t:Ok(self.lootWindow and self.lootWindow:IsShown(), "loot window did not open")
+    t:Ok(self.lootWindow and self.lootWindow.endBtn:IsShown()
+        and not self.lootWindow.startBtn:IsShown(), "loot window not in session mode")
     t:Ok(self.db.global.session[me] ~= nil, "session not mirrored to the DB (resume support)")
 
     -- Respond to both items through the button path (ML fast-path dispatches cResp in-process),
@@ -800,16 +812,15 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     end
     t:Ok(self.voteRows and self.voteRows[1] and self.voteRows[1][me] ~= nil,
         "voting view did not mirror the response")
-    t:Ok(self.votingFrame and self.votingFrame.candRows[1]
-        and self.votingFrame.candRows[1]:IsShown(),
-        "council row did not render for the response")
+    local candRow = self.lootWindow and self.lootWindow.candList.rows[1]
+    t:Ok(candRow ~= nil and candRow:IsShown(), "candidate row did not render for the response")
     -- Own row must be class-colored (live ClassOf path; solo, we are always resolvable).
     local myClass = select(2, UnitClass("player"))
     local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[myClass]
-    if cc and self.votingFrame and self.votingFrame.candRows[1] then
-        local r, g, b = self.votingFrame.candRows[1].name:GetTextColor()
+    if cc and candRow then
+        local r, g, b = candRow.name:GetTextColor()
         t:Ok(math.abs(r - cc.r) < 0.02 and math.abs(g - cc.g) < 0.02 and math.abs(b - cc.b) < 0.02,
-            "council row name not class-colored (got " .. string.format("%.2f/%.2f/%.2f", r, g, b) .. ")")
+            "candidate row name not class-colored (got " .. string.format("%.2f/%.2f/%.2f", r, g, b) .. ")")
     end
 
     -- Gates: a non-group candidate and a non-council voter must both be dropped, silently.
@@ -848,7 +859,7 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     self:EndSession()
     t:Ok(self.session == nil and self.activeSession == nil, "session state not cleared")
     t:Ok(not (self.pollFrame and self.pollFrame:IsShown()), "poll still open after end")
-    t:Ok(not (self.votingFrame and self.votingFrame:IsShown()), "council frame still open after end")
+    t:Ok(not (self.lootWindow and self.lootWindow:IsShown()), "loot window still open after end")
     t:Ok(self.db.global.session[me] == nil, "persisted session not cleared")
 end, { cleanup = function(self)
     -- Unwind every side effect no matter where the test stopped: live/persisted session, both

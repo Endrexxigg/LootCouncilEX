@@ -28,7 +28,7 @@ globals = {
 
 read_globals = {
     -- Core / libs
-    "LibStub", "UISpecialFrames",
+    "LibStub", "UISpecialFrames", "hooksecurefunc", "ChatEdit_InsertLink",
     -- Frames / UI
     "CreateFrame", "UIParent", "GameTooltip", "DEFAULT_CHAT_FRAME", "RAID_CLASS_COLORS", "TradeFrame",
     "BackdropTemplateMixin",

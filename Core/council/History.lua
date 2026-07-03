@@ -56,6 +56,13 @@ LCEX.dispatch.award = function(self, msg, sender)
         winner = msg.winner, itemID = msg.itemID, itemLink = msg.item,
         ts = msg.ts, resp = msg.resp, boss = msg.boss, instance = msg.instance, by = sender,
     })
+    -- Mirror award progress into the live session view (loot-window rail badges).
+    local a = self.activeSession
+    if a and msg.sid == a.sid and type(msg.itemIndex) == "number" then
+        a.awarded = a.awarded or {}
+        a.awarded[msg.itemIndex] = msg.winner
+        self:RefreshLootItem(msg.itemIndex)
+    end
 end
 
 -- Award-history records for a player (normalized key), or ALL when key is nil — newest first.

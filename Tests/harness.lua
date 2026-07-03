@@ -173,7 +173,7 @@ local FILES = {
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
     "Core/Usable.lua",
-    "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/VotingFrame.lua", "UI/SessionFrame.lua",
+    "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/LootWindow.lua",
     "UI/LootBrowser.lua", "UI/PlayerDetail.lua",
     "Core/SelfTest.lua", -- last, like the .toc; only its RUNNER is exercised headlessly
 }
@@ -193,9 +193,9 @@ function LCEX:Msg(text) H.msgs[#H.msgs + 1] = tostring(text) end
 -- enter / leave / resume) can be exercised headlessly without rendering.
 function LCEX:ShowPoll() end
 function LCEX:HidePoll() end
-function LCEX:ShowVotingFrame() end
-function LCEX:HideVotingFrame() end
-function LCEX:RefreshVotingItem() end
+function LCEX:ShowLootWindow() end
+function LCEX:HideLootWindow() end
+function LCEX:RefreshLootItem() end
 
 -- Reset mutable state between tests.
 function H.reset()

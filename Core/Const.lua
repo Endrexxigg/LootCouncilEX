@@ -103,15 +103,22 @@ L["%ds left"]                              = "%ds left"
 L["Responded %s to %s."]                   = "Responded %s to %s."
 L["%s responded %s to %s."]                = "%s responded %s to %s."
 L["No active loot session to respond to."] = "No active loot session to respond to."
-L["LootCouncil EX — Council"]              = "LootCouncil EX — Council"
+
+-- Session UI — the loot window (item rail + candidate table).
+L["Loot Session"]                          = "Loot Session"
 L["No responses yet."]                     = "No responses yet."
 L["Award"]                                 = "Award"
-L["LootCouncil EX"]                        = "LootCouncil EX"
-L["Refresh"]                               = "Refresh"
 L["Start session"]                         = "Start session"
 L["End session"]                           = "End session"
 L["Session active — %d item(s)."]          = "Session active — %d item(s)."
-L["%d councilable item(s) in your bags."]  = "%d councilable item(s) in your bags."
+L["Scan bags"]                             = "Scan bags"
+L["SESSION ITEMS"]                         = "SESSION ITEMS"
+L["STAGED ITEMS"]                          = "STAGED ITEMS"
+L["%d item(s) staged."]                    = "%d item(s) staged."
+L["Nothing staged — scan your bags or add items."] =
+    "Nothing staged — scan your bags or add items."
+L["Couldn't read that item — shift-click a link or type an itemID."] =
+    "Couldn't read that item — shift-click a link or type an itemID."
 
 -- Phase 4 — council sync (Plane B) + proof commands.
 L["Synced %d %s record(s) from %s."]       = "Synced %d %s record(s) from %s."

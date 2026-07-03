@@ -373,6 +373,15 @@ function LCEX:AwardItem(itemIndex, name)
     self:Msg(string.format(
         self.L["Recorded: %s → %s. Trade it to them within the window to hand it off."],
         entry.link, name))
+
+    -- Track award progress on the live view (the loot window's rail badges). Receivers learn
+    -- the same fact from the `award` broadcast (council/History.lua).
+    local a = self.activeSession
+    if a and self.session and a.sid == self.session.sid then
+        a.awarded = a.awarded or {}
+        a.awarded[itemIndex] = name
+        self:RefreshLootItem(itemIndex)
+    end
     return true
 end
 
