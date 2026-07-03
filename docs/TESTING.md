@@ -31,14 +31,6 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.18.x — P1 content + polish batch — **one selftest run + a browser glance**
-- [ ] Run **`/lcex selftest`** solo again (now also covers T4 tokens, the GuildRoster shim, and
-  the class-color assert), `/reload`, tell me — I read the report.
-- [ ] `/lcex loot` → **P1 tab** shows Gruul's Lair / Karazhan / Magtheridon's Lair / World
-  Bosses with bosses in kill order. Spot-check a couple of names (e.g. Attumen drops
-  *Steelhawk Crossbow*, Gruul drops the *Dragonspine Trophy*); the five T4 token drops show a
-  `(token)` annotation (Curator=gloves, Prince=helm, Maulgar=shoulder, Gruul=legs, Mag=chest).
-
 ### v0.16.0 — ML-disconnect session recovery (DL-6) — **2 clients**
 - [ ] A (ML) starts a session → B's frames open. A **`/reload`s**. Within ~95s B prints
   *"Session ML A went quiet — closing the session view"* and the frames close (B isn't stuck).
@@ -80,6 +72,12 @@ Changed since the last in-game pass — verify on your next `/reload`, then tell
 
 ## Passed ✓  (regression reference)
 Verified in-game. Bullets document *what* was checked; re-run a section only if its code changes.
+
+### v0.18.x — P1 content + polish batch
+- [x] Selftest run 2026-07-02 on v0.18.2: **34/34 PASS** (adds the guild-roster contract check;
+  the session E2E now also proves the class-colored council row).
+- [x] `/lcex loot` P1 tab: correct items under each boss (user-verified). *Readability flagged —
+  see Known rough edges.*
 
 ### v0.17.0 — In-game self-test (`/lcex selftest`)
 - [x] First run 2026-07-02 (Bankrex-Dreamscythe, build 2.5.5/68101): **33/33 PASS**, 0 fail /
@@ -149,6 +147,9 @@ Verified in-game. Bullets document *what* was checked; re-run a section only if 
 ---
 
 ## Known rough edges (expected, not bugs)
+- **Loot browser readability** (flagged 2026-07-02): data is accurate but the presentation is
+  hard to scan — one flat uncolored list, no hierarchy indent, an inline mark box on every row.
+  Redesign pending (quality-colored names, indented raid/boss headers, decluttered marks).
 - `/lcex test` on the *first* `/reload` may show `item:NNNNN` for the **pad** items (uncached); real bag items and a second run render correctly.
 - ~~The Respond and Council windows both open centered (overlap) until dragged apart once.~~ Fixed v0.18.2 (first-run offsets; saved positions unaffected).
 - ~~Council names aren't class-colored yet.~~ Fixed v0.18.1.
