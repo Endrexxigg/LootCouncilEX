@@ -520,6 +520,29 @@ test("Poll queue: filtered build + value-remove advance", function()
     H.instant = nil
 end)
 
+test("Starting over a live session never clobbers its award records", function()
+    L:StartSession({ { link = "[Axe]", quality = 4 } })
+    L.sessionItems = { { link = "[Axe]", itemID = 1, quality = 4 } }
+    local marker = L.sessionItems
+    -- A second start via the staging path must refuse BEFORE touching sessionItems.
+    L.stagingItems = { { link = "[Bow]", itemID = 2, quality = 4 } }
+    L:LootStartStaged()
+    ok(L.sessionItems == marker, "staged start over a live session left sessionItems alone")
+    eq(#L.stagingItems, 1, "staging list not consumed by the refused start")
+    L:EndSession()
+    L.stagingItems = {}
+end)
+
+test("Entering own session clears a stale remote-ML watchdog", function()
+    L:EnterSession("S-remote", "OtherML", { { link = "[X]", quality = 4 } }, L.RESPONSES, {})
+    ok(L.sessionTimeout ~= nil, "watchdog armed for the remote ML")
+    -- The remote ML vanishes; we start our OWN session — the stale timer must be cleared,
+    -- or OnSessionTimeout closes our fresh session within 95s.
+    L:StartSession({ { link = "[Y]", quality = 4 } })
+    ok(L.sessionTimeout == nil, "stale watchdog cleared on entering own session")
+    L:EndSession()
+end)
+
 test("OnResponseChosen carries the per-card note into the aggregated row", function()
     L:StartSession({ { link = "[Axe]", quality = 4 } })
     L:OnResponseChosen(1, L.RESPONSES[1], "per-card note")

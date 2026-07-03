@@ -286,6 +286,12 @@ end
 
 -- /lcex start — open a session over the councilable bag items.
 function LCEX:CmdStartFromBags()
+    -- Guard BEFORE touching sessionItems: StartSession would refuse anyway, but by then the
+    -- live session's award records would already be clobbered (uid = sid:index reads them).
+    if self.session then
+        self:Msg(self.L["A session is already active. /lcex end first."])
+        return
+    end
     local list = self:BuildCouncilableList()
     if #list == 0 then
         self:Msg(self.L["Nothing councilable in your bags."])
@@ -709,6 +715,11 @@ local TEST_ITEM_IDS = { 32837, 30055, 28830, 29918, 29381, 28040 }
 -- broadcast → award → trade-assist → timer path can be exercised without a live drop.
 -- Prefers real bag items (so trade auto-fill works); pads with sample item IDs.
 function LCEX:CmdTest(rest)
+    -- Same guard as CmdStartFromBags: never clobber a live session's award records.
+    if self.session then
+        self:Msg(self.L["A session is already active. /lcex end first."])
+        return
+    end
     local n = math.max(1, math.min(6, tonumber(strtrim(rest or "")) or 3))
     local instance = GetInstanceInfo()
     local list = {}

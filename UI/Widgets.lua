@@ -44,38 +44,6 @@ function LCEX:_TabSelect(state, key)
     return state.active
 end
 
--- A row of toggle buttons. `tabs` = { {key, text}, ... }. `onSelect(key)` fires on every
--- Select (incl. programmatic). `strip:Select(key)` highlights the active and calls onSelect.
--- Reused for PlayerDetail's content tabs and LootBrowser's phase tabs.
-function LCEX:CreateTabStrip(parent, tabs, onSelect)
-    local addon = self
-    local strip = CreateFrame("Frame", nil, parent)
-    strip.buttons = {}
-    strip.state = { active = nil, valid = {} }
-
-    local x = 0
-    for _, t in ipairs(tabs) do
-        strip.state.valid[t.key] = true
-        local b = self:CreateButton(strip, t.text, math.max(56, #t.text * 8 + 16), 22)
-        b:SetPoint("LEFT", x, 0)
-        b.tabKey = t.key
-        b:SetScript("OnClick", function() strip:Select(t.key) end)
-        strip.buttons[#strip.buttons + 1] = b
-        x = x + b:GetWidth() + 2
-    end
-    strip:SetSize(math.max(1, x), 24)
-
-    function strip.Select(s, key)
-        local active = addon:_TabSelect(s.state, key)
-        for _, b in ipairs(s.buttons) do
-            if b.tabKey == active then b:LockHighlight() else b:UnlockHighlight() end
-        end
-        if onSelect then onSelect(active) end
-        return active
-    end
-    return strip
-end
-
 -- ── Scroll list (FauxScrollFrame) ────────────────────────────────────────────
 -- A virtualized list: a fixed pool of `visibleRows` rows re-filled from a windowed slice of the
 -- backing data as the user scrolls. `opts = { rowHeight, visibleRows, width, buildRow(list)->row,

@@ -139,7 +139,14 @@ function LCEX:EnsureLootWindow()
     f.endBtn = self:CreateFlatButton(bar, self.L["End session"], 100, 22, "danger")
     f.endBtn:SetPoint("RIGHT", -8, 0)
     f.endBtn:SetScript("OnClick", function()
-        self:EndSession()
+        -- Contextual: the ML ends the session for everyone; anyone else just closes their own
+        -- view (a candidate can't end the ML's session, and EndSession's no-session path would
+        -- discard an unrelated RESUMABLE session — that stays slash-only via /lcex end).
+        if self.session then
+            self:EndSession()
+        elseif self.activeSession then
+            self:LeaveSession(self.activeSession.sid)
+        end
         self:RefreshLootWindow()
     end)
 
@@ -462,6 +469,12 @@ end
 -- Start the session over the staged list: the staging records become sessionItems (full,
 -- ML-side) and the wire list in the SAME order — the index invariant holds by construction.
 function LCEX:LootStartStaged()
+    -- Guard BEFORE touching sessionItems: overwriting it under a live session corrupts that
+    -- session's award records (AwardItem reads sessionItems by index).
+    if self.session then
+        self:Msg(self.L["A session is already active. /lcex end first."])
+        return
+    end
     if #self.stagingItems == 0 then
         self:Msg(self.L["Nothing staged — scan your bags or add items."])
         return
@@ -472,7 +485,7 @@ function LCEX:LootStartStaged()
         wire[i] = { link = it.link, quality = it.quality }
     end
     self:StartSession(wire)
-    if self.session then self.stagingItems = {} end -- consumed (StartSession may refuse)
+    if self.session then self.stagingItems = {} end -- consumed (StartSession may still refuse on empty)
     self:RefreshLootWindow()
 end
 

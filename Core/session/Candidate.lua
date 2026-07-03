@@ -126,8 +126,14 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
     if amCouncil then
         self:ShowLootWindow()
     end
-    -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself out).
-    if not self:IsSelf(ml) then self:ResetSessionTimeout() end
+    -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself
+    -- out). Entering our OWN session must also CLEAR any watchdog left armed by a previous
+    -- remote session, or that stale timer closes the fresh session within 95s.
+    if self:IsSelf(ml) then
+        self:ClearSessionTimeout()
+    else
+        self:ResetSessionTimeout()
+    end
 end
 
 -- ── ML-liveness watchdog (DL-6) ──────────────────────────────────────────────

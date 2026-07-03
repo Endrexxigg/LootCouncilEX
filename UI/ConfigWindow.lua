@@ -12,9 +12,13 @@ local LCEX = LootCouncilEX
 
 local FRAME_NAME = "LCEX_ConfigWindow"
 
--- Push profile.appearance to every open v2 window (each carries RefreshAppearance).
+-- Push profile.appearance to every created v2 window (each carries RefreshAppearance).
+-- Iterate by FIELD NAME: an array literal of window references gets nil holes for windows
+-- that don't exist yet, and ipairs stops at the first hole.
+local WINDOW_FIELDS = { "pollFrame", "lootWindow", "councilWindow", "configWindow" }
 function LCEX:ApplyAppearance()
-    for _, win in ipairs({ self.pollFrame, self.lootWindow, self.councilWindow, self.configWindow }) do
+    for _, field in ipairs(WINDOW_FIELDS) do
+        local win = self[field]
         if win and win.RefreshAppearance then win:RefreshAppearance() end
     end
 end
