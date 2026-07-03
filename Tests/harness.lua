@@ -160,6 +160,7 @@ _G.LibStub = function(name) return libs[name] end
 local FILES = {
     "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua",
     "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/DataAPI.lua",
+    "Core/Display.lua",
     "Core/session/Session.lua", "Core/session/Award.lua",
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",

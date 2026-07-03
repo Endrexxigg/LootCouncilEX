@@ -14,21 +14,7 @@ local LCEX = LootCouncilEX
 -- GetItemInfoInstant: synchronous, never-nil; on Anniversary it may live under C_Item.
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
--- Flat display array for a phase: { {kind="raid",text}, {kind="boss",text}, {kind="item",itemID}, ... }
--- in raid (alpha) → boss (kill order) → item order. Pure — no frames; headless-tested.
-function LCEX:BuildBrowserDisplay(phase)
-    local out = {}
-    for _, raid in ipairs(self:GetRaidsForPhase(phase)) do
-        out[#out + 1] = { kind = "raid", text = raid }
-        for _, boss in ipairs(self:GetBossesForRaid(phase, raid)) do
-            out[#out + 1] = { kind = "boss", text = boss }
-            for _, itemID in ipairs(self:GetItemsForBoss(phase, raid, boss)) do
-                out[#out + 1] = { kind = "item", itemID = itemID }
-            end
-        end
-    end
-    return out
-end
+-- (BuildBrowserDisplay lives in Core/Display.lua.)
 
 -- One reusable row: icon + text (item name / header) + an inline mark edit box (items only).
 function LCEX:BuildBrowserRow(parent)
