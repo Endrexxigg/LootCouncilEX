@@ -100,6 +100,7 @@ L["Test session: broadcasting %d sample item(s)."] =
 L["Loot Drop"]                             = "Loot Drop"
 L["Nothing for you this round."]           = "Nothing for you this round."
 L["%ds left"]                              = "%ds left"
+L["+ %d more"]                             = "+ %d more"
 L["Responded %s to %s."]                   = "Responded %s to %s."
 L["%s responded %s to %s."]                = "%s responded %s to %s."
 L["No active loot session to respond to."] = "No active loot session to respond to."
