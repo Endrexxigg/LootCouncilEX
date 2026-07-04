@@ -209,3 +209,9 @@ L["%dm ago"]                                = "%dm ago"
 L["%dh ago"]                                = "%dh ago"
 L["%dd ago"]                                = "%dd ago"
 L["unknown"]                                = "unknown"
+
+-- Phase 8 — gear-issue tags (Feature G).
+L["No enchant"]                             = "No enchant"
+L["Non-BiS enchant"]                        = "Non-BiS enchant"
+L["Empty socket"]                           = "Empty socket"
+L["Low-quality gem"]                        = "Low-quality gem"

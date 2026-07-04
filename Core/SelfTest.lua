@@ -473,6 +473,35 @@ LCEX:RegisterSelfTest("api", "GetItemInfoInstant shape (icon + equipLoc)", funct
     t:Ok(icon ~= nil, "5th return (icon) nil")
 end)
 
+LCEX:RegisterSelfTest("api", "GetItemStats sockets + gear-issue engine (Feature G)", function(self, t)
+    -- Engine smoke: a synthetic un-enchanted chest link must flag [no enchant] and never error.
+    local issues = self:GearIssuesForItem("item:" .. TEST_ITEM_ID .. ":0:0:0:0:0", 5)
+    if t:Ok(type(issues) == "table", "GearIssuesForItem returned a " .. type(issues)) then
+        local noEnchant = false
+        for _, i in ipairs(issues) do if i.kind == "noenchant" then noEnchant = true end end
+        t:Ok(noEnchant, "un-enchanted enchantable slot did not flag [no enchant]")
+    end
+    -- GetItemStats existence + shape drives empty-socket detection (PROJECT.md X3, DL-13). The
+    -- info line reports the raw EMPTY_SOCKET_* keys so the inherent-vs-unfilled semantics can be
+    -- confirmed against the live client.
+    if not GetItemStats then
+        t.info = "GetItemStats ABSENT — socket check no-ops (fail-safe); enchant/gem checks unaffected"
+        return
+    end
+    local stats = GetItemStats("item:" .. TEST_ITEM_ID)
+    t:Ok(stats == nil or type(stats) == "table", "GetItemStats returned a " .. type(stats))
+    local socketKeys = {}
+    if type(stats) == "table" then
+        for k, v in pairs(stats) do
+            if type(k) == "string" and k:find("EMPTY_SOCKET_", 1, true) then
+                socketKeys[#socketKeys + 1] = k .. "=" .. tostring(v)
+            end
+        end
+    end
+    t.info = "GetItemStats present; sockets on #" .. TEST_ITEM_ID .. ": "
+        .. (#socketKeys > 0 and table.concat(socketKeys, ", ") or "none")
+end)
+
 LCEX:RegisterSelfTest("api", "item data loads (WithItemID round-trip)", function(self, t)
     self:WithItemID(TEST_ITEM_ID, function(name)
         t:Ok(type(name) == "string" and name ~= "",

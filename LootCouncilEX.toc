@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.24.12
+## Version: 0.25.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -24,11 +24,15 @@ Core\Data\Loot.lua
 Core\Data\BiS.lua
 Core\Data\TierTokens.lua
 Core\Data\DataAPI.lua
+# Gear-issue rule tables (Feature G) — hand-maintained CLA-derived data; read by Core\GearIssues.
+Core\Data\GearRules.lua
 
 # Pure display-array builders over the datasets (no frames) — the UI renders these.
 Core\Display.lua
 # Class-usability filter for the poll (tier-token lines + armor/weapon proficiency).
 Core\Usable.lua
+# Gear-issue detector (Feature G): enchant/gem analysis over gearCache links.
+Core\GearIssues.lua
 
 # Plane A — live loot session (ML authority). Session holds state + sStart/sEnd;
 # Award tracks looted/bag items and hands them off by trade, so Session precedes Award.

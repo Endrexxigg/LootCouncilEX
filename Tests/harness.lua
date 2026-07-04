@@ -74,9 +74,12 @@ _G.GetNumSkillLines = function() return 0 end
 _G.GetSkillLineInfo = function() return nil end
 _G.GetItemInfo = function() -- name, link, quality, ilvl, req, class, sub, stack, equip, icon
     if H.itemEmpty then return nil end
-    return "Test Item", "[Test Item]", 4, 60, 60, "", "", 1, "", 135
+    return "Test Item", "[Test Item]", H.itemQuality or 4, 60, 60, "", "", 1, "", 135
 end
 _G.GetInventorySlotInfo = function() return nil end
+-- GetItemStats(link) → stats table; H.itemStats drives the EMPTY_SOCKET_* keys the gear-issue
+-- detector (Core/GearIssues.lua) sums for sockets. nil → the socket check no-ops (fail-safe path).
+_G.GetItemStats = function() return H.itemStats end
 -- Blizzard Item mixin (ItemMixin) used by WithItemQuality/WithItemID. H.itemCached/itemEmpty
 -- drive the cached/empty branches; ContinueOnItemLoad fires synchronously here.
 _G.Item = {
@@ -167,12 +170,13 @@ _G.LibStub = function(name) return libs[name] end
 local FILES = {
     "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua", "Core/Minimap.lua",
     "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/DataAPI.lua",
+    "Core/Data/GearRules.lua",
     "Core/Display.lua",
     "Core/session/Session.lua", "Core/session/Award.lua",
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua",
-    "Core/Usable.lua",
+    "Core/Usable.lua", "Core/GearIssues.lua",
     "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/LootWindow.lua",
     "UI/CouncilWindow.lua", "UI/council/BrowserModule.lua", "UI/council/PlayersModule.lua",
     "UI/council/HistoryModule.lua", "UI/council/SessionConfigModule.lua", "UI/ConfigWindow.lua",
@@ -205,6 +209,7 @@ function H.reset()
     H.guild, H.group = {}, {}
     H.playerName, H.tradePartner = "Tester", nil
     H.itemCached, H.itemEmpty = true, false
+    H.itemStats, H.itemQuality = nil, nil
     H.instant = nil
     H.class = "MAGE"
     H.talentPoints = { 0, 41, 20 } -- Fire mage by default (tab 2 wins)

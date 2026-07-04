@@ -499,6 +499,61 @@ test("ClassCanUse: armor/weapon proficiency matrix", function()
     ok(L:ClassCanUse(12345, "ROGUE"), "no item info -> default SHOW")
 end)
 
+-- ── Gear issues (Core/GearIssues.lua) ────────────────────────────────────────
+local function countKind(issues, kind)
+    local n = 0
+    for _, i in ipairs(issues) do if i.kind == kind then n = n + 1 end end
+    return n
+end
+
+test("ItemEnchantGems parses enchant + gem fields", function()
+    local id, ench, gems = L:ItemEnchantGems("|cffa335ee|Hitem:30055:2647:32409:0:0:0:0:0:70|h[x]|h|r")
+    eq(id, 30055, "itemID")
+    eq(ench, 2647, "enchantID")
+    eq(gems[1], 32409, "gem1 filled")
+    eq(gems[2], 0, "gem2 empty")
+    eq(L:ItemEnchantGems("item:15138"), 15138, "short link: itemID only, no enchant/gem fields")
+    eq((L:ItemEnchantGems("not a link")), nil, "non-item string -> nil")
+end)
+
+test("GearIssuesForItem: missing enchant on enchantable slots only", function()
+    eq(countKind(L:GearIssuesForItem("item:30055:0:0:0:0:0", 5), "noenchant"), 1, "bare chest flagged")
+    eq(countKind(L:GearIssuesForItem("item:30055:0:0:0:0:0", 2), "noenchant"), 0, "neck is not enchantable")
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:0:0:0:0", 5), "noenchant"), 0, "enchanted chest clean")
+end)
+
+test("GearIssuesForItem: empty sockets from GetItemStats (inherent - filled)", function()
+    H.itemStats = { EMPTY_SOCKET_RED = 1, EMPTY_SOCKET_YELLOW = 1 } -- 2 inherent sockets
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:32409:0:0:0", 5), "nogem"), 1, "one gem in, one empty")
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:32409:32410:0:0", 5), "nogem"), 0, "both sockets filled")
+    H.itemStats = nil
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:0:0:0:0", 5), "nogem"), 0, "no stats -> no socket flag")
+end)
+
+test("GearIssuesForItem: low-quality gem below minGemQuality", function()
+    H.itemStats = { EMPTY_SOCKET_RED = 1 } -- 1 socket, filled below so no empty-socket flag
+    H.itemQuality = 2 -- uncommon
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:32409:0:0:0", 5), "badgem"), 1, "uncommon gem flagged")
+    H.itemQuality = 3 -- rare
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:32409:0:0:0", 5), "badgem"), 0, "rare gem clean")
+end)
+
+test("GearIssuesForItem: excluded item is never flagged", function()
+    -- 15138 = Onyxia Scale Cloak (whitelisted); back(15) is enchantable and the enchant is 0.
+    eq(#L:GearIssuesForItem("item:15138:0:0:0:0:0", 15), 0, "excluded item skips all checks")
+end)
+
+test("GearIssuesForPlayer aggregates a cached report", function()
+    L.db.global.gearCache["bob"] = { items = {
+        [5] = "item:30055:0:0:0:0:0", -- chest, no enchant -> 1 issue
+        [2] = "item:30056:0:0:0:0:0", -- neck, not enchantable -> clean
+    } }
+    local rows, total = L:GearIssuesForPlayer("Bob")
+    eq(total, 1, "one issue total")
+    eq(#rows, 1, "one row carries issues")
+    eq(rows[1].slot, 5, "it's the chest row")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)
