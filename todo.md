@@ -71,10 +71,8 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** **specced** — PROJECT.md §6.9 (foundations) + §6.10 + Phase 9 + DL-14/DL-15. Session
-model expands (row per present raider, non-rollers dimmed at bottom); rail-row border only. Build
-after G. **Flagged for review:** "present at the kill" is approximated by "present when looted" (no
-boss-kill event; DL-7 auto-loot) — see DL-15 caveat.
+**Status:** border / tally / anon / D-E **specced** (§6.9/§6.10, Phase 9, DL-14/15). **V1 row-set
+RE-OPENED — probing (R1–R5 below).** Build after G, once the row-set/eligibility model is locked.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
@@ -123,6 +121,45 @@ field, no vote tally / who-voted, no anon setting, no disenchant concept — all
 - **Vd3** (precedence awarded > ready > d/e > voting > waiting) stands, **applied to rail-row
   borders only** (per V4).
 - **Vd4** (no border while staging) stands.
+
+### V1 row-set — RE-OPENED (sub-probe, 2026-07-04)
+
+**Direction locked (user):** the voting list should **always include at least everyone present at the
+kill**, **plus anyone currently in the raid** (a latecomer's row just reads **ineligible**). "More
+data is better." Keep capture simple — the `ENCOUNTER_END` kill-hook was rejected as over-complex.
+
+**Grounding:** no boss-kill event (DL-7 auto-loot; `boss` = `UnitName("target")` at the loot line);
+`PresentRoster()` enumerates the current raid → `{name,class}`; `ClassCanUse(link,class)` gives
+per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via `prev=rows[key]`.
+
+**Open — Decisions:**
+- **R1.** How the "present at the kill" set is captured, and its granularity. Per-item **loot-time
+  snapshot** (who's in the raid when THIS item is looted — per-kill-accurate, auto-loot is seconds
+  after the kill) vs a **raid-wide union** (everyone who's been in the raid this session — simpler,
+  but not per-kill: someone there for boss 1 but not boss 3 would still show on boss 3's loot).
+  *(Recommend: loot-time snapshot = the kill set, unioned at vote time with the current raid →
+  latecomers appear as ineligible. Confirm, or say what "present at the kill" should mean.)*
+- **R2.** Is "present at the kill" a real **eligibility gate** (missed-the-kill ⇒ cannot be awarded
+  that item, shown only for transparency) or just a **display label** (still awardable)? Can the ML
+  override? *(Recommend: real gate + ML override.)*
+- **R3.** Full row status taxonomy + sort order. Proposed: **rolled** (BiS/Major/Minor/Greed — top,
+  by response/votes) · **pending** (eligible, no response yet) · **passed** · **can't use** (at
+  kill, item unusable for class) · **ineligible** (in raid now, not at the kill) · **left** (was at
+  kill, no longer present). Non-rollers dim to the bottom (RCLC). *(Confirm the set + where
+  **pending** sits — with rollers, or at the bottom.)*
+- **R4.** Readiness-border denominator: which rows count toward "everyone responded" (gold/blue/
+  ready)? *(Recommend: only eligible + usable + still-present rows; ineligible / can't-use / left are
+  excluded — they're auto-resolved, not "waiting.")*
+- **R5.** Roster churn during a session: **accumulate/union** (never drop a row; re-mark on
+  leave/rejoin) vs **live-recompute** each refresh? *(Recommend accumulate + re-mark, per "more data
+  is better.")*
+
+**Open — Defaults (veto if wrong):**
+- **Rd1.** Rows keyed by normalized name; the kill-set ∪ current-raid union dedupes (one row per person).
+- **Rd2.** Pets / guardians / non-player raid entries excluded.
+- **Rd3.** The ML gets a row like anyone else (eligible if they can use the item).
+- **Rd4.** "Ineligible (missed kill)" and "can't use" are visually distinct labels even though both dim.
+- **Rd5.** Realm-suffix normalization (the existing helper) so cross-realm raiders dedupe correctly.
 
 ---
 
