@@ -34,7 +34,10 @@ function LCEX:BuildGearDisplay(player)
     local out = {}
     if items then
         for slot = 1, 18 do
-            if items[slot] then out[#out + 1] = { kind = "gearitem", slot = slot, link = items[slot] } end
+            if items[slot] then
+                out[#out + 1] = { kind = "gearitem", slot = slot, link = items[slot],
+                    issues = self:GearIssuesForItem(items[slot], slot) } -- Feature G tags
+            end
         end
     end
     if #out == 0 then out[1] = { kind = "info", text = self.L["(no cached report)"] } end

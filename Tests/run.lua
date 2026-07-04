@@ -564,6 +564,14 @@ test("GearIssuesForPlayer aggregates a cached report", function()
     eq(rows[1].slot, 5, "it's the chest row")
 end)
 
+test("BuildGearDisplay attaches gear issues to each item", function()
+    L.db.global.gearCache["bob"] = { items = { [5] = "item:30055:0:0:0:0:0" } }
+    local disp = L:BuildGearDisplay("Bob")
+    eq(disp[1].kind, "gearitem", "first row is a gear item")
+    ok(disp[1].issues and #disp[1].issues >= 1, "issues attached to the entry")
+    eq(disp[1].issues[1].kind, "noenchant", "no-enchant detected on the bare chest")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

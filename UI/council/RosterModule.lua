@@ -36,13 +36,32 @@ local function BuildDetailRow(panel)
     return row
 end
 
+-- Compact, danger-colored suffix summarising a gear item's issues (Feature G): identical tags
+-- collapse to "Empty socket ×2". Empty string when the item is clean.
+local function IssueTagSuffix(issues)
+    if not issues or #issues == 0 then return "" end
+    local order, count = {}, {}
+    for _, iss in ipairs(issues) do
+        if count[iss.text] then count[iss.text] = count[iss.text] + 1
+        else count[iss.text] = 1; order[#order + 1] = iss.text end
+    end
+    local parts = {}
+    for _, text in ipairs(order) do
+        parts[#parts + 1] = count[text] > 1 and (text .. " ×" .. count[text]) or text
+    end
+    local d = LCEX.Theme.danger
+    return string.format("  |cff%02x%02x%02x%s|r",
+        math.floor(d[1] * 255 + 0.5), math.floor(d[2] * 255 + 0.5), math.floor(d[3] * 255 + 0.5),
+        table.concat(parts, " · "))
+end
+
 local function FillDetailRow(row, entry)
     row.loadingID = nil
     if entry.kind == "gearitem" then
         row.icon:SetItem(entry.link, GetItemInfoInstant and select(5, GetItemInfoInstant(entry.link)))
         row.icon:Show()
         LCEX:ThemeText(row.text, "body", "ink")
-        row.text:SetText(string.format(LCEX.L["  slot %d: %s"], entry.slot, entry.link))
+        row.text:SetText(string.format(LCEX.L["  slot %d: %s"], entry.slot, entry.link) .. IssueTagSuffix(entry.issues))
     elseif entry.kind == "histitem" then
         local rec = entry.rec
         row.icon:SetItem(rec.itemLink, GetItemInfoInstant and select(5, GetItemInfoInstant(rec.itemLink)))
@@ -174,6 +193,10 @@ LCEX:RegisterCouncilModule({
                 row.fs = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.fs, "body", "dim")
                 row.fs:SetPoint("LEFT", 10, 0)
+                row.fs:SetPoint("RIGHT", -22, 0); row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
+                row.badge = row:CreateFontString(nil, "OVERLAY") -- Feature G: gear-issue count
+                LCEX:ThemeText(row.badge, "caption", "dim")
+                row.badge:SetPoint("RIGHT", -6, 0)
                 row:SetScript("OnClick", function(r) SelectPlayer(panel, r.playerName) end)
                 return row
             end,
@@ -182,6 +205,15 @@ LCEX:RegisterCouncilModule({
                 row.fs:SetText(entry.name)
                 local cc = LCEX:ClassColor(LCEX:ClassOf(entry.name) or LCEX:CachedClass(entry.name))
                 row.fs:SetTextColor(cc[1], cc[2], cc[3])
+                local _, issueTotal = LCEX:GearIssuesForPlayer(entry.name)
+                if issueTotal > 0 then
+                    row.badge:SetText(tostring(issueTotal))
+                    local d = LCEX.Theme.danger
+                    row.badge:SetTextColor(d[1], d[2], d[3])
+                    row.badge:Show()
+                else
+                    row.badge:Hide()
+                end
                 if LCEX:NormalizeName(panel.player or "") == entry.key then
                     LCEX:Surface(row, "overlay"); row.sel:Show()
                 else
