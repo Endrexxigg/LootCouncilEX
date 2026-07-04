@@ -46,7 +46,7 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
   short, low-maintenance, **fails safe**: unknown/not-listed enchant → flag for review), with WCL
   slot indices remapped to `INVSLOT_*` per §3. **Not** binary present/absent.
 - **G4.** **Both** surfaces: enrich the per-player Gear sub-tab with issue tags **and** add a
-  roster-wide "Gear Check" overview (every member + issue count — the pre-raid slacker scan).
+  roster-wide "Gear Check" overview (every member + issue count — the pre-raid slacker scan). **Gear Check is a view inside the Roster tab (the Players module renamed → Roster), not a standalone module.** `GetItemStats` socket reliability is unknown until in-game testing — kept as the primary path with the reporter-side fallback (DL-13).
 - **G5.** **Display-only for v1** — no automated reminder/whisper messaging.
 
 **Defaults — CLA sanity-check applied (revisions called out):**

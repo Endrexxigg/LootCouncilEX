@@ -105,8 +105,7 @@ LootCouncilEX/
     ├── CouncilWindow.lua      # `council`: resizable dashboard shell + module registry
     ├── council/               # self-registering dashboard modules
     │   ├── BrowserModule.lua  # loot browser (quality colors, hierarchy, mark editor)
-    │   ├── PlayersModule.lua  # player picker + Gear|History|Profs|BiS|Notes
-    │   ├── GearCheckModule.lua # Feature G: roster-wide gear-issue overview (everyone + issue counts)
+    │   ├── RosterModule.lua   # roster picker (renamed from Players) + Gear|History|Profs|BiS|Notes; gear-issue badges + Gear Check overview (Feature G)
     │   ├── HistoryModule.lua  # guild-wide award log
     │   └── SessionConfigModule.lua # officer: council roster, poll deadline, DL-8 slot
     └── ConfigWindow.lua       # `config`: schema-driven user settings
@@ -207,7 +206,7 @@ TierTokens = { [30243]={ name="Helm of the Vanquished Defender", pieces={ ["WARR
 - **Comms:** `RegisterComm("LCEX", handler)`; `SendCommMessage("LCEX", msg, "RAID"|"GUILD"|"WHISPER", target)`. GUILD reaches all online guildies (the out-of-raid path).
 
 ### 6.8 Gear-issue detection (Feature G)
-Adopts the CLA "gear issues" model (`docs/CLA_gear_issues_findings.md`) as a **viewer-side** analysis over the gear links already in `gearCache` (§6.3) — **no comms or protocol change** (DL-13). Rules ship as static data (`Data/GearRules.lua`); `Core/GearIssues.lua` is the pure, headless-tested evaluator; results surface in the Players → Gear sub-tab (per-item tags) and a new roster-wide **Gear Check** council module (everyone + issue counts — the pre-raid slacker scan). **Display-only in v1** (no auto-whisper). v1 ships the **core three** checks (enchant / empty-socket / gem-quality); boss-conditional + meta-gem are deferred (see below).
+Adopts the CLA "gear issues" model (`docs/CLA_gear_issues_findings.md`) as a **viewer-side** analysis over the gear links already in `gearCache` (§6.3) — **no comms or protocol change** (DL-13). Rules ship as static data (`Data/GearRules.lua`); `Core/GearIssues.lua` is the pure, headless-tested evaluator; results surface in the Roster → Gear sub-tab (per-item tags) and a **Gear Check** overview *within* the Roster tab (the Players module renamed to **Roster** — everyone + issue counts, the pre-raid slacker scan). **Display-only in v1** (no auto-whisper). v1 ships the **core three** checks (enchant / empty-socket / gem-quality); boss-conditional + meta-gem are deferred (see below).
 
 **Item-string parse.** Split the itemString on `:` — the field after `itemID` = enchantID (0 = none); the next four fields = socketed gem itemIDs (0 = empty). This is a new full-string splitter (existing parsers grab only the itemID).
 
@@ -233,7 +232,7 @@ GearRules = {
 
 **Deferred to a fast-follow (DL-13):** the boss-conditional "useless item" family (undead / demon / PvP-trinket / engineering — needs per-encounter flag tables + item→condition maps), meta-gem activation, and true socket-**color** matching. v1 does enchant presence/allowlist + empty-socket + gem-quality only.
 
-**Display.** Per-item tags render in Players → Gear (danger tone = missing, warning tone = suboptimal). The **Gear Check** module lists every present/cached player with an issue count; empty = "no issues". Own character evaluates live equipped gear; others evaluate from `gearCache` with the existing "cached Nm ago" freshness. Names come from `enchantLabel` (enchants) / `GetItemInfo` (gems) — arbitrary good-enchant names via tooltip scan are deferred.
+**Display.** Per-item tags render in Roster → Gear (danger tone = missing, warning tone = suboptimal). The **Gear Check** view (within the Roster tab) lists every present/cached player with an issue count and badges the roster picker per player; empty = "no issues". Own character evaluates live equipped gear; others evaluate from `gearCache` with the existing "cached Nm ago" freshness. Names come from `enchantLabel` (enchants) / `GetItemInfo` (gems) — arbitrary good-enchant names via tooltip scan are deferred.
 
 ---
 
@@ -267,8 +266,8 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 ### Post-v1 feature suite (phases 8–11)
 Phases 8–11 extend **past** the original v1 definition of done — the four features scoped in `todo.md` (probe-for-detail): gear issues, voting-readiness, council access control, guild bank. Speced incrementally; build order **8 → 9 → 10 → 11** (G → V → C → B) by dependency + risk. A small **shared-foundations** step (guild identity/`guildKey`, X4; shared-config channel, X5) leads Phase 10 and is reused by Phase 11. *(Phases 9–11 are specced as each is reached; see `todo.md` for their locked decisions.)*
 
-**Phase 8 — Gear issues (Feature G).** `Core/GearIssues.lua` (pure detection over `gearCache` links + `GetItemStats` sockets), `Data/GearRules.lua` (CLA-derived rule tables), per-item tags in Players → Gear + `UI/council/GearCheckModule.lua` (roster overview). Core three checks only (enchant allowlist + empty socket + gem quality); viewer-side, no comms change (DL-13).
-*Exit:* the Gear Check module lists every raider's enchant/gem problems pre-raid; a test character wearing a missing-enchant + empty-socket + green-gem item surfaces exactly `[no enchant]` `[no gem used]` `[bad gem]`; `/lcex selftest` covers the detection logic (headless, fixed links → expected tags) + the `GetItemStats` socket contract (in-game). Boss-conditional + meta-gem checks are explicitly out of this phase.
+**Phase 8 — Gear issues (Feature G).** `Core/GearIssues.lua` (pure detection over `gearCache` links + `GetItemStats` sockets), `Data/GearRules.lua` (CLA-derived rule tables); **rename the Players module → Roster**, add per-item tags in Roster → Gear, gear-issue badges on the roster picker, and a **Gear Check** overview view within it. Core three checks only (enchant allowlist + empty socket + gem quality); viewer-side, no comms change (DL-13).
+*Exit:* the Gear Check view lists every raider's enchant/gem problems pre-raid; a test character wearing a missing-enchant + empty-socket + green-gem item surfaces exactly `[no enchant]` `[no gem used]` `[bad gem]`; `/lcex selftest` covers the detection logic (headless, fixed links → expected tags) + the `GetItemStats` socket contract (in-game). Boss-conditional + meta-gem checks are explicitly out of this phase.
 
 ---
 
