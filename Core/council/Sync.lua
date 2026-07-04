@@ -44,7 +44,8 @@ function LCEX:SyncSenderOk(sender)
 end
 
 function LCEX:OnGuildRosterUpdate()
-    self._councilSet = nil -- roster changed; recompute on next use
+    self._councilSet = nil    -- roster changed; recompute on next use
+    self:SyncGuildScope()     -- the guild name may now be known (or have changed) — re-scope datasets
 end
 
 -- ── Dataset registry + merge primitives ──────────────────────────────────────
@@ -128,6 +129,7 @@ end
 
 -- ── Hello (digest broadcast) ─────────────────────────────────────────────────
 function LCEX:BuildDigest()
+    self:SyncGuildScope() -- ensure the flat datasets reflect the current guild before we sync (C6)
     local digest = {}
     for name, ds in pairs(self.datasets) do
         digest[name] = digestOf(ds)

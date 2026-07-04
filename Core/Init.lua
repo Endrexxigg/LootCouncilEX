@@ -62,6 +62,11 @@ local DB_DEFAULTS = {
         profCache = {},
         config    = {}, -- shared officer config, keyed by guildKey (Feature V/C, §6.9)
         dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
+        -- Guild scoping (Feature C, C6): non-active guilds' replicated datasets are stashed here
+        -- under db.global.guilds[guildKey][name]; the ACTIVE guild's data stays in the flat tables
+        -- above. `activeGuild` (which guild the flat tables belong to) is NOT defaulted — nil means
+        -- "never scoped", which triggers the one-time in-place claim (Guild.lua SyncGuildScope).
+        guilds    = {},
         -- Owed loot the ML still has to trade out, mirrored here so it survives /reload (DL-6).
         -- Account-wide, keyed by OWNER character name → the in-memory pendingTrades shape. Local
         -- only (NOT a sync dataset). See Award.lua SaveOwedTrades/RestoreOwedTrades.
@@ -139,6 +144,10 @@ function LCEX:OnEnable()
 
     -- Plane B — council sync (council/Sync.lua): roster-change invalidation + a login digest.
     self:SetupSync()
+
+    -- Point the flat council datasets at the current guild (Feature C, C6). No-op / deferred while
+    -- guilded but the roster hasn't loaded — GUILD_ROSTER_UPDATE re-runs it once the name is known.
+    self:SyncGuildScope()
 
     -- Plane B — gear/profession self-report (council/SelfReport.lua): snapshot + login report.
     self:SetupSelfReport()

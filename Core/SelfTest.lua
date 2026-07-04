@@ -804,6 +804,16 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
+LCEX:RegisterSelfTest("load", "guild scoping active (Feature C, C6)", function(self, t)
+    t:Ok(type(self.SyncGuildScope) == "function", "SyncGuildScope missing")
+    t:Ok(type(self.db.global.guilds) == "table", "guilds namespace present")
+    -- Safe to run for real: for the CURRENT guild this is a claim-in-place / no-op — it never moves
+    -- data. Afterward the flat datasets are scoped to this guild (or _local when solo).
+    self:SyncGuildScope()
+    local key = self:GuildKey() or "_local"
+    t:Eq(self.db.global.activeGuild, key, "flat datasets scoped to the current guild")
+end)
+
 LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C)", function(self, t)
     for _, fn in ipairs({ "CanEditConfig", "CanSeeSessionConfig", "CanSeeLootWindow",
                           "LootWindowOptIn", "MyGuildRank" }) do

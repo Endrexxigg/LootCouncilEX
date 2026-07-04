@@ -223,9 +223,13 @@ escape hatch = solo / GM / no-config-yet); Session Config module hidden from non
 `visible()` predicate on the module contract; loot window gated (session-aware `canSeeLoot` = council
 + opt-in; raiders get the poll only, opted-in raiders get a read-only loot window with no vote +/-);
 `config.visibility.lootWindow` toggle in Session Config. *(Greyed-control helper Cd3 deferred — moot
-while see==edit for council; add when Feature B's visibility toggles need it.)* **(3) TODO:** guild-scope
-Plane-B datasets under `db.global.guilds[guildKey]` (hide-on-leave). **(4) TODO:** inherit-on-first-load
-prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
+while see==edit for council; add when Feature B's visibility toggles need it.)* **(3) Guild scoping — DONE (v0.35.0):** active-flat + stash model
+(`Core/Guild.lua` `SyncGuildScope`) — the active guild's replicated datasets stay in the flat
+`db.global.<name>` tables (all ~25 readers unchanged); other guilds stash under
+`db.global.guilds[key]`; switching guild swaps them (hide-on-leave). `activeGuild` nil ⇒ one-time
+in-place claim of existing data (**no migration, nothing vanishes**); defers while guilded-but-
+roster-not-loaded. Runs at OnEnable / GUILD_ROSTER_UPDATE / BuildDigest. **(4) TODO:**
+inherit-on-first-load prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
 
 **The ask (user's words):** "separate council members from other guild members to prevent showing
 council-only settings to anyone in the raid. … inherit [an existing guild config] from another

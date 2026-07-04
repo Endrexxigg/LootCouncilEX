@@ -679,6 +679,43 @@ test("Access predicates: edit/see gating with the C4 escape hatch (Feature C)", 
     L.db.global.config = {}
 end)
 
+test("SyncGuildScope: claim-in-place, stash on switch, restore on rejoin (Feature C, C6)", function()
+    H.inGuild, H.guildName = true, "Alpha"
+    L.db.global.history["u1"] = { player = "Amy", ts = 1 }
+    L.db.global.notes["amy"] = { text = "hi" }
+    L:SetConfigField("anonVoting", true) -- authors config for Alpha
+
+    -- First scope claims the existing flat tables in place for Alpha (no data moves).
+    L:SyncGuildScope()
+    eq(L.db.global.activeGuild, "Alpha", "flat tables claimed for Alpha")
+    ok(L.db.global.history["u1"], "existing data still present after the in-place claim")
+
+    -- Switch to Beta: Alpha's data stashes; the flat tables go empty (hide-on-leave).
+    H.guildName = "Beta"
+    L:SyncGuildScope()
+    eq(L.db.global.activeGuild, "Beta", "now scoped to Beta")
+    ok(not L.db.global.history["u1"], "Alpha history hidden under Beta")
+    ok(not next(L.db.global.notes), "Alpha notes hidden under Beta")
+    eq(L:GetConfig().anonVoting, false, "Alpha config hidden -> Beta sees defaults")
+    ok(L.db.global.guilds["Alpha"], "Alpha data stashed under its namespace")
+
+    -- Author Beta data, switch back to Alpha: Beta stashes, Alpha restores intact.
+    L.db.global.history["u2"] = { player = "Bob", ts = 2 }
+    H.guildName = "Alpha"
+    L:SyncGuildScope()
+    ok(L.db.global.history["u1"], "Alpha history restored on rejoin")
+    ok(not L.db.global.history["u2"], "Beta history not visible under Alpha")
+    eq(L:GetConfig().anonVoting, true, "Alpha config restored on rejoin")
+end)
+
+test("SyncGuildScope defers while guilded but the roster has not loaded", function()
+    H.inGuild, H.guildName = true, nil -- IsInGuild true, GetGuildInfo returns nothing yet
+    L.db.global.history["u1"] = { player = "Amy", ts = 1 }
+    L:SyncGuildScope()
+    eq(L.db.global.activeGuild, nil, "no claim while the guild name is unknown")
+    ok(L.db.global.history["u1"], "flat data left in place (still visible) meanwhile")
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.

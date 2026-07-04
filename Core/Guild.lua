@@ -25,6 +25,43 @@ function LCEX:GuildKey()
     return name
 end
 
+-- ── Guild scoping (Feature C, C6) ────────────────────────────────────────────
+-- Every replicated dataset is guild-scoped so leaving a guild hides its data (§6.11). Rather than
+-- re-home ~25 call sites, the ACTIVE guild's data always lives in the flat `db.global.<name>` tables
+-- (every existing reader is unchanged); OTHER guilds' data is stashed under `db.global.guilds[key]`.
+-- Switching guild (or leaving → key change) stashes the outgoing guild's data and loads the incoming
+-- guild's — so an old guild's records are simply not present in the flat tables (hidden, not deleted;
+-- rejoining restores them). Local recovery stores (pendingTrades/session) are NOT scoped — they are
+-- live ML state, not council data (§6.11).
+local SCOPED = { "notes", "marks", "history", "gearCache", "profCache", "config", "dummy" }
+
+function LCEX:SyncGuildScope()
+    local g = self.db and self.db.global
+    if not g then return end
+    -- Guilded but the roster hasn't loaded yet (GetGuildInfo nil): wait, so we don't claim/stash the
+    -- data under "_local" and strand it. GUILD_ROSTER_UPDATE re-fires this once the name is known.
+    if IsInGuild() and not self:GuildKey() then return end
+    local key = self:GuildKey() or "_local"
+    if g.activeGuild == key then return end
+    g.guilds = g.guilds or {}
+    if g.activeGuild == nil then
+        -- First run under guild scoping: the pre-existing flat tables ARE this guild's data. Claim
+        -- them in place (moving them would blank existing notes/marks/history/caches/config).
+        g.activeGuild = key
+        return
+    end
+    -- Guild changed: stash the outgoing guild's flat tables, load the incoming guild's (empty if new).
+    local out = g.activeGuild
+    g.guilds[out] = g.guilds[out] or {}
+    local incoming = g.guilds[key] or {}
+    for _, name in ipairs(SCOPED) do
+        g.guilds[out][name] = g[name]
+        g[name] = incoming[name] or {}
+    end
+    g.guilds[key] = nil -- its data is live in the flat tables now; re-stashed on the next swap
+    g.activeGuild = key
+end
+
 function LCEX:PresentRoster()
     local out, seen = {}, {}
     local function add(name, class)
