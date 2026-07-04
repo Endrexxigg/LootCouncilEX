@@ -31,6 +31,28 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.25–v0.26 — FEATURE G (gear issues) + FEATURE V (voting readiness, in progress)
+Selftest run **2026-07-04 on v0.26.7: 35 pass / 2 fail / 1 skip.**
+
+- [x] **`GetItemStats` present** on the live client — Feature G's "no comms change" premise holds
+  (X3 resolved; item #30055 reported 0 sockets, so the inherent-vs-unfilled socket semantics still
+  want a socketed item to confirm, but the API exists and returns a table).
+- [x] **Roster module + Gear Check sub-tab render** (renamed from Players); the `config` dataset is
+  registered over its live store and covered by the sync digest.
+- [ ] **⚠ 2 PRE-EXISTING failures (NOT from G/V):** the poll class filter — `PlayerCanUse(30055)`
+  returns false for this character, failing *"poll renders usable-item cards"* and *"poll class
+  filter"*. `Usable.lua`/`PollWindow.lua` are unchanged since v0.19.0 (`196dcac`). Root cause is
+  30055's `GetItemInfoInstant` classID/subClassID vs the ARMOR matrix — a separate fix.
+- [ ] **⚠ Session E2E SKIPPED** — an unfinished session was pending `/lcex resume`, so the solo
+  start→respond→vote→award→end pipeline (incl. Feature V's new row seeding) did **not** run. Clear
+  it with `/lcex end`, then re-run `/lcex selftest` to exercise V1.
+- [ ] **Feature G visual pass**: Roster picker shows a red issue-count badge per player; the Gear
+  sub-tab shows per-item tags (No enchant / Empty socket / 50 HP …) in red; the Gear Check sub-tab
+  lists offenders worst-first.
+- [ ] **Feature V visual pass** (after clearing the stale session + opening a real session): every
+  present raider gets a row; rollers on top, "might roll" below, pass/can't-use/missed-kill/left
+  dimmed at the bottom showing their reason.
+
 ### v0.19–0.24 — THE FOUR-FRAME UI (full rearchitecture) — **selftest + a visual pass**
 The five old frames are gone; poll/loot/council/config replace them, plus a minimap button.
 Mechanics are covered by `/lcex selftest` (now ~40 checks); the visual/feel items below need

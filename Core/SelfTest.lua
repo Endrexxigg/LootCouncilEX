@@ -666,7 +666,18 @@ LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", func
         t:Ok(not self:PlayerCanUse(offToken), "off-class token was NOT filtered")
     end
     t:Ok(self:PlayerCanUse(28830), "trinket must be universal")
-    t:Ok(self:PlayerCanUse(30055), "cloth armor is wearable by every class")
+    -- Diagnostic: 30055 (a cloth robe) fails this on some chars; surface its real item-type fields
+    -- so the report says exactly why PlayerCanUse rejected it (pre-existing poll-filter issue).
+    -- NB: call gii() inside the `if` — `gii and gii(30055)` would truncate the multi-return to one.
+    local gii = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
+    local cid, scid, eloc = "n/a", "n/a", "n/a"
+    if gii then
+        local _, _, _, e, _, c, s = gii(30055)
+        cid, scid, eloc = c, s, e
+    end
+    t:Ok(self:PlayerCanUse(30055), string.format(
+        "cloth armor wearable by every class — 30055 classID=%s subClassID=%s equip=%s",
+        tostring(cid), tostring(scid), tostring(eloc)))
 end)
 
 LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", function(self, t)
