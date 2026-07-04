@@ -783,6 +783,19 @@ test("ResolveDisenchanter: highest-ranked present wins; nil when none present", 
     L.db.global.config = {}
 end)
 
+test("AwardItem forcedResp tags a D/E award (reason renders D/E)", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 1 } -- cloth chest
+    L.sessionItems = { { link = "item:100", itemID = 100, quality = 4,
+        roster = { { name = "Amy", class = "MAGE" } } } }
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    ok(L:AwardItem(1, "Amy", L.STATUS.DISENCHANT), "D/E award recorded")
+    local uid = L.session.sid .. ":1"
+    eq(L.db.global.history[uid].resp, L.STATUS.DISENCHANT, "history carries the D/E reason code")
+    eq(L:AwardReasonText(L.db.global.history[uid].resp), "D/E", "renders as D/E")
+    L:EndSession()
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

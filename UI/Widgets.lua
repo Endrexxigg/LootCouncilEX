@@ -459,3 +459,60 @@ function LCEX:CreateSliderV2(parent, opts)
     wrap:Refresh()
     return wrap
 end
+
+-- ── Confirm popup ────────────────────────────────────────────────────────────
+-- A small centered modal-ish confirm (Feature V's D/E send; reused by Feature C's inherit prompt).
+-- One reused frame on the DIALOG strata, ESC / × / cancel all dismiss. `opts`:
+--   text      — the prompt line(s)
+--   input     — if a string, show an edit box pre-filled with it; onAccept receives its text
+--                (the manual-target path); omit for a plain Yes/No
+--   accept    — accept button label (default "Yes"); cancel is always "No"
+--   onAccept  — function(inputText|nil) called when the user confirms
+function LCEX:ShowConfirm(opts)
+    opts = opts or {}
+    local f = self._confirmFrame
+    if not f then
+        f = self:CreateWindowV2("LCEX_Confirm", { width = 360, height = 150, title = self.L["Confirm"] })
+
+        f.msg = f:CreateFontString(nil, "OVERLAY")
+        self:ThemeText(f.msg, "body", "ink")
+        f.msg:SetPoint("TOPLEFT", 16, -40)
+        f.msg:SetPoint("TOPRIGHT", -16, -40)
+        f.msg:SetJustifyH("LEFT"); f.msg:SetWordWrap(true)
+
+        f.input = self:CreateEditBox(f, {
+            width = 320,
+            onCommit = function() f.acceptBtn:Click() end, -- Enter in the box = confirm
+        })
+        f.input:SetPoint("TOPLEFT", 18, -86)
+
+        f.acceptBtn = self:CreateFlatButton(f, self.L["Yes"], 90, 24, "accent")
+        f.acceptBtn:SetPoint("BOTTOMRIGHT", -14, 12)
+        f.cancelBtn = self:CreateFlatButton(f, self.L["No"], 90, 24)
+        f.cancelBtn:SetPoint("BOTTOMRIGHT", f.acceptBtn, "BOTTOMLEFT", -8, 0)
+        f.cancelBtn:SetScript("OnClick", function() f:Hide() end)
+
+        self._confirmFrame = f
+    end
+
+    f.msg:SetText(opts.text or "")
+    f.acceptBtn:GetFontString():SetText(opts.accept or self.L["Yes"])
+    local hasInput = type(opts.input) == "string"
+    if hasInput then
+        f.input:SetText(opts.input)
+        f.input:Show()
+    else
+        f.input:Hide()
+    end
+
+    local onAccept = opts.onAccept
+    f.acceptBtn:SetScript("OnClick", function()
+        local val = hasInput and f.input:GetText() or nil
+        f:Hide()
+        if onAccept then onAccept(val) end
+    end)
+
+    f:Show()
+    if hasInput then f.input:SetFocus() end
+    return f
+end

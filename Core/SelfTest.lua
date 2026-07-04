@@ -797,6 +797,32 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
+LCEX:RegisterSelfTest("ui", "confirm popup + loot-window D/E control (Feature V)", function(self, t)
+    -- The reusable confirm (D/E send; later Feature C's inherit prompt): accept fires onAccept with
+    -- the input text when a manual-target field is shown, and dismisses. No DB writes here.
+    local got
+    self:ShowConfirm({ text = "test?", input = "Sharder", onAccept = function(v) got = v end })
+    local cf = self._confirmFrame
+    if t:Ok(cf and cf:IsShown(), "confirm popup did not open") then
+        t:Ok(cf.input:IsShown(), "input field should show for a manual-target confirm")
+        cf.acceptBtn:Click()
+        t:Eq(got, "Sharder", "onAccept did not receive the input text")
+        t:Ok(not cf:IsShown(), "confirm popup did not dismiss on accept")
+    end
+    -- Plain Yes/No (no input): onAccept gets nil, the input field hides.
+    local ran = false
+    self:ShowConfirm({ text = "ok?", onAccept = function(v) ran = (v == nil) end })
+    t:Ok(cf and not cf.input:IsShown(), "input should hide for a plain confirm")
+    if cf then cf.acceptBtn:Click() end
+    t:Ok(ran, "plain confirm accept did not fire with nil input")
+
+    -- The loot window exposes the ML-only D/E control.
+    self:EnsureLootWindow()
+    t:Ok(self.lootWindow and self.lootWindow.deBtn ~= nil, "loot window missing the D/E button")
+end, { cleanup = function(self)
+    if self._confirmFrame then self._confirmFrame:Hide() end
+end })
+
 LCEX:RegisterSelfTest("ui", "config window renders its schema + appearance plumbing", function(self, t)
     self:ToggleConfigWindow()
     local f = self.configWindow

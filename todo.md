@@ -74,7 +74,8 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** **in progress** (Phase 9) — **foundations + V1 session model + the readiness border COMPLETE**.
+**Status:** **✅ SHIPPED (Phase 9, v0.27.0–v0.32.0)** — all four sub-features complete (border · tally ·
+anon + who-voted · D/E). Pending in-game validation (`/lcex selftest` + `/reload` + a 2-client pass).
 V1 (through aac6494, v0.26.6): Guild/Config foundations; roster snapshotted at loot time; `session.rows`
 pre-seeded per present raider (`SeedRows`, kill-set ∪ current raid) + broadcast; `cResp` preserves
 class / clears reason; loot window sorts 3-tier ROLLED > MIGHT ROLL > NOT ROLLING with reason text +
@@ -95,9 +96,18 @@ Session Config. **D/E award type (4) — building in 3 commits:** **(A) award-fo
 to group chat when `config.announceAwards` (new shared field, default on) + grouped, else ML-local.
 **(B) ranked disenchanter config — DONE (v0.31.0):** Session Config right-column editor (add box +
 per-row `n. name` with ▲/▼ reorder + × remove), writing the ranked `config.disenchanters` shared list;
-`ResolveDisenchanter` returns the highest-ranked present entry (nil → manual fallback). **(C) TODO:**
-per-item **D/E button** (ML) → themed confirm popup (reused by Feature C's inherit prompt) →
-`AwardItem(i, name, STATUS.DISENCHANT)`. Spec: §6.10, DL-15.
+`ResolveDisenchanter` returns the highest-ranked present entry (nil → manual fallback). **(C) D/E button
++ confirm — DONE (v0.32.0):** ML-only **D/E** button (loot-window bottom bar, shares the hidden
+start-btn slot) → `LootDisenchantSelected` resolves the disenchanter → new reusable themed
+`LCEX:ShowConfirm` popup ("Send `<item>` to `<name>` for disenchant?", or a manual name entry when
+none present) → `AwardItem(i, name, STATUS.DISENCHANT)`. **`ShowConfirm` is reused by Feature C's
+inherit prompt.** Spec: §6.10, DL-15.
+
+### ✅ Feature V COMPLETE (v0.27.0 → v0.32.0)
+All four sub-features shipped: readiness border · vote tally · anonymous voting + who-voted list ·
+D/E award type (messaging + ranked disenchanters + button/confirm). Next in the build order: **Feature C**
+(Phase 10 — council access control + guild scoping; already specced §6.11 / DL-16). `ShowConfirm` (V)
+and the shared `config` dataset (V) are foundations C builds on.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =

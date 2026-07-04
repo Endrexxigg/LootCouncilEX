@@ -183,6 +183,13 @@ function LCEX:EnsureLootWindow()
     f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
     f.startBtn:SetScript("OnClick", function() self:LootStartStaged() end)
 
+    -- Disenchant the selected item (Feature V, ML-only + session-only). Shares startBtn's slot —
+    -- startBtn is hidden in-session and deBtn out-of-session, so they are never both shown.
+    f.deBtn = self:CreateFlatButton(bar, self.L["D/E"], 60, 22)
+    f.deBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
+    f.deBtn:SetScript("OnClick", function() self:LootDisenchantSelected() end)
+    f.deBtn:Hide()
+
     self.lootWindow = f
     return f
 end
@@ -462,10 +469,13 @@ function LCEX:RefreshLootWindow()
     if inSession then
         f.scanBtn:Hide(); f.addBox:Hide()
         f.startBtn:Hide(); f.endBtn:Show()
+        -- D/E is the ML's action only (it awards on the ML-authoritative session).
+        if self.activeSession and self:IsSelf(self.activeSession.ml) then f.deBtn:Show() else f.deBtn:Hide() end
         f.status:SetText(string.format(self.L["Session active — %d item(s)."], #items))
     else
         f.scanBtn:Show(); f.addBox:Show()
         f.startBtn:Show(); f.endBtn:Hide()
+        f.deBtn:Hide()
         if #items == 0 then
             f.status:SetText(self.L["Nothing staged — scan your bags or add items."])
         else
@@ -595,6 +605,40 @@ function LCEX:LootStartStaged()
     self:StartSession(wire)
     if self.session then self.stagingItems = {} end -- consumed (StartSession may still refuse on empty)
     self:RefreshLootWindow()
+end
+
+-- Disenchant the selected item (Feature V, §6.10). ML-only. Auto-picks the highest-ranked present
+-- disenchanter (ResolveDisenchanter) and confirms; if none is set/present, falls back to a manual
+-- name entry (Vd7). On confirm, awards with the D/E reason so the announcement reads "… for D/E".
+function LCEX:LootDisenchantSelected()
+    local f = self.lootWindow
+    local a = self.activeSession
+    if not (f and a and self:IsSelf(a.ml)) then return end
+    local index = f.selectedIndex
+    local items = self:LootRailItems()
+    local entry = index and items[index]
+    if not entry then return end
+
+    local function award(name)
+        name = strtrim(name or "")
+        if name ~= "" and self:AwardItem(index, name, self.STATUS.DISENCHANT) then
+            self:RefreshLootWindow()
+        end
+    end
+
+    local target = self:ResolveDisenchanter()
+    if target then
+        self:ShowConfirm({
+            text = string.format(self.L["Send %s to %s for disenchant?"], entry.link, target),
+            onAccept = function() award(target) end,
+        })
+    else
+        self:ShowConfirm({
+            text = string.format(self.L["No disenchanter available. Send %s for disenchant to:"], entry.link),
+            input = "",
+            onAccept = award,
+        })
+    end
 end
 
 -- ── Entry points (Core contract) ─────────────────────────────────────────────
