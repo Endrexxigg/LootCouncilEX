@@ -526,6 +526,14 @@ LCEX:RegisterSelfTest("api", "trade + loot global strings, tooltip scan", functi
     end
 end)
 
+LCEX:RegisterSelfTest("api", "session-start sound (SOUNDKIT.READY_CHECK)", function(self, t)
+    t:Ok(type(PlaySound) == "function", "PlaySound missing — no session-start cue possible")
+    local id = _G.SOUNDKIT and _G.SOUNDKIT.READY_CHECK
+    -- Soft: absence just means the cue is silent (guarded), so report rather than fail — if nil,
+    -- switch EnterSession to a numeric sound ID.
+    t.info = "SOUNDKIT.READY_CHECK = " .. tostring(id)
+end)
+
 LCEX:RegisterSelfTest("api", "FauxScrollFrame + frame plumbing globals", function(self, t)
     t:Ok(type(FauxScrollFrame_Update) == "function", "FauxScrollFrame_Update missing")
     t:Ok(type(FauxScrollFrame_GetOffset) == "function", "FauxScrollFrame_GetOffset missing")

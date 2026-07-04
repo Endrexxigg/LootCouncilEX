@@ -123,6 +123,12 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
     }
     self.voteRows = {}
     self:ShowPoll(items, self.activeSession.responses, timeout)
+    -- Audible cue that a session opened — but only when there's something for this player to
+    -- answer (an empty "nothing for you" poll shouldn't beep). Guarded: no-ops if the sound is
+    -- unavailable. Fires from EnterSession (fresh session), not /lcex respond (a reopen).
+    if self.pollQueue and #self.pollQueue > 0 and PlaySound and SOUNDKIT and SOUNDKIT.READY_CHECK then
+        PlaySound(SOUNDKIT.READY_CHECK, "Master")
+    end
     if amCouncil then
         self:ShowLootWindow()
     end

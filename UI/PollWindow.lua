@@ -71,6 +71,8 @@ function LCEX:EnsurePoll()
     bar.fill:SetPoint("BOTTOMLEFT", 1, 1)
     bar.text = bar:CreateFontString(nil, "OVERLAY")
     self:ThemeText(bar.text, "caption", "ink")
+    local tf, tsz = bar.text:GetFont()
+    if tf then bar.text:SetFont(tf, tsz, "OUTLINE") end -- thin outline: readable over the fill
     bar.text:SetPoint("CENTER", 0, 0)
     bar:Hide()
     f.timerBar = bar
@@ -205,7 +207,7 @@ function LCEX:RenderPollCards()
     local extra = #queue - shown
     if extra > 0 then
         f.more:ClearAllPoints()
-        f.more:SetPoint("TOPLEFT", PAD + 4, -(bottom + 4))
+        f.more:SetPoint("TOP", 0, -(bottom + 4))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
         bottom = bottom + MORE_H
