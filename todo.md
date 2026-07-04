@@ -71,8 +71,8 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** border / tally / anon / D-E **specced** (§6.9/§6.10, Phase 9, DL-14/15). **V1 row-set
-RE-OPENED — probing (R1–R5 below).** Build after G, once the row-set/eligibility model is locked.
+**Status:** **specced** (§6.9/§6.10, Phase 9, DL-14/15) — V1 row-set **LOCKED** (R1–R5, below).
+Feature V complete; build after G.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
@@ -122,7 +122,7 @@ field, no vote tally / who-voted, no anon setting, no disenchant concept — all
   borders only** (per V4).
 - **Vd4** (no border while staging) stands.
 
-### V1 row-set — RE-OPENED (sub-probe, 2026-07-04)
+### V1 row-set — LOCKED (sub-probe resolved 2026-07-04)
 
 **Direction locked (user):** the voting list should **always include at least everyone present at the
 kill**, **plus anyone currently in the raid** (a latecomer's row just reads **ineligible**). "More
@@ -132,7 +132,20 @@ data is better." Keep capture simple — the `ENCOUNTER_END` kill-hook was rejec
 `PresentRoster()` enumerates the current raid → `{name,class}`; `ClassCanUse(link,class)` gives
 per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via `prev=rows[key]`.
 
-**Open — Decisions:**
+**Answers (locked 2026-07-04):**
+- **R1** as rec'd — loot-time snapshot = kill set, unioned at vote time with the current raid;
+  latecomers → `missedkill`.
+- **R2** as rec'd, **fail-open**: flags ineligible + non-default award target, but the ML can always
+  override; a bugged/stale snapshot must **never block a legitimate award** (err toward allowing —
+  the bigger risk is wrongly blocking an eligible player, not wrongly allowing a rare pug).
+- **R3** — three tiers **ROLLED > MIGHT ROLL > NOT ROLLING**; `pending` (might-roll) sits
+  **directly below the rollers**, not at the bottom.
+- **R4** as rec'd — readiness denominator = eligible + usable + present rows only.
+- **R5** as rec'd — accumulate/union, never drop; re-mark leave/rejoin **subtly**.
+- **Rd4 (revised):** the two ineligible reasons share one color/style, labeled **"Ineligible (missed
+  kill)"** / **"Ineligible (can't use)"**. Rd1 / Rd2 / Rd3 / Rd5 stand.
+
+**Questions as asked (for traceability) — Decisions:**
 - **R1.** How the "present at the kill" set is captured, and its granularity. Per-item **loot-time
   snapshot** (who's in the raid when THIS item is looted — per-kill-accurate, auto-loot is seconds
   after the kill) vs a **raid-wide union** (everyone who's been in the raid this session — simpler,
