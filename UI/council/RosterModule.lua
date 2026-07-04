@@ -1,5 +1,6 @@
--- ── LootCouncil EX — UI/council/PlayersModule.lua ────────────────────────────
--- Council module: per-player detail. Left inner column = the player picker (everyone we know
+-- ── LootCouncil EX — UI/council/RosterModule.lua ────────────────────────────
+-- Council module ("Roster"): per-player detail + a raid-wide gear-issue scan. Left inner column
+-- = the player picker (everyone we know
 -- about: caches, notes, history, guild roster — filterable); right = sub-tabs over the
 -- relocated display builders (Core/Display.lua): Gear / History / Professions / BiS / Notes,
 -- with the data-freshness line on the self-reported tabs.
@@ -139,7 +140,7 @@ local function SelectPlayer(panel, name)
 end
 
 LCEX:RegisterCouncilModule({
-    key = "players", title = LCEX.L["Players"], order = 20,
+    key = "roster", title = LCEX.L["Roster"], order = 20,
 
     build = function(panel)
         -- Player picker column.
@@ -283,7 +284,7 @@ LCEX:RegisterCouncilModule({
 -- the stable entry point for candidate-name clicks and /lcex player.
 function LCEX:OpenPlayerDetail(name)
     if not name or name == "" then name = UnitName("player") end
-    self:OpenCouncilModule("players", name)
+    self:OpenCouncilModule("roster", name)
 end
 
 function LCEX:CmdPlayerDetail(rest)

@@ -724,7 +724,7 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
-LCEX:RegisterSelfTest("ui", "players module renders for self (gear/BiS/history sub-tabs)", function(self, t)
+LCEX:RegisterSelfTest("ui", "roster module renders for self (gear/BiS/history sub-tabs)", function(self, t)
     local me = UnitName("player")
     -- Force a fresh BiS resolve: it only resets when the viewed player CHANGES, so a manually
     -- cycled class from an earlier look at ourselves would false-fail the assert.
@@ -732,7 +732,7 @@ LCEX:RegisterSelfTest("ui", "players module renders for self (gear/BiS/history s
     self:OpenPlayerDetail(me)
     local f = self.councilWindow
     if not t:Ok(f and f:IsShown(), "council window not shown") then return end
-    t:Eq(f.activeModule, "players", "players module not active")
+    t:Eq(f.activeModule, "roster", "roster module not active")
     local panel = f.panels and f.panels.players
     if not t:Ok(panel and panel:IsShown(), "players panel not shown") then return end
     t:Eq(self:NormalizeName(panel.player or ""), self:NormalizeName(me), "own player not selected")
