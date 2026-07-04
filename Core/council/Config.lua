@@ -20,7 +20,10 @@ LCEX:RegisterDataset("config", "lww", function() return LCEX.db.global.config en
 -- Feature-V config fields + their defaults. Feature C extends this (rank/extra/responses/
 -- visibility). The `disenchanters` default is a SHARED empty list when no record exists — callers
 -- read it, they must not mutate it.
-local DEFAULTS = { anonVoting = false, disenchanters = {}, announceAwards = true }
+-- `visibility` gates who sees the loot window (C7; Feature B later adds gbank keys). Default: the
+-- loot/voting window is council-only — raiders see just the poll + award chat.
+local DEFAULTS = { anonVoting = false, disenchanters = {}, announceAwards = true,
+                   visibility = { lootWindow = false } }
 
 -- Record key for the current guild's config, or a local sentinel when guildless (solo testing).
 function LCEX:ConfigKey()

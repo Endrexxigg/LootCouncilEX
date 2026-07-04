@@ -58,7 +58,7 @@ _G.GetGuildRosterInfo = function(i)
     return m.name, m.rank or "Member", m.rankIndex or 0
 end
 _G.GetGuildInfo = function(unit) -- guildName, rankName, rankIndex (GuildKey reads the 1st)
-    if unit == "player" and H.inGuild then return H.guildName or "TestGuild", "Member", 0 end
+    if unit == "player" and H.inGuild then return H.guildName or "TestGuild", "Member", H.myRank or 0 end
     return nil
 end
 _G.IsInRaid = function() return H.inRaid end
@@ -181,6 +181,7 @@ local FILES = {
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua", "Core/council/Config.lua",
+    "Core/Access.lua",
     "Core/Usable.lua", "Core/GearIssues.lua",
     "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/LootWindow.lua",
     "UI/CouncilWindow.lua", "UI/council/BrowserModule.lua", "UI/council/RosterModule.lua",
@@ -218,6 +219,7 @@ function H.reset()
     H.instant = nil
     H.class = "MAGE"
     H.guildName = nil
+    H.myRank = 0 -- local player's guild rank index (0 = GM); Access tests override
     H.talentPoints = { 0, 41, 20 } -- Fire mage by default (tab 2 wins)
     LCEX._councilSet = nil
     LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil

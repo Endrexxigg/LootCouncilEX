@@ -56,6 +56,8 @@ end
 
 LCEX:RegisterCouncilModule({
     key = "sessioncfg", title = LCEX.L["Session Config"], order = 40,
+    -- Officer-only (C3): hidden from non-council, with the C4 escape hatch (solo / GM / no config yet).
+    visible = function() return LCEX:CanSeeSessionConfig() end,
 
     build = function(panel)
         local p = LCEX.db.profile
@@ -211,7 +213,20 @@ LCEX:RegisterCouncilModule({
             end,
         })
         panel.rosterList:SetPoint("TOPLEFT", 4, -210)
-        panel.rosterList:SetPoint("BOTTOMRIGHT", -4, 40)
+        panel.rosterList:SetPoint("BOTTOMRIGHT", -4, 64)
+
+        -- Loot-window visibility (C7) — a SHARED-config toggle. Off by default (raiders see only the
+        -- poll + award chat); on opts the whole raid into watching the voting process.
+        panel.vis = LCEX:CreateCheckbox(panel, LCEX.L["Show the loot window to all raiders"],
+            function() local v = LCEX:GetConfig().visibility; return v and v.lootWindow end,
+            function(v)
+                local cur = LCEX:GetConfig().visibility or {}
+                local nv = {}
+                for k, val in pairs(cur) do nv[k] = val end
+                nv.lootWindow = v
+                LCEX:SetConfigField("visibility", nv)
+            end)
+        panel.vis:SetPoint("BOTTOMLEFT", 14, 40)
 
         -- DL-8 placeholder ----------------------------------------------------------
         panel.dl8 = panel:CreateFontString(nil, "OVERLAY")
@@ -225,6 +240,7 @@ LCEX:RegisterCouncilModule({
         panel.anon:Refresh()
         panel.byRank:Refresh()
         panel.rank:Refresh()
+        panel.vis:Refresh()
         RefreshRoster(panel)
         RefreshDisenchanters(panel)
     end,

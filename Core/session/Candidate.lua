@@ -114,12 +114,15 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
         if nn then set[nn] = true end
     end
     local amCouncil = set[self:NormalizeName(UnitName("player"))] == true
+    -- Loot-window access for THIS session (C7): council members, plus any raider when the guild has
+    -- opted into a transparent process. Default raiders get the poll only, not the loot window.
+    local canSeeLoot = amCouncil or self:LootWindowOptIn()
     timeout = tonumber(timeout)
     if timeout and timeout <= 0 then timeout = nil end
     self.activeSession = {
         sid = sid, ml = ml, items = items,
         responses = responses or self.RESPONSES,
-        council = set, amCouncil = amCouncil, myVotes = {},
+        council = set, amCouncil = amCouncil, canSeeLoot = canSeeLoot, myVotes = {},
         deadlineAt = timeout and (GetTime() + timeout) or nil,
         anon = anon and true or false,
     }
@@ -132,7 +135,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
     if self.pollQueue and #self.pollQueue > 0 and PlaySound and SOUNDKIT and SOUNDKIT.READY_CHECK then
         PlaySound(SOUNDKIT.READY_CHECK, "Master")
     end
-    if amCouncil then
+    if canSeeLoot then
         self:ShowLootWindow()
     end
     -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself

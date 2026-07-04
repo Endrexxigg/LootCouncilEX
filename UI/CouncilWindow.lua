@@ -4,12 +4,16 @@
 -- a MODULE REGISTRY — future modules are one RegisterCouncilModule call, no shell changes.
 --
 -- Module contract:
---   LCEX:RegisterCouncilModule{ key, title, order, build(panel), show(panel, ctx), hide(panel) }
+--   LCEX:RegisterCouncilModule{ key, title, order, build(panel), show(panel, ctx), hide(panel),
+--                               visible() }
 --     • build(panel)  — runs ONCE, lazily, on the module's first display; creates its widgets
 --                       inside `panel` (a full-content-area frame).
 --     • show(panel, ctx) — runs on every display; ctx is the optional payload from
 --                       OpenCouncilModule (e.g. a player name for the Players module).
 --     • hide(panel)   — optional; runs when another module takes over.
+--     • visible()     — optional predicate; when it returns false the module is left out of the rail
+--                       entirely (Feature C hides Session Config from non-council). Evaluated when the
+--                       window is first built, so a council-status change takes effect on /reload.
 --
 -- Loads after UI/Theme.lua + UI/Widgets.lua; the UI/council/*.lua modules load after this
 -- file and self-register.
@@ -55,15 +59,18 @@ function LCEX:EnsureCouncilWindow()
     f.content:SetPoint("BOTTOMRIGHT", -2, 2)
     self:Surface(f.content, "page")
 
-    -- One full-size panel per registered module (built lazily on first show).
+    -- One full-size panel per registered module (built lazily on first show). Modules whose
+    -- visible() returns false are left out of the rail entirely (Feature C access control).
     f.panels = {}
     table.sort(self.councilModules, function(a, b) return (a.order or 99) < (b.order or 99) end)
     for _, def in ipairs(self.councilModules) do
-        f.rail:AddItem(def.key, def.title)
-        local panel = CreateFrame("Frame", nil, f.content)
-        panel:SetAllPoints(f.content)
-        panel:Hide()
-        f.panels[def.key] = panel
+        if not def.visible or def.visible() then
+            f.rail:AddItem(def.key, def.title)
+            local panel = CreateFrame("Frame", nil, f.content)
+            panel:SetAllPoints(f.content)
+            panel:Hide()
+            f.panels[def.key] = panel
+        end
     end
 
     self.councilWindow = f

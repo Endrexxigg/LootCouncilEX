@@ -20,7 +20,9 @@ LCEX.dispatch = LCEX.dispatch or {}
 -- the received cUpdate. `status` (Feature V, §6.10) may be nil — the rail-row border then clears.
 function LCEX:ApplyCUpdate(sid, index, rows, status)
     local a = self.activeSession
-    if not a or sid ~= a.sid or not a.amCouncil then return end
+    -- Populate the local voting view for council AND any opted-in raider watching (C7) — otherwise a
+    -- transparency viewer's loot window would render empty. Non-council can view but not vote.
+    if not a or sid ~= a.sid or not (a.amCouncil or a.canSeeLoot) then return end
     self.voteRows = self.voteRows or {}
     self.voteRows[index] = rows
     self.voteStatus = self.voteStatus or {}

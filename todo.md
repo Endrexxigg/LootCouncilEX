@@ -217,10 +217,15 @@ per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via 
 DONE (v0.33.0, resolves DL-1):** `CouncilConfig` (effective read: shared `config` record if authored,
 else `profile.council` escape hatch) + `SetCouncilConfig` (atomic byRank/rank/extra write via new
 `SetConfigFields`); `ResolveCouncil`, the Session Config roster editor, and `/lcex council add/remove`
-all now read/write the replicated config. **(2) TODO:** `Core/Access.lua` gating (hide Session Config
-module + loot window from non-council; greyed-control state on checkbox/slider; `config.visibility`).
-**(3) TODO:** guild-scope Plane-B datasets under `db.global.guilds[guildKey]` (hide-on-leave). **(4)
-TODO:** inherit-on-first-load prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
+all now read/write the replicated config. **(2) Access control — DONE (v0.34.0):** `Core/Access.lua`
+(`CanEditConfig` / `CanSeeSessionConfig` / `CanSeeLootWindow` / `LootWindowOptIn` / `MyGuildRank`, C4
+escape hatch = solo / GM / no-config-yet); Session Config module hidden from non-council via a
+`visible()` predicate on the module contract; loot window gated (session-aware `canSeeLoot` = council
++ opt-in; raiders get the poll only, opted-in raiders get a read-only loot window with no vote +/-);
+`config.visibility.lootWindow` toggle in Session Config. *(Greyed-control helper Cd3 deferred — moot
+while see==edit for council; add when Feature B's visibility toggles need it.)* **(3) TODO:** guild-scope
+Plane-B datasets under `db.global.guilds[guildKey]` (hide-on-leave). **(4) TODO:** inherit-on-first-load
+prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
 
 **The ask (user's words):** "separate council members from other guild members to prevent showing
 council-only settings to anyone in the raid. … inherit [an existing guild config] from another

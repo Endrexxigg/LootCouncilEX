@@ -430,6 +430,9 @@ function LCEX:FillLootCandRow(row, entry)
 
     row.plus:SetScript("OnClick", function() self:SendVote(itemIndex, candKey, 1) end)
     row.minus:SetScript("OnClick", function() self:SendVote(itemIndex, candKey, -1) end)
+    -- Voting is council-only (C7): a transparency viewer (opted-in raider) sees the tally read-only.
+    if a and a.amCouncil then row.plus:Show(); row.minus:Show()
+    else row.plus:Hide(); row.minus:Hide() end
 
     -- Award is the ML's action only — only the ML's award is authoritative.
     if a and self:IsSelf(a.ml) then
@@ -643,6 +646,15 @@ end
 
 -- ── Entry points (Core contract) ─────────────────────────────────────────────
 function LCEX:ShowLootWindow()
+    -- Access gate (C7): during a session, honor the session's own council membership (+ opt-in),
+    -- decided in EnterSession; out of a session (staging / manual open), the Plane-B predicate. The
+    -- default keeps the window council-only — raiders see just the poll + award chat.
+    local a = self.activeSession
+    local allowed = (a and a.canSeeLoot) or (not a and self:CanSeeLootWindow())
+    if not allowed then
+        self:Msg(self.L["The loot window is council-only for this guild."])
+        return
+    end
     local f = self:EnsureLootWindow()
     f.selectedIndex = nil -- re-derive from the current item list
     f:Show()

@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.33.0
+## Version: 0.34.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -78,6 +78,8 @@ Core\council\History.lua
 Core\council\SelfReport.lua
 # Shared officer config (guildKey-keyed, LWW) — foundations for Features V / C / B.
 Core\council\Config.lua
+# Access control (Feature C): role/visibility predicates over AmCouncil + config. Reads Config + Sync.
+Core\Access.lua
 
 # In-game validation harness (/lcex selftest). Loads LAST — it exercises every module above.
 Core\SelfTest.lua

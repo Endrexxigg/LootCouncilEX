@@ -782,20 +782,38 @@ LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(
     if t:Ok(hp and hp:IsShown(), "history panel not shown") then
         t:Eq(#hp.list.items, #self:BuildHistoryLog(""), "history rows mismatch the log builder")
     end
-    self:OpenCouncilModule("sessioncfg")
-    local sp = f and f.panels and f.panels.sessioncfg
-    if t:Ok(sp and sp:IsShown(), "session-config panel not shown") then
-        t:Ok(sp.timeout ~= nil and sp.rosterList ~= nil and sp.byRank ~= nil,
-            "session-config controls missing")
-        t:Ok(type(sp.rosterList.items) == "table", "council roster failed to resolve")
-        -- Feature V controls: the anon toggle + the ranked disenchanter editor (render-only — no
-        -- SetConfigField here, which would broadcast a config change to the guild).
-        t:Ok(sp.anon ~= nil and sp.deList ~= nil and sp.deAddBox ~= nil, "Feature V session controls missing")
-        t:Ok(type(sp.deList.items) == "table", "disenchanter list failed to render")
+    -- Session Config is officer-only now (Feature C, C3). Assert it renders when this player may see
+    -- it, and is correctly absent from the rail otherwise — either way exercises the gate.
+    if self:CanSeeSessionConfig() then
+        self:OpenCouncilModule("sessioncfg")
+        local sp = f and f.panels and f.panels.sessioncfg
+        if t:Ok(sp and sp:IsShown(), "session-config panel not shown") then
+            t:Ok(sp.timeout ~= nil and sp.rosterList ~= nil and sp.byRank ~= nil,
+                "session-config controls missing")
+            t:Ok(type(sp.rosterList.items) == "table", "council roster failed to resolve")
+            -- Feature V controls: the anon toggle + the ranked disenchanter editor (render-only — no
+            -- SetConfigField here, which would broadcast a config change to the guild).
+            t:Ok(sp.anon ~= nil and sp.deList ~= nil and sp.deAddBox ~= nil, "Feature V session controls missing")
+            t:Ok(type(sp.deList.items) == "table", "disenchanter list failed to render")
+            t:Ok(sp.vis ~= nil, "loot-window visibility toggle missing (C7)")
+        end
+    else
+        t:Ok(f.panels.sessioncfg == nil, "non-council: Session Config correctly hidden from the rail")
     end
 end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
+
+LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C)", function(self, t)
+    for _, fn in ipairs({ "CanEditConfig", "CanSeeSessionConfig", "CanSeeLootWindow",
+                          "LootWindowOptIn", "MyGuildRank" }) do
+        t:Ok(type(self[fn]) == "function", "missing access predicate: " .. fn)
+    end
+    t:Ok(type(self:CanSeeSessionConfig()) == "boolean", "CanSeeSessionConfig returns a boolean")
+    t:Ok(type(self:CanSeeLootWindow()) == "boolean", "CanSeeLootWindow returns a boolean")
+    -- Council always sees the loot window (the opt-in only matters for non-council raiders).
+    if self:AmCouncil() then t:Ok(self:CanSeeLootWindow(), "council must always see the loot window") end
+end)
 
 LCEX:RegisterSelfTest("ui", "confirm popup + loot-window D/E control (Feature V)", function(self, t)
     -- The reusable confirm (D/E send; later Feature C's inherit prompt): accept fires onAccept with

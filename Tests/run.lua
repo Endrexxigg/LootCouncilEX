@@ -641,6 +641,44 @@ test("Council roster sourced from shared config once authored (DL-1 / Feature C)
     L.db.global.config = {}
 end)
 
+test("Access predicates: edit/see gating with the C4 escape hatch (Feature C)", function()
+    -- Solo / guildless -> always editable + visible (the testing escape hatch).
+    H.inGuild = false
+    ok(L:CanEditConfig(), "guildless: config editable")
+    ok(L:CanSeeSessionConfig(), "guildless: session config visible")
+
+    -- In a guild, nothing authored yet -> bootstrap: anyone can author.
+    H.inGuild, H.guildName = true, "Guildy"
+    H.myRank = 5 -- a plain raider
+    L.db.profile.council = { byRank = false, rank = 1, extra = {} } -- Tester not council
+    ok(not L:AmCouncil(), "raider is not council")
+    ok(L:CanEditConfig(), "no config authored -> bootstrap editable")
+
+    -- Authoring a config (as some officer) then locks the raider out.
+    L:SetCouncilConfig({ extra = { "Officer" } })
+    ok(L:ConfigRecord() ~= nil, "config authored")
+    ok(not L:CanEditConfig(), "authored + raider (not council) -> read-only")
+    ok(not L:CanSeeSessionConfig(), "authored + raider -> session config hidden")
+
+    -- GM (rank 0) keeps the escape hatch even after authoring.
+    H.myRank = 0
+    ok(L:CanEditConfig(), "GM can always edit")
+
+    -- Council membership grants edit regardless of guild rank.
+    H.myRank = 3
+    L:SetCouncilConfig({ extra = { "Tester" } })
+    ok(L:AmCouncil(), "Tester now council")
+    ok(L:CanEditConfig(), "council member can edit")
+
+    -- Loot-window visibility (C7): council always; a raider only under the opt-in.
+    L:SetCouncilConfig({ extra = {} }) -- Tester off council again
+    H.myRank = 5
+    ok(not L:CanSeeLootWindow(), "raider, opt-in off -> loot window hidden")
+    L:SetConfigField("visibility", { lootWindow = true })
+    ok(L:CanSeeLootWindow(), "raider, opt-in on -> loot window visible")
+    L.db.global.config = {}
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.
