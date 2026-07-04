@@ -19,8 +19,9 @@ C introduces the guild-scoping + shared-config that **B depends on**; B is large
 
 ## Feature G — Enchant/gem gear issues in the self-report
 
-**Status:** answers locked — **detection model = `docs/CLA_gear_issues_findings.md`**; v1 = core
-checks, boss-conditional + meta-gem deferred to v1.1.
+**Status:** **specced** — PROJECT.md §6.8 + Phase 8 + DL-13 (detection model =
+`docs/CLA_gear_issues_findings.md`); v1 = core checks, boss-conditional + meta-gem → v1.1. Ready
+to build.
 
 **The ask (user's words):** "make the self report also include enchant and gem data. I'd like
 to see each raid member's gear (and gear issues like bad gems/missing enchants) so officers can

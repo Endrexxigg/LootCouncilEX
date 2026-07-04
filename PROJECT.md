@@ -78,6 +78,7 @@ LootCouncilEX/
 │   ├── Minimap.lua            # LDB launcher: left=loot, right=council, ctrl=config
 │   ├── Display.lua            # pure display-array builders (headless-tested; UI renders them)
 │   ├── Usable.lua             # poll class filter: token lines + TBC proficiency matrix
+│   ├── GearIssues.lua         # Feature G: parse gear links → enchant/gem issue tags (pure, headless-tested)
 │   ├── SelfTest.lua           # /lcex selftest — in-game validation harness
 │   ├── session/               # PLANE A
 │   │   ├── Session.lua        # ML state machine (authority); sStart carries the poll deadline
@@ -94,7 +95,8 @@ LootCouncilEX/
 │       ├── Loot.lua           # phase → raid → boss → {itemIDs}
 │       ├── BiS.lua            # class → spec → phase → slot → {itemIDs}
 │       ├── TierTokens.lua     # tokenItemID → {class → {tierPieceItemIDs}}
-│       └── DataAPI.lua        # pure accessors over the three tables
+│       ├── GearRules.lua      # Feature G: enchant allowlist + gem-min-quality + excluded-gear whitelist (CLA-derived)
+│       └── DataAPI.lua        # pure accessors over the shipped tables
 └── UI/                        # the four-frame UI (DL-12): flat-dark, gold accent
     ├── Theme.lua              # design language: surface tones, fonts, paint helpers
     ├── Widgets.lua            # themed primitives: window/rail/list/button/checkbox/slider
@@ -104,6 +106,7 @@ LootCouncilEX/
     ├── council/               # self-registering dashboard modules
     │   ├── BrowserModule.lua  # loot browser (quality colors, hierarchy, mark editor)
     │   ├── PlayersModule.lua  # player picker + Gear|History|Profs|BiS|Notes
+    │   ├── GearCheckModule.lua # Feature G: roster-wide gear-issue overview (everyone + issue counts)
     │   ├── HistoryModule.lua  # guild-wide award log
     │   └── SessionConfigModule.lua # officer: council roster, poll deadline, DL-8 slot
     └── ConfigWindow.lua       # `config`: schema-driven user settings
@@ -203,6 +206,35 @@ TierTokens = { [30243]={ name="Helm of the Vanquished Defender", pieces={ ["WARR
 - **Equipped ilvl:** `GetAverageItemLevel` unreliable in Classic; show the competing-slot item from the snapshot instead.
 - **Comms:** `RegisterComm("LCEX", handler)`; `SendCommMessage("LCEX", msg, "RAID"|"GUILD"|"WHISPER", target)`. GUILD reaches all online guildies (the out-of-raid path).
 
+### 6.8 Gear-issue detection (Feature G)
+Adopts the CLA "gear issues" model (`docs/CLA_gear_issues_findings.md`) as a **viewer-side** analysis over the gear links already in `gearCache` (§6.3) — **no comms or protocol change** (DL-13). Rules ship as static data (`Data/GearRules.lua`); `Core/GearIssues.lua` is the pure, headless-tested evaluator; results surface in the Players → Gear sub-tab (per-item tags) and a new roster-wide **Gear Check** council module (everyone + issue counts — the pre-raid slacker scan). **Display-only in v1** (no auto-whisper). v1 ships the **core three** checks (enchant / empty-socket / gem-quality); boss-conditional + meta-gem are deferred (see below).
+
+**Item-string parse.** Split the itemString on `:` — the field after `itemID` = enchantID (0 = none); the next four fields = socketed gem itemIDs (0 = empty). This is a new full-string splitter (existing parsers grab only the itemID).
+
+**Socket count** comes from `GetItemStats(link)` keys `EMPTY_SOCKET_RED|YELLOW|BLUE|META|PRISMATIC` (the item's *inherent* sockets). Empty sockets = inherent sockets − filled gem fields. **Verify on the live Anniversary client (X3):** if `GetItemStats` sockets prove unreliable, fall back to a tooltip scan (localized "Socket" lines) or a reporter-side socket count added to `pReport`/`gearCache` — the *only* variant that would touch comms.
+
+**Rule tables — `Data/GearRules.lua`** (CLA §4, WCL slot indices remapped to `INVSLOT_*` per CLA §3):
+```lua
+GearRules = {
+  minGemQuality = 3,                                   -- rare; filled gem below this = flagged (meta exempt)
+  enchantable   = { [INVSLOT_HEAD]=true, ... },        -- slots that SHOULD carry an enchant
+  enchantAllow  = { [INVSLOT_HEAD]={ [enchID]=true }, ... },  -- per-slot acceptable enchants (allowlist; CLA §6 inversion — fails safe)
+  enchantLabel  = { [enchID]="+10 Critical Strike", ... },    -- names for flagged enchants (GetItemInfo can't resolve enchant names)
+  excludeItems  = { [15138]=true, ... },               -- never flag (fishing poles, off-set, un-enchantable BiS) — CLA §4c
+}
+```
+
+**Evaluation pipeline** — per equipped item, emit one tag per failure (CLA §5):
+1. In `excludeItems`? → skip all checks.
+2. Slot in `enchantable` and enchantID == 0 → `[no enchant]`.
+3. enchantID present and **not** in `enchantAllow[slot]` → `[bad enchant]` (label from `enchantLabel`, else "non-BiS enchant"). Unknown enchant → flagged for review (fail-safe).
+4. Empty socket (inherent > filled) → `[no gem used]` (×N).
+5. Filled non-meta gem below `minGemQuality` (quality via `GetItemInfo` on the gem itemID) → `[bad gem]`.
+
+**Deferred to a fast-follow (DL-13):** the boss-conditional "useless item" family (undead / demon / PvP-trinket / engineering — needs per-encounter flag tables + item→condition maps), meta-gem activation, and true socket-**color** matching. v1 does enchant presence/allowlist + empty-socket + gem-quality only.
+
+**Display.** Per-item tags render in Players → Gear (danger tone = missing, warning tone = suboptimal). The **Gear Check** module lists every present/cached player with an issue count; empty = "no issues". Own character evaluates live equipped gear; others evaluate from `gearCache` with the existing "cached Nm ago" freshness. Names come from `enchantLabel` (enchants) / `GetItemInfo` (gems) — arbitrary good-enchant names via tooltip scan are deferred.
+
 ---
 
 ## 7. Build map
@@ -232,6 +264,14 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 
 ---
 
+### Post-v1 feature suite (phases 8–11)
+Phases 8–11 extend **past** the original v1 definition of done — the four features scoped in `todo.md` (probe-for-detail): gear issues, voting-readiness, council access control, guild bank. Speced incrementally; build order **8 → 9 → 10 → 11** (G → V → C → B) by dependency + risk. A small **shared-foundations** step (guild identity/`guildKey`, X4; shared-config channel, X5) leads Phase 10 and is reused by Phase 11. *(Phases 9–11 are specced as each is reached; see `todo.md` for their locked decisions.)*
+
+**Phase 8 — Gear issues (Feature G).** `Core/GearIssues.lua` (pure detection over `gearCache` links + `GetItemStats` sockets), `Data/GearRules.lua` (CLA-derived rule tables), per-item tags in Players → Gear + `UI/council/GearCheckModule.lua` (roster overview). Core three checks only (enchant allowlist + empty socket + gem quality); viewer-side, no comms change (DL-13).
+*Exit:* the Gear Check module lists every raider's enchant/gem problems pre-raid; a test character wearing a missing-enchant + empty-socket + green-gem item surfaces exactly `[no enchant]` `[no gem used]` `[bad gem]`; `/lcex selftest` covers the detection logic (headless, fixed links → expected tags) + the `GetItemStats` socket contract (in-game). Boss-conditional + meta-gem checks are explicitly out of this phase.
+
+---
+
 ## 8. Decision log / open questions
 
 - **DL-1 (open, needs owner decision):** `profile.council` currently defines both the live-vote roster *and* the Plane-B sync roster. If notes/sync membership should differ from vote membership, split into two settings before Phase 4.
@@ -258,6 +298,7 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
   (`/lcex respond`) intentionally shows ALL items again — re-clicking is the DL-3 re-respond
   mechanism.
 - **DL-11 (accepted, Phase 3):** Plane-A session authority is bound to the **`sStart` sender**, per `sid` — candidates/council record the ML as whoever opened the session and accept subsequent `cUpdate`/`sEnd`/`award` only from that same sender carrying that `sid`. The WoW master-looter API is **not** the authority source: under DL-7 the group need not be using master loot during a council session, so `GetRaidRosterInfo`-derived ML (RCLC's model) doesn't apply here. The trusted guild model (§2) makes initial trust of the `sStart` sender acceptable for v1; `sid` stays an identifier, not a credential. On the ML's own client the session ML is simply whoever runs `/lcex start` (it broadcasts `sStart`); `PlayerIsML` governs only passive loot-tracking, a separate concern.
+- **DL-13 (accepted, 2026-07-04 — Feature G gear issues):** enchant/gem issue detection is **viewer-side** over the links already in `gearCache` + `GetItemStats` sockets — **no comms/protocol change**. The one exception: if `GetItemStats` sockets prove unreliable on Anniversary (verify via selftest, X3), a reporter-side socket count is added to `pReport`/`gearCache`. Rules ship as **static `Data/GearRules.lua`** (CLA-derived: per-slot enchant **allowlist** that fails safe on unknown enchants, gem-min-quality = rare, excluded-gear whitelist), **not** guild-editable in v1. The boss-conditional "useless item" (undead/demon/PvP/engi) + meta-gem-activation checks, and true socket-color matching, are **deferred to a fast-follow**. Model: `docs/CLA_gear_issues_findings.md`; canonical spec §6.8.
 
 ---
 
