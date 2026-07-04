@@ -74,15 +74,14 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** **in progress** (Phase 9) — **foundations complete**: `Core/Guild.lua` (a295a06) +
-`Core/council/Config.lua` (5bd2fce), v0.26.2, 288 tests. **Next (the big, riskiest piece):** the
-session-model change — pre-seed `session.rows` with a row per present raider (kill-set ∪ current
-raid; eligibility via `ClassCanUse`; `pending`/`cantuse`/`missedkill`/`left` reasons), touching
-`Award.lua` (snapshot roster at loot time), `Session.lua` (seed + cResp-merge preserving
-class/reason), and the loot-window render (3-tier ROLLED > MIGHT ROLL > NOT ROLLING). **Then:**
-`Core/session/Readiness.lua` + `cUpdate.status` border broadcast → vote tally → anon (`sStart.anon`)
-→ D/E award type (`STATUS.DISENCHANT` + disenchanter picker). Spec: §6.9/§6.10, Phase 9, DL-14/15;
-row-set in R1–R5.
+**Status:** **in progress** (Phase 9) — **foundations + the V1 session-model change COMPLETE**
+(through aac6494, v0.26.6; 301 tests): Guild/Config foundations; roster snapshotted at loot time;
+`session.rows` pre-seeded per present raider (`SeedRows`, kill-set ∪ current raid) + broadcast;
+`cResp` preserves class / clears reason; loot window sorts 3-tier ROLLED > MIGHT ROLL > NOT ROLLING
+with reason text + dimming. **Remaining V sub-features (each its own commits):** (1)
+`Core/session/Readiness.lua` + `cUpdate.status` rail-row border (new theme colors, ML-broadcast);
+(2) vote tally "X/Y voted"; (3) anon voting (`sStart.anon`, default off); (4) D/E award type
+(`STATUS.DISENCHANT` + ranked disenchanter picker). Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
