@@ -178,8 +178,10 @@ per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via 
 
 ## Feature C — Council/officer access control + guild config inheritance
 
-**Status:** answers locked — synced shared config; **loot window also hidden from non-council by
-default** (new, C7); no legacy-data migration (addon unreleased).
+**Status:** **specced** — PROJECT.md §6.11 + Phase 10 + DL-16 (builds on the §6.9 foundations).
+Council sourced from shared config (resolves DL-1), non-council gating (settings + loot window),
+guild-scoped datasets under `guilds[guildKey]` with hide-on-leave, inherit-on-first-load prompt +
+escape hatch. Build after V.
 
 **The ask (user's words):** "separate council members from other guild members to prevent showing
 council-only settings to anyone in the raid. … inherit [an existing guild config] from another
