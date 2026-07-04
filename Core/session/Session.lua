@@ -103,6 +103,39 @@ function LCEX:NewSessionID()
     return UnitName("player") .. "-" .. time() .. "-" .. counter
 end
 
+-- Build the pre-seeded candidate rows for one session item (V1, PROJECT.md §6.10). The row list is
+-- the union (deduped by normalized name) of the KILL roster — who was present when the item dropped
+-- — and the CURRENT raid, so both latecomers and leavers show. Each row carries a `reason` until
+-- the candidate responds (cResp then sets `resp` and clears `reason`):
+--   pending    — eligible (in the kill set, class can use it, still present): "might roll"
+--   cantuse    — in the kill set but their class can't use it (an auto-pass, ineligible)
+--   missedkill — in the raid now but NOT present at the kill (ineligible for this item)
+--   left       — was present at the kill but has since left the raid
+-- Pure: depends only on ClassCanUse + NormalizeName. `killRoster`/`nowRoster` are { {name,class} }.
+function LCEX:SeedRows(killRoster, nowRoster, itemLink)
+    local nowByKey = {}
+    for _, m in ipairs(nowRoster or {}) do
+        local k = self:NormalizeName(m.name)
+        if k then nowByKey[k] = m end
+    end
+    local rows = {}
+    local function put(m, inKill)
+        local k = self:NormalizeName(m.name)
+        if not k or rows[k] then return end
+        local now = nowByKey[k]
+        local class = (now and now.class) or m.class
+        local reason
+        if not now then reason = "left"
+        elseif not inKill then reason = "missedkill"
+        elseif self:ClassCanUse(itemLink, class) then reason = "pending"
+        else reason = "cantuse" end
+        rows[k] = { name = m.name, class = class, reason = reason, votes = 0 }
+    end
+    for _, m in ipairs(killRoster or {}) do put(m, true) end
+    for _, m in ipairs(nowRoster or {}) do put(m, false) end -- add current-raid latecomers
+    return rows
+end
+
 -- Open a session over the given trimmed item list and broadcast sStart. Refuses if a
 -- session is already open or there is nothing to council. With no group we still open the
 -- session locally (no broadcast) so the flow can be exercised/tested solo.

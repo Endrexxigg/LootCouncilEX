@@ -623,6 +623,23 @@ test("GetConfig defaults + SetConfigField replicates via pSet", function()
     eq(c2.disenchanters[1], "Zap", "new field stored")
 end)
 
+-- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
+test("SeedRows: pending / cantuse / missedkill / left", function()
+    -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 4 }
+    local kill = { { name = "War", class = "WARRIOR" }, { name = "Pri", class = "PRIEST" },
+                   { name = "Gone", class = "WARRIOR" } }
+    local now  = { { name = "War", class = "WARRIOR" }, { name = "Pri", class = "PRIEST" },
+                   { name = "Late", class = "WARRIOR" } }
+    local rows = L:SeedRows(kill, now, "item:100")
+    eq(rows["war"].reason,  "pending",    "at kill + can use -> pending")
+    eq(rows["pri"].reason,  "cantuse",    "at kill + cannot use -> cantuse")
+    eq(rows["gone"].reason, "left",       "at kill but gone -> left")
+    eq(rows["late"].reason, "missedkill", "in raid now but missed the kill -> missedkill")
+    eq(rows["war"].class,   "WARRIOR",    "class captured on the row")
+    eq(rows["war"].resp,    nil,          "no response yet")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)
