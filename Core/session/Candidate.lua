@@ -105,8 +105,9 @@ end
 -- the session, resolves whether WE are on the council, opens the candidate poll (everyone
 -- responds) and, if we vote, the council view. Centralizes the comms path and the ML's own
 -- local path (solo or grouped), so the frames appear without depending on the echo.
--- `timeout` (optional seconds, from sStart) arms the poll's response deadline.
-function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
+-- `timeout` (optional seconds, from sStart) arms the poll's response deadline. `anon` (from sStart)
+-- fixes anonymous voting for the session so every client agrees who-voted names are hidden (V7).
+function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
     local set = {}
     for _, n in ipairs(council or {}) do
         local nn = self:NormalizeName(n)
@@ -120,6 +121,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
         responses = responses or self.RESPONSES,
         council = set, amCouncil = amCouncil, myVotes = {},
         deadlineAt = timeout and (GetTime() + timeout) or nil,
+        anon = anon and true or false,
     }
     self.voteRows = {}
     self.voteStatus = {} -- per-item readiness status from cUpdate (Feature V rail-row border)
@@ -187,7 +189,7 @@ end
 LCEX.dispatch.sStart = function(self, msg, sender)
     if type(msg.items) ~= "table" or #msg.items == 0 then return end
     if self.activeSession and self.activeSession.sid == msg.sid and self:IsSelf(sender) then return end
-    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council, msg.timeout)
+    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council, msg.timeout, msg.anon)
 end
 
 -- The session ended: only the ML that opened THIS sid can close it (DL-11).

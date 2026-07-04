@@ -82,21 +82,38 @@ function LCEX:PresentCouncilCount()
     return n
 end
 
--- Distinct council members who have cast a non-zero vote on item `index` (the tally numerator, and
--- the readiness "all present council voted" test). voters[index][candKey][voterName] = vote.
-function LCEX:VotesCastOn(index)
+-- A voter's display name from its normalized key (capitalized short name, realm dropped). The
+-- who-voted list is cosmetic, so this light touch-up beats storing a parallel display map through
+-- the whole vote path.
+function LCEX:VoterDisplay(key)
+    local short = tostring(key):match("^[^%-]+") or tostring(key)
+    if short == "" then return short end
+    return short:sub(1, 1):upper() .. short:sub(2)
+end
+
+-- Distinct council members (display names, sorted) who have cast a non-zero vote on item `index` —
+-- the who-voted list (V6) and, by its length, the tally numerator + the "all present council voted"
+-- readiness test. voters[index][candKey][voterName] = vote (voterName is the normalized key).
+function LCEX:VotersOn(index)
     local s = self.session
     local byCand = s and s.voters and s.voters[index]
-    if not byCand then return 0 end
-    local voters = {}
+    local out = {}
+    if not byCand then return out end
+    local seen = {}
     for _, voterMap in pairs(byCand) do
         for voterName, v in pairs(voterMap) do
-            if v ~= 0 then voters[voterName] = true end
+            if v ~= 0 and not seen[voterName] then
+                seen[voterName] = true
+                out[#out + 1] = self:VoterDisplay(voterName)
+            end
         end
     end
-    local n = 0
-    for _ in pairs(voters) do n = n + 1 end
-    return n
+    table.sort(out)
+    return out
+end
+
+function LCEX:VotesCastOn(index)
+    return #self:VotersOn(index)
 end
 
 -- ML-side glue: gather the live facts for item `index` and run the calculator. Nil when there is
@@ -108,11 +125,16 @@ function LCEX:ComputeItemStatus(index)
     if not rows then return nil end
     local a = self.activeSession
     local awarded = (a and a.awarded and a.awarded[index] ~= nil) or false
-    return self:ReadinessStatus({
+    local voters = self:VotersOn(index)
+    local status = self:ReadinessStatus({
         rows           = rows,
         passId         = self:PassResponseId(),
         awarded        = awarded,
-        votesCast      = self:VotesCastOn(index),
+        votesCast      = #voters,
         councilPresent = self:PresentCouncilCount(),
     })
+    -- Attach the who-voted list (V6) unless the session is anonymous (V7) — then only the count
+    -- survives on the wire, so no client can reconstruct who voted for whom.
+    if not s.anon then status.voted.names = voters end
+    return status
 end

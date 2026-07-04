@@ -990,6 +990,16 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
         t:Ok(self.lootWindow.voteTally:IsShown(), "vote tally hidden during a live session")
         t:Eq(self.lootWindow.voteTally:GetText(), "1 / 1 voted", "vote tally text")
     end
+    -- Who-voted list (V6) + the anon gate (V7): names ride the status unless the session is anon.
+    -- Guarded on activeSession.anon so it holds whether or not anonymous voting is configured on.
+    local st1v = self.voteStatus and self.voteStatus[1]
+    if t:Ok(st1v and st1v.voted ~= nil, "readiness status missing after vote") then
+        if self.activeSession and self.activeSession.anon then
+            t:Eq(st1v.voted.names, nil, "anonymous session must not carry voter names")
+        else
+            t:Ok(st1v.voted.names and #st1v.voted.names >= 1, "who-voted list should name the voter")
+        end
+    end
 
     -- Award item 1 to a dummy who never responded (→ STATUS.ANNOUNCED), item 2 to ourselves
     -- (→ carries our own response id). Solo: no channel, so no award broadcast.

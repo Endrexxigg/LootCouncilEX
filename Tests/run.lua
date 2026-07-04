@@ -719,13 +719,33 @@ test("Readiness: voted tally echoes the vote/council counts", function()
     eq(st.voted.of, 3, "voted denominator = present council")
 end)
 
-test("VotesCastOn: distinct council voters with a non-zero vote", function()
+test("VotesCastOn / VotersOn: distinct council voters with a non-zero vote", function()
     L.session = { voters = { [1] = {
         cand1 = { v1 = 1, v2 = 0 },  -- v2 abstained (0) -> not counted
         cand2 = { v1 = 1, v3 = -1 }, -- v1 already counted; v3 downvoted
     } } }
     eq(L:VotesCastOn(1), 2, "v1 and v3 voted; v2's zero does not count")
     eq(L:VotesCastOn(2), 0, "no voters on an untouched item")
+    local names = L:VotersOn(1)
+    eq(table.concat(names, ","), "V1,V3", "voter display names, deduped + sorted + capitalized")
+    L.session = nil
+end)
+
+test("ComputeItemStatus: anon gate hides voter names, keeps the count", function()
+    L.session = {
+        rows    = { [1] = { a = { resp = 1 } } },    -- one roller (BiS)
+        voters  = { [1] = { a = { tester = 1 } } },   -- the runner voted for them
+        council = { "tester" }, anon = false,
+    }
+    L.activeSession = nil
+    local st = L:ComputeItemStatus(1)
+    eq(st.voted.n, 1, "one voter counted")
+    ok(st.voted.names and #st.voted.names == 1, "names present when not anonymous")
+    eq(st.voted.names[1], "Tester", "voter display name")
+    L.session.anon = true
+    local sta = L:ComputeItemStatus(1)
+    eq(sta.voted.n, 1, "count still shows under anonymous voting")
+    eq(sta.voted.names, nil, "names hidden under anonymous voting")
     L.session = nil
 end)
 

@@ -36,6 +36,13 @@ LCEX:RegisterCouncilModule({
         })
         panel.timeout:SetPoint("TOPLEFT", 14, -16)
 
+        -- Anonymous voting (V7) — a SHARED-config field (replicated), so the whole council agrees
+        -- for a session's lifetime. Right of the deadline slider, clear of the roster column below.
+        panel.anon = LCEX:CreateCheckbox(panel, LCEX.L["Anonymous voting"],
+            function() return LCEX:GetConfig().anonVoting end,
+            function(v) LCEX:SetConfigField("anonVoting", v) end)
+        panel.anon:SetPoint("TOPLEFT", 320, -24)
+
         -- Council roster ----------------------------------------------------------
         panel.byRank = LCEX:CreateCheckbox(panel, LCEX.L["Include guild ranks at or above:"],
             function() return p.council.byRank end,
@@ -125,6 +132,7 @@ LCEX:RegisterCouncilModule({
 
     show = function(panel)
         panel.timeout:Refresh()
+        panel.anon:Refresh()
         panel.byRank:Refresh()
         panel.rank:Refresh()
         RefreshRoster(panel)

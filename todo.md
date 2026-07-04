@@ -85,9 +85,12 @@ icon border on the rail rows (`StatusColor` + new `Theme.status` colors + `Build
 instantly off the existing award flow. Headless cascade tests + in-game selftest (pure cascade + StatusColor
 + E2E readiness assertion). **Vote tally (v0.28.0):** "X / Y voted" header on the selected item in the loot window
 (`status.voted={n,of}` off the broadcast status; hidden outside a session / when no council present;
-count shows even under anon). **Remaining V sub-features (each its own commits):** (3) anon voting
-(`sStart.anon`, default off; hides voter NAMES, folds in the who-voted list); (4) D/E award type
-(`STATUS.DISENCHANT` + ranked disenchanter picker). Spec: §6.10, DL-15.
+count shows even under anon). **Anon voting + who-voted list (v0.29.0):** `config.anonVoting`
+snapshotted at start → `sStart.anon` → `session/activeSession.anon` (fixed for the session's life);
+ML attaches `status.voted.names` (sorted display names via `VotersOn`/`VoterDisplay`) unless anon;
+loot-window tally shows a who-voted hover tooltip (or "Anonymous voting"); a shared-config checkbox in
+Session Config. **Remaining V sub-feature (its own commits):** (4) D/E award type (`STATUS.DISENCHANT` +
+ranked disenchanter picker, confirm popup, award-for-reason messaging). Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =

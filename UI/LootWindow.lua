@@ -117,6 +117,28 @@ function LCEX:EnsureLootWindow()
     f.voteTally:SetPoint("TOPRIGHT", -12, -30)
     f.voteTally:Hide()
 
+    -- Hover target over the tally → the who-voted list (V6), suppressed to "Anonymous voting" when
+    -- the session is anon (V7). Reads the selected item's status live at hover time.
+    f.voteTallyBtn = CreateFrame("Button", nil, pane)
+    f.voteTallyBtn:SetAllPoints(f.voteTally)
+    f.voteTallyBtn:Hide()
+    f.voteTallyBtn:SetScript("OnEnter", function(b)
+        local idx = f.selectedIndex
+        local st = idx and self.voteStatus and self.voteStatus[idx]
+        local voted = st and st.voted
+        GameTooltip:SetOwner(b, "ANCHOR_LEFT")
+        if self.activeSession and self.activeSession.anon then
+            GameTooltip:AddLine(self.L["Anonymous voting"])
+        elseif voted and voted.names and #voted.names > 0 then
+            GameTooltip:AddLine(self.L["Voted:"])
+            for _, n in ipairs(voted.names) do GameTooltip:AddLine(n, 1, 1, 1) end
+        else
+            GameTooltip:AddLine(self.L["No votes yet."])
+        end
+        GameTooltip:Show()
+    end)
+    f.voteTallyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     f.empty = pane:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.empty, "body", "faint")
     f.empty:SetPoint("TOP", 0, -110)
@@ -474,8 +496,10 @@ function LCEX:RefreshLootWindow()
     if voted and (voted.of or 0) > 0 then
         f.voteTally:SetText(string.format(self.L["%d / %d voted"], voted.n or 0, voted.of))
         f.voteTally:Show()
+        f.voteTallyBtn:Show()
     else
         f.voteTally:Hide()
+        f.voteTallyBtn:Hide()
     end
 
     local display = {}

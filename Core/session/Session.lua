@@ -189,9 +189,12 @@ function LCEX:StartSession(items)
     -- `rows` accumulates candidate responses per item index (the ML-authority aggregate that
     -- gets rebroadcast as cUpdate): rows[itemIndex][normName] = { name, resp, note, gear, votes }.
     -- `voters` tracks each council member's vote per candidate so the tally recomputes on change.
+    -- Anonymous voting (V7) is snapshotted from the shared config at start and rides sStart, so it
+    -- is fixed for the session's lifetime (mid-session config edits don't retroactively de-anon it).
+    local anon = self:GetConfig().anonVoting and true or false
     self.session = {
         sid = sid, items = items, council = council, councilSet = councilSet,
-        rows = {}, voters = {}, startedAt = time(),
+        rows = {}, voters = {}, startedAt = time(), anon = anon,
     }
 
     -- Optional response deadline (Session Config): rides sStart as a DURATION so receivers
@@ -203,7 +206,7 @@ function LCEX:StartSession(items)
     if channel then
         self:Send("sStart", sid, {
             items = items, council = council, responses = self:ResponseSet(),
-            timeout = timeout,
+            timeout = timeout, anon = anon,
         }, channel)
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
     else
@@ -213,7 +216,7 @@ function LCEX:StartSession(items)
 
     -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
     -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
-    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council, timeout)
+    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council, timeout, anon)
     self:SeedSessionRows() -- pre-seed each item's rows from its roster (V1) and push to the council
 
     self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
@@ -282,9 +285,12 @@ function LCEX:ResumeSession()
 
     local councilSet = {}
     for _, n in ipairs(saved.council or {}) do councilSet[n] = true end
+    -- Re-snapshot anon from the current shared config (it isn't persisted — a config setting, so
+    -- reading it fresh on resume is correct).
+    local anon = self:GetConfig().anonVoting and true or false
     self.session = {
         sid = saved.sid, items = saved.items, council = saved.council, councilSet = councilSet,
-        rows = {}, voters = {}, startedAt = saved.startedAt or time(),
+        rows = {}, voters = {}, startedAt = saved.startedAt or time(), anon = anon,
     }
     self.sessionItems = saved.sessionItems
 
@@ -294,10 +300,10 @@ function LCEX:ResumeSession()
     if channel then
         self:Send("sStart", saved.sid, {
             items = saved.items, council = saved.council, responses = self:ResponseSet(),
-            timeout = timeout,
+            timeout = timeout, anon = anon,
         }, channel)
     end
-    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout)
+    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout, anon)
     self:SeedSessionRows()
     self:SaveSession()
     self:StartHeartbeat()
