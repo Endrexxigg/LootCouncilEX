@@ -206,11 +206,13 @@ function LCEX:RenderPollCards()
 
     local extra = #queue - shown
     if extra > 0 then
+        -- Left-justified, vertically centered in a MORE_H band a PAD below the last card. The
+        -- "LEFT" anchor point puts the text's vertical centre on the y, so it reads as centered.
         f.more:ClearAllPoints()
-        f.more:SetPoint("TOP", 0, -(bottom + 4))
+        f.more:SetPoint("LEFT", f, "TOPLEFT", PAD + 4, -(bottom + PAD + MORE_H / 2))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
-        bottom = bottom + MORE_H
+        bottom = bottom + PAD + MORE_H
     else
         f.more:Hide()
     end
