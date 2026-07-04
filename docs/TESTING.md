@@ -31,6 +31,28 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.27–v0.32 — FEATURE V COMPLETE (readiness border · tally · anon · D/E)
+Selftest run **2026-07-04, v0.32.0 → 41 pass / 0 fail / 0 error / 0 skip — all green** (Bankrex-
+Dreamscythe, solo). Automated coverage that passed: the pure readiness cascade + status→color map,
+the anon gate on voter names, award-reason mapping, disenchanter ordering, the confirm popup + D/E
+control, the disenchanter-list render, and the solo E2E (now asserting a lone roller borders **ready**
++ the who-voted list). Manual/visual items the selftest can't reach:
+
+- [ ] **Readiness border** (open a real 2+ player session): rail-row icon border shifts **grey →
+  gold → light-green** as responses/votes arrive; an all-passed item borders **blue**; an awarded
+  item borders **dark-green**. Header icon stays un-bordered (V4).
+- [ ] **Vote tally + who-voted**: "X / Y voted" shows under the item count; hovering it lists who
+  voted. Toggle **Anonymous voting** (Session Config) on → the hover reads "Anonymous voting" and
+  names never appear, but the count still moves.
+- [ ] **D/E award**: with a disenchanter configured + present, the **D/E** button (bottom bar, ML)
+  → confirm "Send `<item>` to `<name>` for disenchant?" → Yes trades it + posts "…for D/E" to raid
+  chat. With none present, the confirm offers a manual name field.
+- [ ] **Disenchanter editor** (Session Config, right column): add names, ▲/▼ reorders priority, ×
+  removes; replicates to a second officer.
+- [ ] **Award announcements**: normal awards now post "`<item>` was awarded to `<player>` for
+  `<reason>`" to raid/party chat (reason = the poll response). *(Announce channel is code-default on;
+  its user-facing toggle lands with Feature C's visibility settings.)*
+
 ### v0.25–v0.26 — FEATURE G (gear issues) + FEATURE V (voting readiness, in progress)
 Selftest run **2026-07-04, v0.26.9 → 38 pass / 0 fail / 0 skip — all green.** (The earlier v0.26.7
 run's 2 poll-fixture fails + 1 session-E2E skip are both resolved below.)
