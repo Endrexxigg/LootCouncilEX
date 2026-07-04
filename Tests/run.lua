@@ -587,6 +587,22 @@ test("BuildGearCheckDisplay lists offenders worst-first, omits clean players", f
     ok(not cid, "clean player omitted")
 end)
 
+-- ── Guild identity + present roster (Core/Guild.lua) ─────────────────────────
+test("GuildKey + PresentRoster", function()
+    H.inGuild, H.guildName = true, "Wipe Enthusiasts"
+    eq(L:GuildKey(), "Wipe Enthusiasts", "guild name is the key")
+    H.inGuild = false
+    eq(L:GuildKey(), nil, "guildless -> nil")
+
+    H.inRaid, H.group = false, {}
+    local solo = L:PresentRoster()
+    eq(#solo, 1, "solo roster is just self")
+    eq(solo[1].name, "Tester", "self present")
+
+    H.inRaid, H.group = true, { "Amy", "Bob", "Tester" }
+    eq(#L:PresentRoster(), 3, "self + amy + bob, self deduped")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

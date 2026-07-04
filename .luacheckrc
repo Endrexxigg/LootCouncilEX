@@ -41,7 +41,7 @@ read_globals = {
     "UnitAffectingCombat", "IsControlKeyDown",
     "GetNumGroupMembers", "GetNumRaidMembers", "GetRaidRosterInfo", "IsInRaid", "IsInGroup",
     "LE_PARTY_CATEGORY_INSTANCE", "GetInstanceInfo",
-    "IsInGuild", "GuildRoster", "C_GuildInfo", "GetNumGuildMembers", "GetGuildRosterInfo",
+    "IsInGuild", "GuildRoster", "C_GuildInfo", "GetNumGuildMembers", "GetGuildRosterInfo", "GetGuildInfo",
     -- Loot / master loot
     "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems", "GetLootMethod",
     "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem", "LOOT_ITEM_SELF",

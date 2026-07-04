@@ -57,6 +57,10 @@ _G.GetGuildRosterInfo = function(i)
     if not m then return nil end
     return m.name, m.rank or "Member", m.rankIndex or 0
 end
+_G.GetGuildInfo = function(unit) -- guildName, rankName, rankIndex (GuildKey reads the 1st)
+    if unit == "player" and H.inGuild then return H.guildName or "TestGuild", "Member", 0 end
+    return nil
+end
 _G.IsInRaid = function() return H.inRaid end
 _G.IsInGroup = function() return #H.group > 0 end
 _G.GetNumGroupMembers = function() return #H.group end
@@ -168,7 +172,7 @@ _G.LibStub = function(name) return libs[name] end
 
 -- ── Load the Core files (toc order, Core only — UI is not unit-tested here) ──
 local FILES = {
-    "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua", "Core/Minimap.lua",
+    "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua", "Core/Guild.lua", "Core/Minimap.lua",
     "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/DataAPI.lua",
     "Core/Data/GearRules.lua",
     "Core/Display.lua",
@@ -212,6 +216,7 @@ function H.reset()
     H.itemStats, H.itemQuality = nil, nil
     H.instant = nil
     H.class = "MAGE"
+    H.guildName = nil
     H.talentPoints = { 0, 41, 20 } -- Fire mage by default (tab 2 wins)
     LCEX._councilSet = nil
     LCEX.bisClass, LCEX.bisSpec, LCEX.bisPhase = nil, nil, nil
