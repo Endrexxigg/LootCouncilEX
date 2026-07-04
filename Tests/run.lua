@@ -623,6 +623,24 @@ test("GetConfig defaults + SetConfigField replicates via pSet", function()
     eq(c2.disenchanters[1], "Zap", "new field stored")
 end)
 
+test("Council roster sourced from shared config once authored (DL-1 / Feature C)", function()
+    H.inGuild, H.guildName = true, "Guildy"
+    -- No config record yet -> the pre-config default is profile.council (the C4 escape hatch).
+    L.db.profile.council = { byRank = false, rank = 1, extra = { "Alice" } }
+    ok(L:ResolveCouncil(false)["alice"], "pre-config: profile.council.extra resolves")
+    ok(not L:ConfigRecord(), "no config record authored yet")
+
+    -- Authoring the roster writes+replicates config; from then on profile.council is ignored.
+    L:SetCouncilConfig({ extra = { "Bob" } })
+    ok(L:ConfigRecord() ~= nil, "config record now authored")
+    local set = L:ResolveCouncil(false)
+    ok(set["bob"], "post-config: config.extra resolves")
+    ok(not set["alice"], "profile.council no longer consulted once config is authored")
+    -- byRank/rank were seeded atomically from the prior effective roster (not dropped).
+    eq(L:CouncilConfig().byRank, false, "byRank seeded from the effective roster on first write")
+    L.db.global.config = {}
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.

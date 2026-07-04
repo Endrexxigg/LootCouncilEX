@@ -27,6 +27,13 @@ function LCEX:ConfigKey()
     return self:GuildKey() or "_local"
 end
 
+-- The RAW stored config record for this guild, or nil if none is authored yet — distinct from
+-- GetConfig, which always returns a defaults-merged view. Callers use this to tell "authored" from
+-- "default" (Feature C: the council roster + escape hatch decide off whether a record exists).
+function LCEX:ConfigRecord()
+    return self.db.global.config[self:ConfigKey()]
+end
+
 -- The current guild's shared config with defaults merged in (never nil). A fresh table each call,
 -- so callers can't accidentally mutate the stored record (mod/by are stripped from the view).
 function LCEX:GetConfig()
@@ -41,8 +48,10 @@ function LCEX:GetConfig()
     return out
 end
 
--- Set one shared-config field and replicate it (LWW). Preserves the record's other fields.
-function LCEX:SetConfigField(field, value)
+-- Set several shared-config fields at once and replicate them (LWW) in ONE write. Preserves the
+-- record's other fields; seeds from DEFAULTS when no record exists yet. The atomic form matters for
+-- the council roster (byRank/rank/extra move together, C1) so a first edit can't drop the others.
+function LCEX:SetConfigFields(fields)
     local key = self:ConfigKey()
     local cur = self.db.global.config[key]
     local rec = {}
@@ -51,6 +60,11 @@ function LCEX:SetConfigField(field, value)
     else
         for k, v in pairs(DEFAULTS) do rec[k] = v end
     end
-    rec[field] = value
+    for k, v in pairs(fields) do rec[k] = v end
     self:SetRecord("config", key, rec)
+end
+
+-- Set one shared-config field and replicate it (LWW). Preserves the record's other fields.
+function LCEX:SetConfigField(field, value)
+    self:SetConfigFields({ [field] = value })
 end

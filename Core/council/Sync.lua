@@ -264,23 +264,25 @@ function LCEX:CmdDummy(rest)
     end
 end
 
--- /lcex council [add|remove <name>] — show or edit the council (profile.council.extra).
+-- /lcex council [add|remove <name>] — show or edit the council's `extra` list. Writes go to the
+-- SHARED, replicated config (Feature C) via SetCouncilConfig, reading the current effective list.
 function LCEX:CmdCouncil(rest)
     rest = strtrim(rest or "")
     local action, name = rest:match("^(%S+)%s+(.+)$")
-    local p = self.db.profile.council
-    p.extra = p.extra or {}
     if action == "add" and name then
         name = strtrim(name)
-        table.insert(p.extra, name)
-        self._councilSet = nil
+        local extra = {}
+        for _, n in ipairs(self:CouncilConfig().extra or {}) do extra[#extra + 1] = n end
+        extra[#extra + 1] = name
+        self:SetCouncilConfig({ extra = extra })
         self:Msg(string.format(self.L["Added %s to the council."], name))
     elseif action == "remove" and name then
         local target = self:NormalizeName(strtrim(name))
-        for i = #p.extra, 1, -1 do
-            if self:NormalizeName(p.extra[i]) == target then table.remove(p.extra, i) end
+        local extra = {}
+        for _, n in ipairs(self:CouncilConfig().extra or {}) do
+            if self:NormalizeName(n) ~= target then extra[#extra + 1] = n end
         end
-        self._councilSet = nil
+        self:SetCouncilConfig({ extra = extra })
         self:Msg(string.format(self.L["Removed %s from the council."], strtrim(name)))
     else
         local names = {}

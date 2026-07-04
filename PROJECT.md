@@ -383,7 +383,7 @@ Phases 8–11 extend **past** the original v1 definition of done — the four fe
 
 ## 8. Decision log / open questions
 
-- **DL-1 (open, needs owner decision):** `profile.council` currently defines both the live-vote roster *and* the Plane-B sync roster. If notes/sync membership should differ from vote membership, split into two settings before Phase 4.
+- **DL-1 (RESOLVED, Phase 10 — Feature C):** the council roster is **one** list, now sourced from the officer-authored, replicated shared `config` (`byRank`/`rank`/`extra`), so every client resolves the same council (`CouncilConfig`/`SetCouncilConfig`; `ResolveCouncil` reads it). `profile.council` remains only as the pre-config local default + escape hatch (C4). No split between vote/sync membership — one roster for v1 as originally intended, just no longer per-client-local.
 - **DL-2 (out of scope v1):** cross-guild council sync via custom channel — fragile; deferred.
 - **DL-3 (accepted v1):** no ACK on Plane A; last-write-wins + re-click. Revisit only if delivery gaps appear in practice.
 - **DL-4 (accepted, no alternative):** gear/professions are self-reported; out-of-raid / non-addon users show cached or none.

@@ -132,12 +132,12 @@ LCEX:RegisterCouncilModule({
         panel.deList:SetPoint("TOPLEFT", 316, -100)
         panel.deList:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -8, -204)
 
-        -- Council roster ----------------------------------------------------------
+        -- Council roster (Feature C: the officer-authored SHARED config, replicated — CouncilConfig
+        -- reads it, SetCouncilConfig writes+broadcasts it; profile.council is the pre-config default).
         panel.byRank = LCEX:CreateCheckbox(panel, LCEX.L["Include guild ranks at or above:"],
-            function() return p.council.byRank end,
+            function() return LCEX:CouncilConfig().byRank end,
             function(v)
-                p.council.byRank = v
-                LCEX._councilSet = nil
+                LCEX:SetCouncilConfig({ byRank = v })
                 RefreshRoster(panel)
             end)
         panel.byRank:SetPoint("TOPLEFT", 14, -66)
@@ -146,10 +146,9 @@ LCEX:RegisterCouncilModule({
             width = 200, min = 0, max = 9, step = 1,
             label = LCEX.L["Rank cutoff (0 = GM)"],
             fmt = function(v) return tostring(math.floor(v)) end,
-            get = function() return p.council.rank or 1 end,
+            get = function() return LCEX:CouncilConfig().rank or 1 end,
             set = function(v)
-                p.council.rank = math.floor(v)
-                LCEX._councilSet = nil
+                LCEX:SetCouncilConfig({ rank = math.floor(v) })
                 RefreshRoster(panel)
             end,
         })
@@ -165,8 +164,10 @@ LCEX:RegisterCouncilModule({
             onCommit = function(text)
                 text = strtrim(text or "")
                 if text == "" then return end
-                table.insert(p.council.extra, text)
-                LCEX._councilSet = nil
+                local extra = {}
+                for _, n in ipairs(LCEX:CouncilConfig().extra or {}) do extra[#extra + 1] = n end
+                extra[#extra + 1] = text
+                LCEX:SetCouncilConfig({ extra = extra })
                 panel.addBox:SetText("")
                 RefreshRoster(panel)
             end,
@@ -203,7 +204,7 @@ LCEX:RegisterCouncilModule({
                 row.fs:SetText(name)
                 -- Only explicit extras are removable here; rank members come from the guild.
                 local isExtra = false
-                for _, n in ipairs(p.council.extra or {}) do
+                for _, n in ipairs(LCEX:CouncilConfig().extra or {}) do
                     if LCEX:NormalizeName(n) == name then isExtra = true; break end
                 end
                 if isExtra then row.remove:Show() else row.remove:Hide() end

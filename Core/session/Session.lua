@@ -27,14 +27,42 @@ local SPING_INTERVAL = 30
 -- the ML's bags, not a loot window, so there is no loot slot — the ML resolves the live
 -- bag/slot at trade time in Award.lua.) `rows` is the per-item response aggregate (see below).
 
--- Resolve the council as a SET of normalized names from profile.council: explicit `extra`,
--- guild members at/above the configured rank (when byRank), and — when `forceSelf` — the local
--- player. Plane A (the session, GetCouncil) forces self in so the runner can always vote and
+-- The effective council-roster config (Feature C, C1/C2, resolves DL-1): the shared, officer-authored
+-- `config` record when one is authored for this guild, else the local `profile.council` — the
+-- pre-config default and the escape hatch (C4). Returns { byRank, rank, extra }.
+function LCEX:CouncilConfig()
+    local rec = self:ConfigRecord()
+    if rec and (rec.byRank ~= nil or rec.rank ~= nil or rec.extra ~= nil) then
+        return { byRank = rec.byRank, rank = rec.rank, extra = rec.extra }
+    end
+    return self.db.profile.council or {}
+end
+
+-- Write a council-roster change to the SHARED config (replicated, LWW). Seeds the full trio from the
+-- current effective roster so a first edit doesn't drop the other two fields. `changes` overrides any
+-- of byRank/rank/extra. Invalidates the cached Plane-B set. (Who MAY write is gated in Core/Access.)
+function LCEX:SetCouncilConfig(changes)
+    local c = self:CouncilConfig()
+    local extra = {}
+    for i, n in ipairs(c.extra or {}) do extra[i] = n end
+    local rec = {
+        byRank = (c.byRank == nil) and true or c.byRank,
+        rank   = c.rank or 1,
+        extra  = extra,
+    }
+    for k, v in pairs(changes) do rec[k] = v end
+    self:SetConfigFields(rec)
+    self._councilSet = nil
+end
+
+-- Resolve the council as a SET of normalized names from the effective council config: explicit
+-- `extra`, guild members at/above the configured rank (when byRank), and — when `forceSelf` — the
+-- local player. Plane A (the session, GetCouncil) forces self in so the runner can always vote and
 -- solo testing has a council of one; Plane B (sync) does NOT (you participate only if actually
--- configured as council). Shared by both planes per DL-1 (one council roster for v1).
+-- configured as council). Shared by both planes per DL-1 (one council roster, now config-sourced).
 function LCEX:ResolveCouncil(forceSelf)
     local set = {}
-    local p = self.db.profile.council or {}
+    local p = self:CouncilConfig()
     for _, name in ipairs(p.extra or {}) do
         local n = self:NormalizeName(name)
         if n then set[n] = true end

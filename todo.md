@@ -213,10 +213,14 @@ per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via 
 
 ## Feature C — Council/officer access control + guild config inheritance
 
-**Status:** **specced** — PROJECT.md §6.11 + Phase 10 + DL-16 (builds on the §6.9 foundations).
-Council sourced from shared config (resolves DL-1), non-council gating (settings + loot window),
-guild-scoped datasets under `guilds[guildKey]` with hide-on-leave, inherit-on-first-load prompt +
-escape hatch. Build after V.
+**Status:** **in progress** (Phase 10) — building in 4 parts. **(1) Council from shared config —
+DONE (v0.33.0, resolves DL-1):** `CouncilConfig` (effective read: shared `config` record if authored,
+else `profile.council` escape hatch) + `SetCouncilConfig` (atomic byRank/rank/extra write via new
+`SetConfigFields`); `ResolveCouncil`, the Session Config roster editor, and `/lcex council add/remove`
+all now read/write the replicated config. **(2) TODO:** `Core/Access.lua` gating (hide Session Config
+module + loot window from non-council; greyed-control state on checkbox/slider; `config.visibility`).
+**(3) TODO:** guild-scope Plane-B datasets under `db.global.guilds[guildKey]` (hide-on-leave). **(4)
+TODO:** inherit-on-first-load prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
 
 **The ask (user's words):** "separate council members from other guild members to prevent showing
 council-only settings to anyone in the raid. … inherit [an existing guild config] from another
