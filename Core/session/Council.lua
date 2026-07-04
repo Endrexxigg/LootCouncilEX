@@ -14,14 +14,17 @@
 local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
--- Mirror the ML's broadcast of one item's rows into our local voting view and refresh the
--- frame. Council-only and gated to the active session's sid (a stale/foreign sid is ignored).
--- On the ML this is fed directly from session.rows; on council from the received cUpdate.
-function LCEX:ApplyCUpdate(sid, index, rows)
+-- Mirror the ML's broadcast of one item's rows (+ readiness status) into our local voting view and
+-- refresh the frame. Council-only and gated to the active session's sid (a stale/foreign sid is
+-- ignored). On the ML this is fed directly from session.rows + ComputeItemStatus; on council from
+-- the received cUpdate. `status` (Feature V, §6.10) may be nil — the rail-row border then clears.
+function LCEX:ApplyCUpdate(sid, index, rows, status)
     local a = self.activeSession
     if not a or sid ~= a.sid or not a.amCouncil then return end
     self.voteRows = self.voteRows or {}
     self.voteRows[index] = rows
+    self.voteStatus = self.voteStatus or {}
+    self.voteStatus[index] = status
     self:RefreshLootItem(index)
 end
 
@@ -55,7 +58,7 @@ LCEX.dispatch.cUpdate = function(self, msg, sender)
     if self:NormalizeName(sender) ~= self:NormalizeName(a.ml) then return end
     if type(msg.item) ~= "number" or type(msg.rows) ~= "table" then return end
     self:ResetSessionTimeout() -- a real update from our ML counts as a heartbeat (DL-6)
-    self:ApplyCUpdate(msg.sid, msg.item, msg.rows)
+    self:ApplyCUpdate(msg.sid, msg.item, msg.rows, msg.status)
 end
 
 -- A council member voted (WHISPER → ML). ML-only authority: validate the open session + a
@@ -81,6 +84,6 @@ LCEX.dispatch.vVote = function(self, msg, sender)
     for _, v in pairs(s.voters[index][candKey]) do sum = sum + v end
     row.votes = sum
 
-    self:ApplyCUpdate(s.sid, index, s.rows[index]) -- refresh the ML's own frame
+    self:ApplyCUpdate(s.sid, index, s.rows[index], self:ComputeItemStatus(index)) -- ML's own frame
     self:BroadcastCUpdate(index)
 end

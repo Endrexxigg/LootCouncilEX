@@ -158,6 +158,45 @@ function LCEX:EnsureLootWindow()
     return f
 end
 
+-- ── Award-readiness icon border (Feature V, §6.10) ───────────────────────────
+-- A thin colored outline hugging a rail row's item icon (V4/Vd1: the icon, not the whole row nor
+-- the header). Four WHITE8X8 edges in OVERLAY so they sit above the icon art; recolored + toggled
+-- per the ML-broadcast status. Corners double-draw at the same color — reads as one clean box.
+local ICON_BORDER = 2
+local function BuildIconBorder(row)
+    local icon, edges = row.icon, {}
+    for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
+        local t = row:CreateTexture(nil, "OVERLAY")
+        t:SetTexture("Interface\\Buttons\\WHITE8X8")
+        t:Hide()
+        edges[side] = t
+    end
+    edges.TOP:SetPoint("TOPLEFT", icon, "TOPLEFT", -ICON_BORDER, ICON_BORDER)
+    edges.TOP:SetPoint("TOPRIGHT", icon, "TOPRIGHT", ICON_BORDER, ICON_BORDER)
+    edges.TOP:SetHeight(ICON_BORDER)
+    edges.BOTTOM:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -ICON_BORDER, -ICON_BORDER)
+    edges.BOTTOM:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", ICON_BORDER, -ICON_BORDER)
+    edges.BOTTOM:SetHeight(ICON_BORDER)
+    edges.LEFT:SetPoint("TOPLEFT", icon, "TOPLEFT", -ICON_BORDER, ICON_BORDER)
+    edges.LEFT:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -ICON_BORDER, -ICON_BORDER)
+    edges.LEFT:SetWidth(ICON_BORDER)
+    edges.RIGHT:SetPoint("TOPRIGHT", icon, "TOPRIGHT", ICON_BORDER, ICON_BORDER)
+    edges.RIGHT:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", ICON_BORDER, -ICON_BORDER)
+    edges.RIGHT:SetWidth(ICON_BORDER)
+    return edges
+end
+
+local function SetIconBorder(edges, color)
+    if color then
+        for _, t in pairs(edges) do
+            t:SetVertexColor(color[1], color[2], color[3], 1)
+            t:Show()
+        end
+    else
+        for _, t in pairs(edges) do t:Hide() end
+    end
+end
+
 -- ── Left rail rows ───────────────────────────────────────────────────────────
 function LCEX:BuildLootRailRow(parent)
     local row = CreateFrame("Button", nil, parent)
@@ -173,6 +212,7 @@ function LCEX:BuildLootRailRow(parent)
 
     row.icon = self:CreateItemIcon(row, 22)
     row.icon:SetPoint("LEFT", 8, 0)
+    row.statusBorder = BuildIconBorder(row) -- award-readiness edge (Feature V)
 
     row.name = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.name, "body", "ink")
@@ -217,20 +257,29 @@ function LCEX:FillLootRailRow(row, entry, index)
     local a = self.activeSession
     if a then
         row.remove:Hide()
+        -- Award-readiness border (Feature V, §6.10): awarded items force "awarded" directly off the
+        -- existing award flow (so it lights the instant `award` lands, no cUpdate round-trip); every
+        -- other state rides the ML-broadcast status mirrored into voteStatus.
+        local statusKind
         local awardedTo = a.awarded and a.awarded[index]
         if awardedTo then
             row.badge:SetText("✓ " .. DisplayName(nil, awardedTo))
             row.badge:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
+            statusKind = "awarded"
         else
             local n = 0
             local rows = self.voteRows and self.voteRows[index]
             if rows then for _ in pairs(rows) do n = n + 1 end end
             row.badge:SetText(tostring(n))
             self:ThemeText(row.badge, "caption", "faint")
+            local st = self.voteStatus and self.voteStatus[index]
+            statusKind = st and st.kind
         end
+        SetIconBorder(row.statusBorder, self:StatusColor(statusKind))
     else
         row.remove:Show()
         row.badge:SetText("")
+        SetIconBorder(row.statusBorder, nil)
     end
 
     if f and f.selectedIndex == index then

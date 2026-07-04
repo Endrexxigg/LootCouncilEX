@@ -164,8 +164,8 @@ function LCEX:SeedSessionRows()
     for i, it in ipairs(s.items) do
         local killRoster = self.sessionItems and self.sessionItems[i] and self.sessionItems[i].roster
         s.rows[i] = self:SeedRows(killRoster, nowRoster, it.link)
-        self:ApplyCUpdate(s.sid, i, s.rows[i]) -- the ML's own voting frame
-        self:BroadcastCUpdate(i)               -- and the council (no-op solo)
+        self:ApplyCUpdate(s.sid, i, s.rows[i], self:ComputeItemStatus(i)) -- the ML's own voting frame
+        self:BroadcastCUpdate(i)                                          -- and the council (no-op solo)
     end
 end
 
@@ -362,7 +362,10 @@ function LCEX:BroadcastCUpdate(index)
     self:DebouncedSend("cUpdate:" .. index, function()
         local s = self.session
         if not s or not s.rows[index] then return end
-        self:Send("cUpdate", s.sid, { item = index, rows = s.rows[index] }, channel)
+        -- Status computed at SEND time (inside the debounce) so it reflects the final state after a
+        -- burst of responses/votes coalesces (V3 — every client renders the same border, §6.10).
+        self:Send("cUpdate", s.sid,
+            { item = index, rows = s.rows[index], status = self:ComputeItemStatus(index) }, channel)
     end)
 end
 
@@ -392,6 +395,6 @@ LCEX.dispatch.cResp = function(self, msg, sender)
 
     self:Msg(string.format(self.L["%s responded %s to %s."],
         sender, self:ResponseText(msg.resp), s.items[index].link))
-    self:ApplyCUpdate(s.sid, index, s.rows[index]) -- refresh the ML's own voting frame now
+    self:ApplyCUpdate(s.sid, index, s.rows[index], self:ComputeItemStatus(index)) -- ML's own frame now
     self:BroadcastCUpdate(index)
 end

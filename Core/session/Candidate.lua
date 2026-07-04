@@ -122,6 +122,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout)
         deadlineAt = timeout and (GetTime() + timeout) or nil,
     }
     self.voteRows = {}
+    self.voteStatus = {} -- per-item readiness status from cUpdate (Feature V rail-row border)
     self:ShowPoll(items, self.activeSession.responses, timeout)
     -- Audible cue that a session opened — but only when there's something for this player to
     -- answer (an empty "nothing for you" poll shouldn't beep). Guarded: no-ops if the sound is
@@ -172,6 +173,7 @@ function LCEX:LeaveSession(sid)
     if a and (not sid or a.sid == sid) then
         self.activeSession = nil
         self.voteRows = nil
+        self.voteStatus = nil
         self:ClearSessionTimeout()
         self:HidePoll()
         self:HideLootWindow()

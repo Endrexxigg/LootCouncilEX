@@ -659,6 +659,76 @@ test("StartSession pre-seeds rows from the item roster (V1)", function()
     eq(L.session.rows[1]["amy"].class, "MAGE", "seeded class preserved")
 end)
 
+-- ── Award-readiness cascade (Core/session/Readiness.lua, Feature V) ──────────
+-- The PURE calculator over a plain rows table. PASS = 5; a non-PASS response = a "roller".
+local function readiness(rows, opts)
+    opts = opts or {}
+    return L:ReadinessStatus({
+        rows = rows, passId = 5,
+        awarded = opts.awarded, votesCast = opts.votesCast, councilPresent = opts.councilPresent,
+    })
+end
+
+test("Readiness: waiting while a present-eligible row has not responded", function()
+    eq(readiness({ a = { reason = "pending" } }, { councilPresent = 1 }).kind, "waiting",
+        "one eligible, unresponded -> waiting")
+    -- A roller plus a still-pending eligible: not everyone responded -> still waiting.
+    eq(readiness({ a = { resp = 1 }, b = { reason = "pending" } }, { councilPresent = 2 }).kind,
+        "waiting", "a wanter but responses outstanding -> waiting")
+end)
+
+test("Readiness: de when all present-eligible responded and nobody wants it", function()
+    eq(readiness({ a = { resp = 5 }, b = { resp = 5 } }).kind, "de",
+        "all passed -> disenchant (blue)")
+    -- Not-yet-all-responded with nobody (so far) wanting it stays grey, not blue.
+    eq(readiness({ a = { resp = 5 }, b = { reason = "pending" } }).kind, "waiting",
+        "a passer but someone still pending -> waiting")
+end)
+
+test("Readiness: ready via the single-roller shortcut", function()
+    eq(readiness({ a = { resp = 1 }, b = { resp = 5 } }, { councilPresent = 3 }).kind, "ready",
+        "all responded, exactly one roller -> ready without votes")
+end)
+
+test("Readiness: voting then ready as council votes come in", function()
+    local rows = { a = { resp = 1 }, b = { resp = 1 } } -- two rollers, all responded
+    eq(readiness(rows, { councilPresent = 2, votesCast = 0 }).kind, "voting",
+        "all responded, multiple rollers, no votes -> voting (gold)")
+    eq(readiness(rows, { councilPresent = 2, votesCast = 2 }).kind, "ready",
+        "all present council voted -> ready (light green)")
+end)
+
+test("Readiness: awarded overrides every other state", function()
+    eq(readiness({ a = { reason = "pending" } }, { awarded = true }).kind, "awarded",
+        "awarded wins even with responses still outstanding")
+end)
+
+test("Readiness: ineligible rows are excluded from the denominator (R4)", function()
+    -- cantuse/missedkill/left don't count; only the lone roller does -> ready, not waiting.
+    local rows = { a = { reason = "cantuse" }, b = { reason = "missedkill" },
+                   c = { reason = "left" }, d = { resp = 1 } }
+    eq(readiness(rows, { councilPresent = 1 }).kind, "ready", "only the eligible roller counts")
+    -- No eligible rows at all -> nothing to be ready about.
+    eq(readiness({ a = { reason = "cantuse" }, b = { reason = "left" } }).kind, "waiting",
+        "zero present-eligible -> waiting")
+end)
+
+test("Readiness: voted tally echoes the vote/council counts", function()
+    local st = readiness({ a = { resp = 1 } }, { votesCast = 1, councilPresent = 3 })
+    eq(st.voted.n, 1, "voted numerator = votes cast")
+    eq(st.voted.of, 3, "voted denominator = present council")
+end)
+
+test("VotesCastOn: distinct council voters with a non-zero vote", function()
+    L.session = { voters = { [1] = {
+        cand1 = { v1 = 1, v2 = 0 },  -- v2 abstained (0) -> not counted
+        cand2 = { v1 = 1, v3 = -1 }, -- v1 already counted; v3 downvoted
+    } } }
+    eq(L:VotesCastOn(1), 2, "v1 and v3 voted; v2's zero does not count")
+    eq(L:VotesCastOn(2), 0, "no voters on an untouched item")
+    L.session = nil
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

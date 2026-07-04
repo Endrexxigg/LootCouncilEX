@@ -886,6 +886,32 @@ end, { async = true, timeout = 8, cleanup = function(self) self._selfTestEcho = 
 -- Automates TESTING.md section A: start → respond → vote (incl. the toggle) → award → end,
 -- through the SAME entry points the buttons use. Solo only: with a group, sStart/award would
 -- broadcast to real players (and every present client would log the fake award to history).
+-- Pure award-readiness cascade (Feature V, §6.10) — no session/frame/DB side effects, so it needs
+-- no cleanup. Mirrors the headless Tests/run.lua coverage, run against the LIVE client's Lua, and
+-- confirms every status kind resolves to a theme color (the rail-row border, LootWindow.lua).
+LCEX:RegisterSelfTest("session", "award-readiness cascade + status colors (pure)", function(self, t)
+    local PASS = self:PassResponseId()
+    local function kind(rows, opts)
+        opts = opts or {}
+        return self:ReadinessStatus({ rows = rows, passId = PASS, awarded = opts.awarded,
+            votesCast = opts.votesCast, councilPresent = opts.councilPresent }).kind
+    end
+    t:Eq(kind({ a = { reason = "pending" } }), "waiting", "unresponded eligible -> waiting")
+    t:Eq(kind({ a = { resp = PASS }, b = { resp = PASS } }), "de", "all passed -> disenchant")
+    t:Eq(kind({ a = { resp = 1 }, b = { resp = PASS } }), "ready", "lone roller -> ready")
+    t:Eq(kind({ a = { resp = 1 }, b = { resp = 1 } }, { councilPresent = 2, votesCast = 0 }),
+        "voting", "multiple rollers, no votes -> voting")
+    t:Eq(kind({ a = { resp = 1 }, b = { resp = 1 } }, { councilPresent = 2, votesCast = 2 }),
+        "ready", "all present council voted -> ready")
+    t:Eq(kind({ a = { reason = "pending" } }, { awarded = true }), "awarded", "awarded overrides")
+    t:Eq(kind({ a = { reason = "cantuse" }, b = { reason = "left" } }), "waiting",
+        "zero present-eligible -> waiting")
+    for _, k in ipairs({ "waiting", "ready", "de", "awarded", "voting" }) do
+        t:Ok(type(self:StatusColor(k)) == "table", "no theme color for status: " .. k)
+    end
+    t:Ok(self:StatusColor(nil) == nil, "nil kind should map to no color")
+end)
+
 LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote → award → end", function(self, t)
     if self.session or self.activeSession then return t:Skip("a session is already open") end
     if self.recoverableSession then return t:Skip("an unfinished session is pending /lcex resume") end
@@ -928,6 +954,13 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     end
     t:Ok(self.voteRows and self.voteRows[1] and self.voteRows[1][me] ~= nil,
         "voting view did not mirror the response")
+    -- Readiness status rode the same cUpdate path into the voting view (Feature V): a lone present-
+    -- eligible roller lands "ready", and the tally denominator counts the runner (council-of-one).
+    local st1 = self.voteStatus and self.voteStatus[1]
+    if t:Ok(st1 ~= nil, "readiness status did not mirror into voteStatus") then
+        t:Eq(st1.kind, "ready", "solo single-roller item should border ready")
+        t:Ok(st1.voted and st1.voted.of >= 1, "vote tally denominator should count present council")
+    end
     local candRow = self.lootWindow and self.lootWindow.candList.rows[1]
     t:Ok(candRow ~= nil and candRow:IsShown(), "candidate row did not render for the response")
     -- Own row must be class-colored (live ClassOf path; solo, we are always resolvable).

@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.26.15
+## Version: 0.27.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -39,6 +39,8 @@ Core\GearIssues.lua
 # Plane A — live loot session (ML authority). Session holds state + sStart/sEnd;
 # Award tracks looted/bag items and hands them off by trade, so Session precedes Award.
 Core\session\Session.lua
+# Award-readiness calculator (Feature V) — pure status cascade + ML glue; rides cUpdate.
+Core\session\Readiness.lua
 Core\session\Award.lua
 
 # UI — native frames (no AceGUI). Theme is the design language (tones/fonts/paint helpers);

@@ -74,14 +74,19 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** **in progress** (Phase 9) — **foundations + the V1 session-model change COMPLETE**
-(through aac6494, v0.26.6; 301 tests): Guild/Config foundations; roster snapshotted at loot time;
-`session.rows` pre-seeded per present raider (`SeedRows`, kill-set ∪ current raid) + broadcast;
-`cResp` preserves class / clears reason; loot window sorts 3-tier ROLLED > MIGHT ROLL > NOT ROLLING
-with reason text + dimming. **Remaining V sub-features (each its own commits):** (1)
-`Core/session/Readiness.lua` + `cUpdate.status` rail-row border (new theme colors, ML-broadcast);
-(2) vote tally "X/Y voted"; (3) anon voting (`sStart.anon`, default off); (4) D/E award type
-(`STATUS.DISENCHANT` + ranked disenchanter picker). Spec: §6.10, DL-15.
+**Status:** **in progress** (Phase 9) — **foundations + V1 session model + the readiness border COMPLETE**.
+V1 (through aac6494, v0.26.6): Guild/Config foundations; roster snapshotted at loot time; `session.rows`
+pre-seeded per present raider (`SeedRows`, kill-set ∪ current raid) + broadcast; `cResp` preserves
+class / clears reason; loot window sorts 3-tier ROLLED > MIGHT ROLL > NOT ROLLING with reason text +
+dimming. **Readiness border (v0.27.0, 315 tests):** `Core/session/Readiness.lua` — pure `ReadinessStatus`
+cascade (awarded/de/ready/voting/waiting per §6.10) + ML glue (`ComputeItemStatus`, `VotesCastOn`,
+`PresentCouncilCount`); status rides `cUpdate.status`, mirrored into `voteStatus`, painted as a per-status
+icon border on the rail rows (`StatusColor` + new `Theme.status` colors + `BuildIconBorder`); awarded lights
+instantly off the existing award flow. Headless cascade tests + in-game selftest (pure cascade + StatusColor
++ E2E readiness assertion). **Remaining V sub-features (each its own commits):** (2) vote tally "X/Y voted"
+(the `status.voted={n,of}` is already computed + on the wire — just needs rendering + who-voted list);
+(3) anon voting (`sStart.anon`, default off); (4) D/E award type (`STATUS.DISENCHANT` + ranked disenchanter
+picker). Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =

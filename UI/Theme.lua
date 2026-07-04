@@ -40,6 +40,14 @@ LCEX.Theme = {
         [0] = { 0.62, 0.62, 0.62 }, [1] = { 1, 1, 1 },       [2] = { 0.12, 1, 0 },
         [3] = { 0, 0.44, 0.87 },    [4] = { 0.64, 0.21, 0.93 }, [5] = { 1, 0.5, 0 },
     },
+    -- Award-readiness rail-row border tones (Feature V, §6.10). "voting" reuses `accent` (gold);
+    -- the rest are net-new per Vd2. Kept saturated enough to read as a 2px edge over dark rows.
+    status = {
+        waiting = { 0.47, 0.49, 0.54 }, -- neutral grey — responses still outstanding
+        ready   = { 0.53, 0.87, 0.60 }, -- light green   — ready to be awarded
+        de      = { 0.45, 0.64, 0.88 }, -- blue          — nobody wants it → disenchant waiting
+        awarded = { 0.28, 0.55, 0.38 }, -- dark green    — awarded
+    },
 }
 
 -- ── Paint helpers ────────────────────────────────────────────────────────────
@@ -107,6 +115,13 @@ end
 -- {r,g,b} for an item quality (nil-safe: unknown → common white).
 function LCEX:QualityColor(quality)
     return self.Theme.quality[quality] or self.Theme.quality[1]
+end
+
+-- {r,g,b} for an award-readiness status kind (Feature V, §6.10). "voting" = the gold accent; the
+-- others come from the status tones. nil for an unknown/absent kind → the border paints nothing.
+function LCEX:StatusColor(kind)
+    if kind == "voting" then return self.Theme.accent end
+    return kind and self.Theme.status[kind] or nil
 end
 
 -- {r,g,b} for a class token via RAID_CLASS_COLORS (nil-safe: unknown → ink).
