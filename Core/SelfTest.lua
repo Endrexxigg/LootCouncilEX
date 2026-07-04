@@ -28,11 +28,12 @@
 
 local LCEX = LootCouncilEX
 
--- Real TBC item for item-API checks (Robe of Hateful Echoes, SSC — INVTYPE_ROBE).
-local TEST_ITEM_ID = 30055
+-- Real TBC item for item-API checks (30056 Robe of Hateful Echoes, SSC — cloth INVTYPE_ROBE,
+-- usable by every class). NB: 30055 is Shoulderpads of the Stranger — LEATHER, NOT universal.
+local TEST_ITEM_ID = 30056
 -- Session E2E items: MUST be usable by every class so the poll filter never hides them on
--- any test character — a trinket (28830 Dragonspine Trophy) and a cloth robe (30055).
-local TEST_LINK_IDS = { 28830, 30055 }
+-- any test character — a trinket (28830 Dragonspine Trophy) and a cloth robe (30056).
+local TEST_LINK_IDS = { 28830, 30056 }
 -- Award target that can never collide with a real trade partner (ShortKey → "lcextestdummy").
 local AWARD_DUMMY = "LCEXTestDummy"
 
@@ -666,18 +667,12 @@ LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", func
         t:Ok(not self:PlayerCanUse(offToken), "off-class token was NOT filtered")
     end
     t:Ok(self:PlayerCanUse(28830), "trinket must be universal")
-    -- Diagnostic: 30055 (a cloth robe) fails this on some chars; surface its real item-type fields
-    -- so the report says exactly why PlayerCanUse rejected it (pre-existing poll-filter issue).
-    -- NB: call gii() inside the `if` — `gii and gii(30055)` would truncate the multi-return to one.
-    local gii = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
-    local cid, scid, eloc = "n/a", "n/a", "n/a"
-    if gii then
-        local _, _, _, e, _, c, s = gii(30055)
-        cid, scid, eloc = c, s, e
-    end
-    t:Ok(self:PlayerCanUse(30055), string.format(
-        "cloth armor wearable by every class — 30055 classID=%s subClassID=%s equip=%s",
-        tostring(cid), tostring(scid), tostring(eloc)))
+    -- Cloth armor (30056 Robe of Hateful Echoes) is wearable by every class → never filtered.
+    t:Ok(self:PlayerCanUse(30056), "cloth armor is wearable by every class")
+    -- Negative case, char-agnostic via explicit classes: 30055 (Shoulderpads of the Stranger) is
+    -- LEATHER — a cloth class can't wear it, a leather-wearer can (verifies the real armor subclass).
+    t:Ok(not self:ClassCanUse(30055, "MAGE"), "mage cannot use leather (30055)")
+    t:Ok(self:ClassCanUse(30055, "ROGUE"), "rogue can use leather (30055)")
 end)
 
 LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", function(self, t)

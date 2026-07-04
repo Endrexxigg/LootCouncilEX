@@ -39,10 +39,12 @@ Selftest run **2026-07-04 on v0.26.7: 35 pass / 2 fail / 1 skip.**
   want a socketed item to confirm, but the API exists and returns a table).
 - [x] **Roster module + Gear Check sub-tab render** (renamed from Players); the `config` dataset is
   registered over its live store and covered by the sync digest.
-- [ ] **⚠ 2 PRE-EXISTING failures (NOT from G/V):** the poll class filter — `PlayerCanUse(30055)`
-  returns false for this character, failing *"poll renders usable-item cards"* and *"poll class
-  filter"*. `Usable.lua`/`PollWindow.lua` are unchanged since v0.19.0 (`196dcac`). Root cause is
-  30055's `GetItemInfoInstant` classID/subClassID vs the ARMOR matrix — a separate fix.
+- [x] **2 poll-filter failures — FIXED (bad test fixture, NOT a code bug), v0.26.9.** 30055 is
+  *Shoulderpads of the Stranger* (**leather**), not the cloth robe the test assumed — a cloth class
+  correctly can't wear it, so the filter was right all along. Fixed the fixture to **30056** (*Robe
+  of Hateful Echoes*, the actual universal cloth item) and made the leather case an explicit-class
+  assertion. Re-run to confirm green. *(Also: the `marks[30055]="give to a mage"` in your DB is a
+  stale/wrong note from old testing — clear it with `/lcex mark 30055` if you like; harmless.)*
 - [ ] **⚠ Session E2E SKIPPED** — an unfinished session was pending `/lcex resume`, so the solo
   start→respond→vote→award→end pipeline (incl. Feature V's new row seeding) did **not** run. Clear
   it with `/lcex end`, then re-run `/lcex selftest` to exercise V1.
