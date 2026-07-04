@@ -89,8 +89,13 @@ count shows even under anon). **Anon voting + who-voted list (v0.29.0):** `confi
 snapshotted at start → `sStart.anon` → `session/activeSession.anon` (fixed for the session's life);
 ML attaches `status.voted.names` (sorted display names via `VotersOn`/`VoterDisplay`) unless anon;
 loot-window tally shows a who-voted hover tooltip (or "Anonymous voting"); a shared-config checkbox in
-Session Config. **Remaining V sub-feature (its own commits):** (4) D/E award type (`STATUS.DISENCHANT` +
-ranked disenchanter picker, confirm popup, award-for-reason messaging). Spec: §6.10, DL-15.
+Session Config. **D/E award type (4) — building in 3 commits:** **(A) award-for-reason messaging — DONE (v0.30.0):**
+`STATUS.DISENCHANT=93`; `AwardItem(i,name,forcedResp)` carries a forced reason; `AwardReasonText`
+(D/E / response text / nil); `AnnounceAward` posts "`<item>` was awarded to `<player>` for `<reason>`"
+to group chat when `config.announceAwards` (new shared field, default on) + grouped, else ML-local.
+**(B) TODO:** ranked `config.disenchanters` editor (add + ▲/▼ reorder + remove in Session Config) +
+`ResolveDisenchanter` (highest-ranked present). **(C) TODO:** per-item **D/E button** (ML) → themed
+confirm popup (reused by C's inherit prompt) → `AwardItem(i, name, STATUS.DISENCHANT)`. Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =

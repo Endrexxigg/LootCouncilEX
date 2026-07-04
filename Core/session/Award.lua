@@ -316,7 +316,7 @@ end
 -- opening a trade with them auto-loads the item), broadcast `award`, and arm the 2h ticker.
 -- Shared by the /lcex award command and the VotingFrame's Award button. Returns true on
 -- success. The award carries the winner's own response where we have it (else ANNOUNCED).
-function LCEX:AwardItem(itemIndex, name)
+function LCEX:AwardItem(itemIndex, name, forcedResp)
     name = strtrim(name or "")
     local entry = self.sessionItems and self.sessionItems[itemIndex]
     if not entry then
@@ -325,11 +325,15 @@ function LCEX:AwardItem(itemIndex, name)
     end
     if name == "" then return false end
 
-    -- Carry the winner's response into the award/history record if they responded.
-    local resp = self.STATUS.ANNOUNCED
-    if self.session and self.session.rows[itemIndex] then
-        local r = self.session.rows[itemIndex][self:NormalizeName(name)]
-        if r and r.resp then resp = r.resp end
+    -- The award's reason: an explicit override (a D/E award forces STATUS.DISENCHANT — §6.10),
+    -- else the winner's own poll response if they made one, else ANNOUNCED (assigned outside the poll).
+    local resp = forcedResp
+    if not resp then
+        resp = self.STATUS.ANNOUNCED
+        if self.session and self.session.rows[itemIndex] then
+            local r = self.session.rows[itemIndex][self:NormalizeName(name)]
+            if r and r.resp then resp = r.resp end
+        end
     end
 
     -- Owed items are keyed per-partner as a LIST (a winner can be owed several), each tagged
@@ -383,6 +387,7 @@ function LCEX:AwardItem(itemIndex, name)
     self:Msg(string.format(
         self.L["Recorded: %s → %s. Trade it to them within the window to hand it off."],
         entry.link, name))
+    self:AnnounceAward(entry.link, name, resp) -- RCLC-like "<item> awarded to <player> for <reason>"
 
     -- Track award progress on the live view (the loot window's rail badges). Receivers learn
     -- the same fact from the `award` broadcast (council/History.lua).
@@ -393,6 +398,33 @@ function LCEX:AwardItem(itemIndex, name)
         self:RefreshLootItem(itemIndex)
     end
     return true
+end
+
+-- Human-readable award reason for a resp code (§6.10): D/E for a disenchant, the poll response text
+-- for a real response, or nil when the ML assigned it outside the poll (ANNOUNCED) — then the
+-- announcement drops the "for <reason>" clause.
+function LCEX:AwardReasonText(resp)
+    if resp == self.STATUS.DISENCHANT then return self.L["D/E"] end
+    for _, r in ipairs(self.RESPONSES) do
+        if r.id == resp then return r.text end
+    end
+    return nil
+end
+
+-- Announce an award RCLC-style. To group chat when `config.announceAwards` is on and we are in a
+-- group (default on — the whole raid sees who won what and why); otherwise just to our own chat
+-- frame. ML-only path: receivers learn the award from the `award` comm, so only the ML announces.
+function LCEX:AnnounceAward(link, name, resp)
+    local reason = self:AwardReasonText(resp)
+    local text = reason
+        and string.format(self.L["%s was awarded to %s for %s."], link, name, reason)
+        or  string.format(self.L["%s was awarded to %s."], link, name)
+    local channel = self:GroupChannel()
+    if self:GetConfig().announceAwards and channel then
+        SendChatMessage(text, channel)
+    else
+        self:Msg(text)
+    end
 end
 
 -- /lcex award <itemIndex> <name> — parse the args and hand off to AwardItem.

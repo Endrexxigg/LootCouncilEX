@@ -67,6 +67,7 @@ _G.GetNumGroupMembers = function() return #H.group end
 _G.GetNumRaidMembers = function() return H.inRaid and #H.group or 0 end
 _G.GetRaidRosterInfo = function(i) local m = H.group[i]; return m end
 _G.GetInstanceInfo = function() return "Test Zone" end
+_G.SendChatMessage = function(text, chan) H.chat[#H.chat + 1] = { text = text, chan = chan } end
 _G.LE_PARTY_CATEGORY_INSTANCE = 2
 _G.GetRealmName = function() return "TestRealm" end
 _G.GetBuildInfo = function() return "2.5.5", "99999", "Jan 1 2026", 20505 end
@@ -208,7 +209,7 @@ function LCEX:RefreshLootItem() end
 
 -- Reset mutable state between tests.
 function H.reset()
-    H.sent, H.msgs = {}, {}
+    H.sent, H.msgs, H.chat = {}, {}, {}
     H.now, H.inGuild, H.inRaid = 1000, true, false
     H.guild, H.group = {}, {}
     H.playerName, H.tradePartner = "Tester", nil

@@ -910,6 +910,11 @@ LCEX:RegisterSelfTest("session", "award-readiness cascade + status colors (pure)
         t:Ok(type(self:StatusColor(k)) == "table", "no theme color for status: " .. k)
     end
     t:Ok(self:StatusColor(nil) == nil, "nil kind should map to no color")
+    -- Award-reason text (V5): D/E for a disenchant, the response text for a real response, and no
+    -- reason clause for an ML-assigned (ANNOUNCED) award.
+    t:Eq(self:AwardReasonText(self.STATUS.DISENCHANT), self.L["D/E"], "disenchant reason -> D/E")
+    t:Ok(self:AwardReasonText(self.RESPONSES[1].id) ~= nil, "a real response id yields reason text")
+    t:Eq(self:AwardReasonText(self.STATUS.ANNOUNCED), nil, "announced -> no reason clause")
 end)
 
 LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote → award → end", function(self, t)

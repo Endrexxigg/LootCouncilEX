@@ -58,7 +58,7 @@ read_globals = {
     "GetNumTalentTabs", "GetTalentTabInfo",
     -- Misc WoW
     "GetTime", "GetServerTime", "GetRealmName", "GetBuildInfo", "GetLocale", "CreateColor",
-    "PlaySound", "SOUNDKIT",
+    "PlaySound", "SOUNDKIT", "SendChatMessage",
     -- Lua 5.1 + WoW string/table extras
     "wipe", "strtrim", "strsplit", "strfind", "strmatch", "format",
     "tinsert", "tremove", "tContains", "time", "date",

@@ -749,6 +749,28 @@ test("ComputeItemStatus: anon gate hides voter names, keeps the count", function
     L.session = nil
 end)
 
+-- ── Award messaging (Core/session/Award.lua, Feature V D/E) ──────────────────
+test("AwardReasonText: D/E, response text, or nil for announced", function()
+    eq(L:AwardReasonText(L.STATUS.DISENCHANT), "D/E", "disenchant -> D/E")
+    eq(L:AwardReasonText(1), "BiS", "response id -> its text")
+    eq(L:AwardReasonText(L.STATUS.ANNOUNCED), nil, "announced -> no reason clause")
+end)
+
+test("AnnounceAward: raid chat when configured + grouped, else local", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    L.db.global.config = {} -- announceAwards defaults on
+    L:AnnounceAward("item:100", "Amy", 1)
+    eq(#H.chat, 1, "announced to chat when grouped + on")
+    eq(H.chat[1].chan, "RAID", "announce channel is RAID")
+    ok(H.chat[1].text:find("for BiS"), "reason rides the message")
+    -- Toggle off -> the message stays in the ML's own chat frame, not raid chat.
+    H.chat = {}
+    L:SetConfigField("announceAwards", false)
+    L:AnnounceAward("item:100", "Amy", L.STATUS.DISENCHANT)
+    eq(#H.chat, 0, "no raid chat when the toggle is off")
+    L.db.global.config = {}
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

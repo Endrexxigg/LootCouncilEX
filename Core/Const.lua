@@ -31,9 +31,10 @@ LCEX.RESPONSES = {
 
 -- Non-response status codes (PROJECT.md §6.5). Kept numerically clear of RESPONSES ids.
 LCEX.STATUS = {
-    ANNOUNCED = 90,
-    TIMEOUT   = 91,
-    NOADDON   = 92,
+    ANNOUNCED  = 90,
+    TIMEOUT    = 91,
+    NOADDON    = 92,
+    DISENCHANT = 93, -- Feature V: a D/E award; renders "D/E" as the award reason (§6.10)
 }
 
 -- Locale. AceLocale is intentionally not embedded; this is a plain table whose
@@ -116,6 +117,9 @@ L["%d / %d voted"]                         = "%d / %d voted"
 L["Voted:"]                                = "Voted:"
 L["No votes yet."]                         = "No votes yet."
 L["Anonymous voting"]                      = "Anonymous voting"
+L["%s was awarded to %s for %s."]          = "%s was awarded to %s for %s."
+L["%s was awarded to %s."]                 = "%s was awarded to %s."
+L["D/E"]                                   = "D/E"
 L["Scan bags"]                             = "Scan bags"
 L["SESSION ITEMS"]                         = "SESSION ITEMS"
 L["STAGED ITEMS"]                          = "STAGED ITEMS"
