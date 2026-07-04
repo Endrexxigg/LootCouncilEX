@@ -83,10 +83,11 @@ cascade (awarded/de/ready/voting/waiting per §6.10) + ML glue (`ComputeItemStat
 `PresentCouncilCount`); status rides `cUpdate.status`, mirrored into `voteStatus`, painted as a per-status
 icon border on the rail rows (`StatusColor` + new `Theme.status` colors + `BuildIconBorder`); awarded lights
 instantly off the existing award flow. Headless cascade tests + in-game selftest (pure cascade + StatusColor
-+ E2E readiness assertion). **Remaining V sub-features (each its own commits):** (2) vote tally "X/Y voted"
-(the `status.voted={n,of}` is already computed + on the wire — just needs rendering + who-voted list);
-(3) anon voting (`sStart.anon`, default off); (4) D/E award type (`STATUS.DISENCHANT` + ranked disenchanter
-picker). Spec: §6.10, DL-15.
++ E2E readiness assertion). **Vote tally (v0.28.0):** "X / Y voted" header on the selected item in the loot window
+(`status.voted={n,of}` off the broadcast status; hidden outside a session / when no council present;
+count shows even under anon). **Remaining V sub-features (each its own commits):** (3) anon voting
+(`sStart.anon`, default off; hides voter NAMES, folds in the who-voted list); (4) D/E award type
+(`STATUS.DISENCHANT` + ranked disenchanter picker). Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =

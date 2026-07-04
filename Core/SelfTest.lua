@@ -985,6 +985,11 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Eq(row and row.votes, 0, "re-casting the same vote should toggle it off")
     self:SendVote(1, me, 1)
     t:Eq(row and row.votes, 1, "vote tally after re-vote")
+    -- The "X / Y voted" header (V6) reflects the recomputed tally for the selected item.
+    if self.lootWindow and self.lootWindow.voteTally then
+        t:Ok(self.lootWindow.voteTally:IsShown(), "vote tally hidden during a live session")
+        t:Eq(self.lootWindow.voteTally:GetText(), "1 / 1 voted", "vote tally text")
+    end
 
     -- Award item 1 to a dummy who never responded (→ STATUS.ANNOUNCED), item 2 to ourselves
     -- (→ carries our own response id). Solo: no channel, so no award broadcast.

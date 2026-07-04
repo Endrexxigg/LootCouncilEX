@@ -110,6 +110,13 @@ function LCEX:EnsureLootWindow()
     f.itemCount:SetPoint("TOPRIGHT", -12, -16)
     f.itemName:SetPoint("RIGHT", f.itemCount, "LEFT", -8, 0)
 
+    -- Vote tally for the selected item (V6): "X / Y voted", below the item count. Session-only,
+    -- and the count shows even under anonymous voting (only voter NAMES hide — V7).
+    f.voteTally = pane:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(f.voteTally, "caption", "dim")
+    f.voteTally:SetPoint("TOPRIGHT", -12, -30)
+    f.voteTally:Hide()
+
     f.empty = pane:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.empty, "body", "faint")
     f.empty:SetPoint("TOP", 0, -110)
@@ -458,6 +465,17 @@ function LCEX:RefreshLootWindow()
         f.itemIcon:Hide()
         f.itemName:SetText("")
         f.itemCount:SetText("")
+    end
+
+    -- Vote tally for the selected item (V6). Hidden outside a session, or when no council is
+    -- present to vote (of == 0). The numerator/denominator ride the ML's broadcast status.
+    local st = inSession and entry and self.voteStatus and self.voteStatus[f.selectedIndex]
+    local voted = st and st.voted
+    if voted and (voted.of or 0) > 0 then
+        f.voteTally:SetText(string.format(self.L["%d / %d voted"], voted.n or 0, voted.of))
+        f.voteTally:Show()
+    else
+        f.voteTally:Hide()
     end
 
     local display = {}
