@@ -538,6 +538,16 @@ test("GearIssuesForItem: low-quality gem below minGemQuality", function()
     eq(countKind(L:GearIssuesForItem("item:30055:2647:32409:0:0:0", 5), "badgem"), 0, "rare gem clean")
 end)
 
+test("GearIssuesForItem: blacklisted enchant flagged with its CLA label", function()
+    -- 908 = "50 HP" chest enchant (low-rank, on the CLA §4b blacklist).
+    local issues = L:GearIssuesForItem("item:30055:908:0:0:0:0", 5)
+    eq(countKind(issues, "badenchant"), 1, "blacklisted enchant flagged")
+    local label
+    for _, i in ipairs(issues) do if i.kind == "badenchant" then label = i.text end end
+    eq(label, "50 HP", "flag carries the CLA label")
+    eq(countKind(L:GearIssuesForItem("item:30055:2647:0:0:0:0", 5), "badenchant"), 0, "unlisted enchant is clean")
+end)
+
 test("GearIssuesForItem: excluded item is never flagged", function()
     -- 15138 = Onyxia Scale Cloak (whitelisted); back(15) is enchantable and the enchant is 0.
     eq(#L:GearIssuesForItem("item:15138:0:0:0:0:0", 15), 0, "excluded item skips all checks")

@@ -75,14 +75,16 @@ function LCEX:GearIssuesForItem(link, slot)
         end
     else
         local allow = R.enchantAllow[slot]
-        local flag
-        if allow then
-            flag = not allow[enchant] -- allowlist mode: anything unlisted is suspect (fail-safe)
-        else
-            flag = R.enchantBad[enchant] == true -- blacklist fallback
+        local label
+        if allow then -- allowlist mode: anything unlisted is suspect (fail-safe)
+            if not allow[enchant] then
+                label = R.enchantLabel[enchant] or R.enchantBad[enchant] or self.L["Non-BiS enchant"]
+            end
+        else -- blacklist fallback: enchantBad maps a listed ID → its display label (nil = not listed)
+            label = R.enchantBad[enchant]
         end
-        if flag then
-            out[#out + 1] = { kind = "badenchant", text = R.enchantLabel[enchant] or self.L["Non-BiS enchant"] }
+        if label then
+            out[#out + 1] = { kind = "badenchant", text = label }
         end
     end
 
