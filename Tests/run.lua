@@ -771,6 +771,18 @@ test("AnnounceAward: raid chat when configured + grouped, else local", function(
     L.db.global.config = {}
 end)
 
+test("ResolveDisenchanter: highest-ranked present wins; nil when none present", function()
+    L.db.global.config = {}
+    L:SetConfigField("disenchanters", { "Bob", "Amy" }) -- Bob ranked highest
+    H.inRaid, H.group = true, { "Amy", "Tester" }        -- Bob absent, Amy present
+    eq(L:ResolveDisenchanter(), "Amy", "top-ranked Bob absent -> next present (Amy)")
+    H.group = { "Bob", "Amy", "Tester" }
+    eq(L:ResolveDisenchanter(), "Bob", "top-ranked Bob present -> Bob")
+    H.group = { "Tester" }
+    eq(L:ResolveDisenchanter(), nil, "none present -> nil (manual fallback)")
+    L.db.global.config = {}
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

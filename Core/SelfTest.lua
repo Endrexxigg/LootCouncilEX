@@ -788,6 +788,10 @@ LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(
         t:Ok(sp.timeout ~= nil and sp.rosterList ~= nil and sp.byRank ~= nil,
             "session-config controls missing")
         t:Ok(type(sp.rosterList.items) == "table", "council roster failed to resolve")
+        -- Feature V controls: the anon toggle + the ranked disenchanter editor (render-only — no
+        -- SetConfigField here, which would broadcast a config change to the guild).
+        t:Ok(sp.anon ~= nil and sp.deList ~= nil and sp.deAddBox ~= nil, "Feature V session controls missing")
+        t:Ok(type(sp.deList.items) == "table", "disenchanter list failed to render")
     end
 end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end

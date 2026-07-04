@@ -182,6 +182,7 @@ L["Off"]                                    = "Off"
 L["Include guild ranks at or above:"]       = "Include guild ranks at or above:"
 L["Rank cutoff (0 = GM)"]                   = "Rank cutoff (0 = GM)"
 L["Extra members (any guild rank):"]        = "Extra members (any guild rank):"
+L["Disenchanters (D/E), ranked:"]           = "Disenchanters (D/E), ranked:"
 L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
     "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
 

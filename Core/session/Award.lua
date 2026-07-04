@@ -427,6 +427,17 @@ function LCEX:AnnounceAward(link, name, resp)
     end
 end
 
+-- The highest-ranked configured disenchanter currently present in the raid (V5/Vd7).
+-- config.disenchanters is ranked top = highest priority, so the first present entry wins. nil when
+-- none is set or present — the D/E flow then falls back to a manual target pick. "Eligible to
+-- receive" for a shard is simply being present (class usability is irrelevant — it's being sharded).
+function LCEX:ResolveDisenchanter()
+    for _, name in ipairs(self:GetConfig().disenchanters or {}) do
+        if self:InGroupWith(name) then return name end
+    end
+    return nil
+end
+
 -- /lcex award <itemIndex> <name> — parse the args and hand off to AwardItem.
 function LCEX:CmdAward(rest)
     local indexStr, name = strtrim(rest or ""):match("^(%S+)%s+(.+)$")

@@ -93,9 +93,11 @@ Session Config. **D/E award type (4) — building in 3 commits:** **(A) award-fo
 `STATUS.DISENCHANT=93`; `AwardItem(i,name,forcedResp)` carries a forced reason; `AwardReasonText`
 (D/E / response text / nil); `AnnounceAward` posts "`<item>` was awarded to `<player>` for `<reason>`"
 to group chat when `config.announceAwards` (new shared field, default on) + grouped, else ML-local.
-**(B) TODO:** ranked `config.disenchanters` editor (add + ▲/▼ reorder + remove in Session Config) +
-`ResolveDisenchanter` (highest-ranked present). **(C) TODO:** per-item **D/E button** (ML) → themed
-confirm popup (reused by C's inherit prompt) → `AwardItem(i, name, STATUS.DISENCHANT)`. Spec: §6.10, DL-15.
+**(B) ranked disenchanter config — DONE (v0.31.0):** Session Config right-column editor (add box +
+per-row `n. name` with ▲/▼ reorder + × remove), writing the ranked `config.disenchanters` shared list;
+`ResolveDisenchanter` returns the highest-ranked present entry (nil → manual fallback). **(C) TODO:**
+per-item **D/E button** (ML) → themed confirm popup (reused by Feature C's inherit prompt) →
+`AwardItem(i, name, STATUS.DISENCHANT)`. Spec: §6.10, DL-15.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
