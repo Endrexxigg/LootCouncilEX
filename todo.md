@@ -74,8 +74,11 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** **specced** (§6.9/§6.10, Phase 9, DL-14/15) — V1 row-set **LOCKED** (R1–R5, below).
-Feature V complete; build after G.
+**Status:** **in progress** (Phase 9) — foundations underway: `Core/Guild.lua` (GuildKey +
+PresentRoster) shipped (a295a06, v0.26.0; 280 tests). **Next, in order:** `Core/council/Config.lua`
+(shared officer-config LWW dataset) → session-model change (pre-seed a row per present raider) →
+`Core/session/Readiness.lua` + rail-row border broadcast → vote tally → anon voting → D/E award type.
+Full spec locked in §6.9/§6.10, Phase 9, DL-14/15; V1 row-set in R1–R5 below.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
