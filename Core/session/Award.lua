@@ -64,8 +64,9 @@ local ERR_TRADE_COMPLETE = _G.ERR_TRADE_COMPLETE
 local LE_TRADE_COMPLETE  = _G.LE_GAME_ERR_TRADE_COMPLETE
 
 -- State:
---   LCEX.pendingLoot  = { { link, itemID, quality, boss, instance, lootedAt } }  (raid log)
---   LCEX.sessionItems = index -> { link, itemID, quality, bag, slot, boss, instance, lootedAt }
+--   LCEX.pendingLoot  = { { link, itemID, quality, boss, instance, lootedAt, roster } }  (raid log)
+--   LCEX.sessionItems = index -> { link, itemID, quality, bag, slot, boss, instance, lootedAt, roster }
+--     roster = the { {name,class} } present when the item was looted (V1 kill-set proxy, §6.10)
 --   LCEX.pendingTrades = shortKey -> { {uid, link, itemID, winner, boss, instance, lootedAt,
 --                        expireAt, warned}, ... }  (owed items — a LIST, so one winner can be
 --                        owed several items at once)
@@ -177,6 +178,7 @@ function LCEX:OnChatMsgLoot(_, text)
     local boss     = UnitName("target")
     local instance = GetInstanceInfo()
     local lootedAt = time()
+    local roster   = self:PresentRoster() -- who's present at loot time (V1 kill-set proxy, §6.10)
     self:WithItemQuality(link, function(quality)
         if not self:IsCouncilable(quality) then return end
         self.pendingLoot[#self.pendingLoot + 1] = {
@@ -186,6 +188,7 @@ function LCEX:OnChatMsgLoot(_, text)
             boss     = boss,
             instance = instance,
             lootedAt = lootedAt,
+            roster   = roster,
         }
         self:Msg(string.format(self.L["Tracking %s for council (from %s)."], link, boss or "?"))
     end)
@@ -241,6 +244,7 @@ function LCEX:BuildCouncilableList()
             item.boss     = p.boss
             item.instance = p.instance
             item.lootedAt = p.lootedAt
+            item.roster   = p.roster
         end
     end
     return list
