@@ -218,7 +218,15 @@ function LCEX:RenderPollCards()
     end
 
     if shown == 0 then f.empty:Show() else f.empty:Hide() end
+    -- Grow/shrink DOWNWARD: pin the current top-left, then resize. The window default is a CENTER
+    -- anchor, which resizes around the middle — so shrinking as you answer would slide the cards
+    -- (and their buttons) up, out from under the cursor. Re-anchoring TOPLEFT keeps the top fixed.
+    local winTop, winLeft = f:GetTop(), f:GetLeft()
     f:SetHeight(bottom + PAD)
+    if type(winTop) == "number" and type(winLeft) == "number" then
+        f:ClearAllPoints()
+        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", winLeft, winTop)
+    end
 end
 
 -- A card was answered: drop that item from the queue; if that was the last one, close.
