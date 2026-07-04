@@ -640,6 +640,25 @@ test("SeedRows: pending / cantuse / missedkill / left", function()
     eq(rows["war"].resp,    nil,          "no response yet")
 end)
 
+test("StartSession pre-seeds rows from the item roster (V1)", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 1 } -- cloth chest: MAGE can use
+    L.sessionItems = { { link = "item:100",
+        roster = { { name = "Amy", class = "MAGE" }, { name = "Gone", class = "MAGE" } } } }
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    local rows = L.session.rows[1]
+    ok(rows, "item 1 rows seeded")
+    eq(rows["amy"].reason,  "pending",    "Amy at kill + can use -> pending")
+    eq(rows["gone"].reason, "left",       "Gone in kill roster but not present -> left")
+    eq(rows["tester"].reason, "missedkill", "self present but not in this item's kill roster -> missedkill")
+
+    -- A response clears the reason and keeps the seeded class.
+    L.dispatch.cResp(L, { sid = L.session.sid, item = 1, resp = 2, note = "" }, "Amy")
+    eq(L.session.rows[1]["amy"].resp, 2, "cResp recorded")
+    eq(L.session.rows[1]["amy"].reason, nil, "reason cleared on response")
+    eq(L.session.rows[1]["amy"].class, "MAGE", "seeded class preserved")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

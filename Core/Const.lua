@@ -217,3 +217,9 @@ L["Non-BiS enchant"]                        = "Non-BiS enchant"
 L["Empty socket"]                           = "Empty socket"
 L["Low-quality gem"]                        = "Low-quality gem"
 L["No gear issues found."]                  = "No gear issues found."
+
+-- Phase 9 — voting readiness (Feature V): seeded-row reasons.
+L["Waiting"]                                = "Waiting"
+L["Can't use"]                              = "Can't use"
+L["Missed kill"]                            = "Missed kill"
+L["Left"]                                   = "Left"

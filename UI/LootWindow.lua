@@ -293,6 +293,10 @@ function LCEX:FillLootCandRow(row, entry)
     row.name:SetText(DisplayName(data, candKey))
     local cc = self:ClassColor(self:ClassOf(data.name or candKey) or self:CachedClass(data.name or candKey))
     row.name:SetTextColor(cc[1], cc[2], cc[3])
+    -- Dim the "not rolling" tier — declined, ineligible (can't use / missed kill), or left (V1, R3).
+    if data.resp == self:PassResponseId() or (data.reason and data.reason ~= "pending") then
+        self:ThemeText(row.name, "body", "faint")
+    end
 
     local resp = ResponseEntry(self, data.resp)
     if resp then
@@ -300,7 +304,8 @@ function LCEX:FillLootCandRow(row, entry)
         local c = resp.color
         if c then row.resp:SetTextColor(c[1], c[2], c[3]) end
     else
-        row.resp:SetText("?")
+        -- No response yet: show the seeded reason (Waiting / Can't use / Missed kill / Left), dimmed.
+        row.resp:SetText(self:ReasonText(data.reason))
         self:ThemeText(row.resp, "body", "faint")
     end
 
@@ -410,9 +415,21 @@ function LCEX:RefreshLootWindow()
     if inSession and f.selectedIndex then
         local rows = self.voteRows and self.voteRows[f.selectedIndex]
         if rows then
+            local PASS = self:PassResponseId()
+            local function tier(d) -- ROLLED (1) > MIGHT ROLL (2) > NOT ROLLING (3) — V1, R3
+                if d.resp and d.resp ~= PASS then return 1 end
+                if d.reason == "pending" then return 2 end
+                return 3
+            end
             local keys = {}
             for k in pairs(rows) do keys[#keys + 1] = k end
-            table.sort(keys, function(x, y) return (rows[x].votes or 0) > (rows[y].votes or 0) end)
+            table.sort(keys, function(x, y)
+                local rx, ry = rows[x], rows[y]
+                local tx, ty = tier(rx), tier(ry)
+                if tx ~= ty then return tx < ty end
+                if (rx.votes or 0) ~= (ry.votes or 0) then return (rx.votes or 0) > (ry.votes or 0) end
+                return tostring(rx.name or x) < tostring(ry.name or y)
+            end)
             for _, k in ipairs(keys) do
                 display[#display + 1] = { itemIndex = f.selectedIndex, candKey = k, data = rows[k] }
             end

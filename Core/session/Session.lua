@@ -83,6 +83,24 @@ function LCEX:ResponseText(id)
     return tostring(id)
 end
 
+-- The id of the built-in PASS response (a decline / non-roll), used to classify "rollers" in the
+-- loot window's 3-tier sort (V1).
+function LCEX:PassResponseId()
+    for _, r in ipairs(self.RESPONSES) do
+        if r.key == "PASS" then return r.id end
+    end
+    return 5
+end
+
+-- Short display text for a seeded row's `reason` while it has no response yet (V1). Locale-driven.
+function LCEX:ReasonText(reason)
+    if reason == "pending"    then return self.L["Waiting"] end
+    if reason == "cantuse"    then return self.L["Can't use"] end
+    if reason == "missedkill" then return self.L["Missed kill"] end
+    if reason == "left"       then return self.L["Left"] end
+    return ""
+end
+
 -- True if `name` is in our current group (raid/party). The ML drops cResp/vVote from
 -- non-members. Self always passes (the ML can respond to its own session).
 function LCEX:InGroupWith(name)
@@ -136,6 +154,21 @@ function LCEX:SeedRows(killRoster, nowRoster, itemLink)
     return rows
 end
 
+-- Seed every open-session item's rows from its captured loot roster ∪ the current raid (V1), then
+-- push each to the ML's own view and out to the council (cUpdate) so the full roster shows
+-- immediately. Called from StartSession/ResumeSession AFTER EnterSession (needs the local view).
+function LCEX:SeedSessionRows()
+    local s = self.session
+    if not s then return end
+    local nowRoster = self:PresentRoster()
+    for i, it in ipairs(s.items) do
+        local killRoster = self.sessionItems and self.sessionItems[i] and self.sessionItems[i].roster
+        s.rows[i] = self:SeedRows(killRoster, nowRoster, it.link)
+        self:ApplyCUpdate(s.sid, i, s.rows[i]) -- the ML's own voting frame
+        self:BroadcastCUpdate(i)               -- and the council (no-op solo)
+    end
+end
+
 -- Open a session over the given trimmed item list and broadcast sStart. Refuses if a
 -- session is already open or there is nothing to council. With no group we still open the
 -- session locally (no broadcast) so the flow can be exercised/tested solo.
@@ -181,6 +214,7 @@ function LCEX:StartSession(items)
     -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
     -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
     self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council, timeout)
+    self:SeedSessionRows() -- pre-seed each item's rows from its roster (V1) and push to the council
 
     self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
     self:StartHeartbeat() -- tell candidates we're alive
@@ -264,6 +298,7 @@ function LCEX:ResumeSession()
         }, channel)
     end
     self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout)
+    self:SeedSessionRows()
     self:SaveSession()
     self:StartHeartbeat()
     self:Msg(string.format(self.L["Resumed session (%s) — %d item(s)."], saved.sid, #saved.items))
@@ -346,11 +381,13 @@ LCEX.dispatch.cResp = function(self, msg, sender)
     local key = self:NormalizeName(sender)
     local prev = rows[key]
     rows[key] = {
-        name  = sender,
-        resp  = msg.resp,
-        note  = msg.note,
-        gear  = msg.gear,
-        votes = (prev and prev.votes) or 0, -- preserve any tally across a re-response
+        name   = sender,
+        class  = prev and prev.class,        -- preserve the seeded class (V1)
+        resp   = msg.resp,
+        reason = nil,                        -- responded → no longer a pending/ineligible seed
+        note   = msg.note,
+        gear   = msg.gear,
+        votes  = (prev and prev.votes) or 0, -- preserve any tally across a re-response
     }
 
     self:Msg(string.format(self.L["%s responded %s to %s."],
