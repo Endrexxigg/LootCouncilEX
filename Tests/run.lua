@@ -572,6 +572,21 @@ test("BuildGearDisplay attaches gear issues to each item", function()
     eq(disp[1].issues[1].kind, "noenchant", "no-enchant detected on the bare chest")
 end)
 
+test("BuildGearCheckDisplay lists offenders worst-first, omits clean players", function()
+    L.db.global.gearCache["bob"] = { items = { [5] = "item:30055:0:0:0:0:0" } }                 -- 1 issue
+    L.db.global.gearCache["amy"] = { items = { [5] = "item:30055:0:0:0:0:0",
+                                               [3] = "item:30056:0:0:0:0:0" } }                  -- 2 issues
+    L.db.global.gearCache["cid"] = { items = { [5] = "item:30055:2647:0:0:0:0" } }               -- clean
+    local disp = L:BuildGearCheckDisplay()
+    eq(disp[1].kind, "gearcheck", "row kind")
+    eq(disp[1].name, "amy", "worst offender first")
+    eq(disp[1].total, 2, "amy has two issues")
+    eq(disp[2].name, "bob", "bob second")
+    local cid = false
+    for _, e in ipairs(disp) do if e.name == "cid" then cid = true end end
+    ok(not cid, "clean player omitted")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

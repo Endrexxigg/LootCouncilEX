@@ -44,6 +44,31 @@ function LCEX:BuildGearDisplay(player)
     return out
 end
 
+-- Roster-wide gear-issue overview (Feature G): every self-reporting player (plus self, live) that
+-- has at least one gear issue, worst offender first. Rows: { kind="gearcheck", name, total, rows }.
+function LCEX:BuildGearCheckDisplay()
+    local names, seen = {}, {}
+    local me = UnitName("player")
+    local meKey = self:NormalizeName(me)
+    if meKey then names[#names + 1] = me; seen[meKey] = true end -- self uses live gear
+    for key, rec in pairs(self.db.global.gearCache) do
+        if not seen[key] then names[#names + 1] = rec.by or key; seen[key] = true end
+    end
+    local out = {}
+    for _, name in ipairs(names) do
+        local rows, total = self:GearIssuesForPlayer(name)
+        if total > 0 then
+            out[#out + 1] = { kind = "gearcheck", name = name, total = total, rows = rows }
+        end
+    end
+    table.sort(out, function(a, b)
+        if a.total ~= b.total then return a.total > b.total end
+        return a.name < b.name
+    end)
+    if #out == 0 then out[1] = { kind = "info", text = self.L["No gear issues found."] } end
+    return out
+end
+
 function LCEX:BuildHistoryDisplay(player)
     local out = {}
     for _, rec in ipairs(self:HistoryForPlayer(self:NormalizeName(player))) do

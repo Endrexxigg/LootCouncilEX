@@ -21,6 +21,7 @@ local SUBTABS = {
     { key = "profs",   text = "Professions" },
     { key = "bis",     text = "BiS" },
     { key = "notes",   text = "Notes" },
+    { key = "gearcheck", text = "Gear Check" }, -- roster-wide overview (Feature G), not per-player
 }
 
 -- ── Detail rows (typed display arrays from Core/Display.lua) ─────────────────
@@ -84,6 +85,17 @@ local function FillDetailRow(row, entry)
             row.text:SetText(entry.slot .. ":  " .. tostring(link or name or ("item:" .. id)) .. suffix)
             row.icon:SetItem(link, GetItemInfoInstant and select(5, GetItemInfoInstant(id)))
         end)
+    elseif entry.kind == "gearcheck" then
+        row.icon:Hide()
+        local cc = LCEX:ClassColor(LCEX:ClassOf(entry.name) or LCEX:CachedClass(entry.name))
+        local flat = {}
+        for _, r in ipairs(entry.rows) do
+            for _, iss in ipairs(r.issues) do flat[#flat + 1] = iss end
+        end
+        LCEX:ThemeText(row.text, "body", "ink")
+        row.text:SetText(string.format("|cff%02x%02x%02x%s|r%s",
+            math.floor(cc[1] * 255 + 0.5), math.floor(cc[2] * 255 + 0.5), math.floor(cc[3] * 255 + 0.5),
+            entry.name, IssueTagSuffix(flat)))
     else -- info
         row.icon:Hide()
         LCEX:ThemeText(row.text, "body", "dim")
@@ -139,6 +151,7 @@ local function SelectSubTab(panel, key)
     if key == "gear" then data = LCEX:BuildGearDisplay(player)
     elseif key == "history" then data = LCEX:BuildHistoryDisplay(player)
     elseif key == "profs" then data = LCEX:BuildProfsDisplay(player)
+    elseif key == "gearcheck" then data = LCEX:BuildGearCheckDisplay() -- roster-wide, ignores `player`
     else
         data = LCEX:BuildBiSDisplay(player)
         panel.bisBar.classBtn:SetText(string.format(LCEX.L["Class: %s"], tostring(LCEX.bisClass or "?")))

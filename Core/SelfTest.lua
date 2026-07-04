@@ -724,7 +724,7 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
-LCEX:RegisterSelfTest("ui", "roster module renders for self (gear/BiS/history sub-tabs)", function(self, t)
+LCEX:RegisterSelfTest("ui", "roster module renders for self (gear/BiS/history/gear-check sub-tabs)", function(self, t)
     local me = UnitName("player")
     -- Force a fresh BiS resolve: it only resets when the viewed player CHANGES, so a manually
     -- cycled class from an earlier look at ourselves would false-fail the assert.
@@ -733,7 +733,7 @@ LCEX:RegisterSelfTest("ui", "roster module renders for self (gear/BiS/history su
     local f = self.councilWindow
     if not t:Ok(f and f:IsShown(), "council window not shown") then return end
     t:Eq(f.activeModule, "roster", "roster module not active")
-    local panel = f.panels and f.panels.players
+    local panel = f.panels and f.panels.roster
     if not t:Ok(panel and panel:IsShown(), "players panel not shown") then return end
     t:Eq(self:NormalizeName(panel.player or ""), self:NormalizeName(me), "own player not selected")
     t:Ok(#panel.playerList.items >= 1, "player picker empty")
@@ -754,6 +754,8 @@ LCEX:RegisterSelfTest("ui", "roster module renders for self (gear/BiS/history su
     t:Ok(subtab("history"), "no history sub-tab")
     t:Ok(not panel.cacheMeta:IsShown(), "cacheMeta should hide on the history sub-tab")
     t:Ok(#panel.detailList.items >= 1, "history display empty (needs at least the info row)")
+    t:Ok(subtab("gearcheck"), "no Gear Check sub-tab")
+    t:Ok(#panel.detailList.items >= 1, "Gear Check overview empty (needs at least the info row)")
 end, { cleanup = function(self)
     self.bisClass, self.bisSpec = nil, nil
     if self.councilWindow then self.councilWindow:Hide() end

@@ -19,11 +19,12 @@ C introduces the guild-scoping + shared-config that **B depends on**; B is large
 
 ## Feature G — Enchant/gem gear issues in the self-report
 
-**Status:** **in progress** — full detection layer shipped & tested (dd36d37 engine, f1b0f90 CLA
-blacklist; v0.25.2): all four checks active (missing-enchant / empty-socket / low-gem / bad-enchant),
-267 headless tests, + a `GetItemStats` selftest check (the X3 live-client unknown). **Left: the
-Roster UI only** — rename Players→Roster, per-item issue tags in the Gear sub-tab, issue-count badges
-on the roster picker, the Gear Check overview view.
+**Status:** **shipped v0.25.6** (Phase 8) — detection layer (all four checks + CLA blacklist) **and**
+the full Roster UI: Players→Roster rename, per-item issue tags in the Gear sub-tab, issue-count picker
+badges, and the Gear Check overview sub-tab (offenders worst-first). 275 headless tests; selftest
+extended (roster render + `GetItemStats` X3 contract). **Pending in-game validation** (user defers):
+`/lcex selftest` + `/reload` to confirm clean load, the `GetItemStats` socket contract, and a visual
+pass. Follow-ups in the Deferred list (bad-enchant allowlist, boss-conditional + meta-gem checks).
 
 **The ask (user's words):** "make the self report also include enchant and gem data. I'd like
 to see each raid member's gear (and gear issues like bad gems/missing enchants) so officers can
