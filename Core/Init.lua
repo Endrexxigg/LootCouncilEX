@@ -58,6 +58,7 @@ local DB_DEFAULTS = {
         history   = {},
         gearCache = {},
         profCache = {},
+        config    = {}, -- shared officer config, keyed by guildKey (Feature V/C, §6.9)
         dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
         -- Owed loot the ML still has to trade out, mirrored here so it survives /reload (DL-6).
         -- Account-wide, keyed by OWNER character name → the in-memory pendingTrades shape. Local

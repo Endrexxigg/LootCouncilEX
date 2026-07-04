@@ -36,7 +36,7 @@ local TEST_LINK_IDS = { 28830, 30055 }
 -- Award target that can never collide with a real trade partner (ShortKey → "lcextestdummy").
 local AWARD_DUMMY = "LCEXTestDummy"
 
-local ALL_DATASETS = { "dummy", "notes", "marks", "history", "gearCache", "profCache" }
+local ALL_DATASETS = { "dummy", "notes", "marks", "history", "gearCache", "profCache", "config" }
 
 -- ── Registry ─────────────────────────────────────────────────────────────────
 LCEX.selfTests = LCEX.selfTests or {}

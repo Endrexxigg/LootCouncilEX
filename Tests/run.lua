@@ -603,6 +603,26 @@ test("GuildKey + PresentRoster", function()
     eq(#L:PresentRoster(), 3, "self + amy + bob, self deduped")
 end)
 
+-- ── Shared config dataset (Core/council/Config.lua) ─────────────────────────
+test("GetConfig defaults + SetConfigField replicates via pSet", function()
+    H.inGuild, H.guildName = true, "Guildy"
+    local cfg = L:GetConfig()
+    eq(cfg.anonVoting, false, "default anonVoting is off")
+    eq(type(cfg.disenchanters), "table", "default disenchanters is a list")
+
+    H.now = 500
+    L:SetConfigField("anonVoting", true)
+    eq(L:GetConfig().anonVoting, true, "anonVoting now on")
+    eq(L.db.global.config["Guildy"].by, "Tester", "record stamped by self")
+    eq(#H.sent, 1, "one broadcast")
+    eq(H.sent[1].msg.cmd, "pSet", "broadcast was a pSet")
+
+    L:SetConfigField("disenchanters", { "Zap" })
+    local c2 = L:GetConfig()
+    eq(c2.anonVoting, true, "earlier field preserved across a second set")
+    eq(c2.disenchanters[1], "Zap", "new field stored")
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)
