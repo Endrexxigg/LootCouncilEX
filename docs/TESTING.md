@@ -31,6 +31,26 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.33–v0.36 — FEATURE C COMPLETE (access control + guild scoping + inherit)
+Selftest **green through v0.35.0 (43 pass / 0 fail)**; `guild scoping active` passed and `activeGuild
+= "Menu"` with existing history intact — the guild-scope **claim-in-place did not lose data**. v0.36.0
+(inherit prompt) adds headless coverage + a safe no-op selftest. Automated coverage: access predicates,
+config-sourced council, guild-scope claim/stash/restore, and the inherit gate/accept/decline. Manual /
+2-client items the selftest can't reach:
+
+- [ ] **Non-council hiding (C3/C7)**: as a raider (guild rank **above** the cutoff, not an extra), the
+  council window shows **no Session Config** module and `/lcex loot` says "council-only"; you still get
+  the **poll** on a drop. As an officer/GM you see both.
+- [ ] **Config replicates (C1)**: two officers — one edits the roster / anon / disenchanters / the
+  "show loot window to all raiders" toggle; the other sees it converge (shared `config`, LWW).
+- [ ] **Loot-window opt-in (C7)**: flip "show loot window to all raiders" on → a raider now sees a
+  **read-only** loot window on a session (no vote ±); off → back to poll-only.
+- [ ] **Inherit prompt (C1/C5)**: a fresh/no-config officer joining sees "Inherit `<Guild>` settings
+  from `<Player>`? Y/N" a few seconds after login; **Yes** adopts the guild config, **No** keeps local
+  defaults and doesn't re-ask that session. (GM / solo skip the prompt.)
+- [ ] **Hide-on-leave (C6)**: switching guilds hides the old guild's notes/marks/history/config; the
+  new guild starts empty; rejoining restores the first guild's data. (Hard to test without two guilds.)
+
 ### v0.27–v0.32 — FEATURE V COMPLETE (readiness border · tally · anon · D/E)
 Selftest run **2026-07-04, v0.32.0 → 41 pass / 0 fail / 0 error / 0 skip — all green** (Bankrex-
 Dreamscythe, solo). Automated coverage that passed: the pure readiness cascade + status→color map,
