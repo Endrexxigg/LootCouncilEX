@@ -19,8 +19,8 @@ C introduces the guild-scoping + shared-config that **B depends on**; B is large
 
 ## Feature G — Enchant/gem gear issues in the self-report
 
-**Status:** answers locked — **detection model = `docs/CLA_gear_issues_findings.md`**; one v1-scope
-fork still open (G-scope).
+**Status:** answers locked — **detection model = `docs/CLA_gear_issues_findings.md`**; v1 = core
+checks, boss-conditional + meta-gem deferred to v1.1.
 
 **The ask (user's words):** "make the self report also include enchant and gem data. I'd like
 to see each raid member's gear (and gear issues like bad gems/missing enchants) so officers can
@@ -59,13 +59,12 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
   distinct "suboptimal" (amber/warning) tone vs hard "missing" (danger) is a possible refinement.
 - **Gd3, Gd5, Gd6, Gd7** stand. (Gd7 is moot anyway — no legacy data, addon unreleased; see C6.)
 
-**Still open — Decision:**
-- **G-scope.** The two richest CLA checks — **boss-conditional "useless item"** (undead/demon/
-  PvP-trinket/engi; needs per-encounter is-undead/is-demon/is-PvP flag tables + item→condition
-  maps) and **meta-gem activation** — are also the most **data-heavy**. Ship them in v1, or ship
-  **enchant-allowlist + empty-socket + gem-quality first** and fast-follow the boss-conditional +
-  meta checks? *(Recommend: core three in v1; boss-conditional + meta as a v1.1 fast-follow —
-  they're the largest data lift and independently shippable.)*
+**Decision — G-scope (locked):**
+- **G-scope.** v1 = the **core three** (enchant allowlist + empty socket + gem quality). The
+  **boss-conditional "useless item"** check (undead/demon/PvP-trinket/engi — needs per-encounter
+  is-undead/is-demon/is-PvP flag tables + item→condition maps) and **meta-gem activation** are
+  **deferred to a v1.1 fast-follow** (largest data lift, independently shippable). Added to the
+  Deferred list.
 
 ---
 
@@ -93,6 +92,9 @@ field, no vote tally / who-voted, no anon setting, no disenchant concept — all
   "denominator" approach from V1's original framing — the eligible set is now explicit, so
   "everyone responded" is well-defined.* (Eligibility computable ML-side from `UnitClass` of present
   group members + item type — verify at spec time.)
+  **Row set (locked):** the list shows **all present raiders** — everyone at the kill gets a line.
+  **All non-roll responses** (pass, ineligible, left group, auto-passed) **sort to the bottom and
+  are dimmed**; active rollers sort on top. RCLC behavior throughout.
 - **V2.** **No abstain.** Items are typically awarded **without** full votes — the border exists to
   flag "this one's ready, knock it out while others collect votes." "All present council voted" is
   **one** possible ready-reason, **not** a requirement. Awarding is usually sequential by session
@@ -236,3 +238,5 @@ overlay, etc. remain.)
 - **Automatic transaction-note prompt (B7).** The close-prompt-on-gbank-close + chat-reminder flow.
   v1 scope is transaction notes themselves, not the automatic prompt.
 - **Enchant-name display via tooltip scan (Gd4).** Showing arbitrary (non-tabled) enchant names.
+- **G v1.1: boss-conditional + meta-gem checks.** The CLA "useless item" family (undead/demon/
+  PvP-trinket/engi) + meta-gem activation — needs per-encounter flag tables + item→condition maps.
