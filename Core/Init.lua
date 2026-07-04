@@ -36,6 +36,8 @@ local DB_DEFAULTS = {
         syncChannel        = "GUILD",
         minQuality         = 4,
         selfReport         = true,
+        showGearIssues     = false, -- Feature G: show the gear-issue callouts on the Roster tab
+
         ui                 = {
             poll    = {},
             loot    = {},

@@ -62,7 +62,8 @@ local function FillDetailRow(row, entry)
         row.icon:SetItem(entry.link, GetItemInfoInstant and select(5, GetItemInfoInstant(entry.link)))
         row.icon:Show()
         LCEX:ThemeText(row.text, "body", "ink")
-        row.text:SetText(string.format(LCEX.L["  slot %d: %s"], entry.slot, entry.link) .. IssueTagSuffix(entry.issues))
+        row.text:SetText(string.format(LCEX.L["  slot %d: %s"], entry.slot, entry.link)
+            .. (LCEX.db.profile.showGearIssues and IssueTagSuffix(entry.issues) or ""))
     elseif entry.kind == "histitem" then
         local rec = entry.rec
         row.icon:SetItem(rec.itemLink, GetItemInfoInstant and select(5, GetItemInfoInstant(rec.itemLink)))
@@ -218,7 +219,11 @@ LCEX:RegisterCouncilModule({
                 row.fs:SetText(entry.name)
                 local cc = LCEX:ClassColor(LCEX:ClassOf(entry.name) or LCEX:CachedClass(entry.name))
                 row.fs:SetTextColor(cc[1], cc[2], cc[3])
-                local _, issueTotal = LCEX:GearIssuesForPlayer(entry.name)
+                local issueTotal = 0
+                if LCEX.db.profile.showGearIssues then
+                    local _, total = LCEX:GearIssuesForPlayer(entry.name)
+                    issueTotal = total
+                end
                 if issueTotal > 0 then
                     row.badge:SetText(tostring(issueTotal))
                     local d = LCEX.Theme.danger
@@ -241,6 +246,17 @@ LCEX:RegisterCouncilModule({
         panel.header = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.header, "section", "ink")
         panel.header:SetPoint("TOPLEFT", picker, "TOPRIGHT", 12, -8)
+
+        -- Feature G: toggle the gear-issue callouts (per-item tags + picker badges). Off by default;
+        -- the Gear Check sub-tab is unaffected — it stays as the explicit "show me problems" view.
+        panel.gearToggle = LCEX:CreateCheckbox(panel, LCEX.L["Show gear issues"],
+            function() return LCEX.db.profile.showGearIssues end,
+            function(v)
+                LCEX.db.profile.showGearIssues = v
+                panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText())) -- badges
+                SelectSubTab(panel, panel.subTab or "gear")                                -- tags
+            end)
+        panel.gearToggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -8)
 
         panel.subTabs = {}
         local x = 0
