@@ -468,6 +468,7 @@ end
 --                (the manual-target path); omit for a plain Yes/No
 --   accept    — accept button label (default "Yes"); cancel is always "No"
 --   onAccept  — function(inputText|nil) called when the user confirms
+--   onCancel  — function() called when the user declines (No / × / ESC — any non-accept dismiss)
 function LCEX:ShowConfirm(opts)
     opts = opts or {}
     local f = self._confirmFrame
@@ -491,12 +492,20 @@ function LCEX:ShowConfirm(opts)
         f.cancelBtn = self:CreateFlatButton(f, self.L["No"], 90, 24)
         f.cancelBtn:SetPoint("BOTTOMRIGHT", f.acceptBtn, "BOTTOMLEFT", -8, 0)
         f.cancelBtn:SetScript("OnClick", function() f:Hide() end)
+        -- Any dismiss that isn't the accept button (No / × / ESC) counts as cancel — onHide fires the
+        -- cancel callback unless accept already ran. Guarded so accept's own Hide() doesn't double-fire.
+        f:SetScript("OnHide", function()
+            if not f._accepted and f._onCancel then f._onCancel() end
+            f._accepted = false
+        end)
 
         self._confirmFrame = f
     end
 
     f.msg:SetText(opts.text or "")
     f.acceptBtn:GetFontString():SetText(opts.accept or self.L["Yes"])
+    f._onCancel = opts.onCancel
+    f._accepted = false
     local hasInput = type(opts.input) == "string"
     if hasInput then
         f.input:SetText(opts.input)
@@ -508,6 +517,7 @@ function LCEX:ShowConfirm(opts)
     local onAccept = opts.onAccept
     f.acceptBtn:SetScript("OnClick", function()
         local val = hasInput and f.input:GetText() or nil
+        f._accepted = true
         f:Hide()
         if onAccept then onAccept(val) end
     end)

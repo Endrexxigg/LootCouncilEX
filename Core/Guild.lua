@@ -60,6 +60,7 @@ function LCEX:SyncGuildScope()
     end
     g.guilds[key] = nil -- its data is live in the flat tables now; re-stashed on the next swap
     g.activeGuild = key
+    self._inheritDecided, self._pendingInherit = nil, nil -- a new guild gets a fresh inherit decision
 end
 
 function LCEX:PresentRoster()

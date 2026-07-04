@@ -716,6 +716,35 @@ test("SyncGuildScope defers while guilded but the roster has not loaded", functi
     ok(L.db.global.history["u1"], "flat data left in place (still visible) meanwhile")
 end)
 
+test("Inherit gate: hold + prompt a peer config on first load; accept applies it (Feature C)", function()
+    H.inGuild, H.guildName, H.myRank = true, "Menu", 3 -- guilded officer, not GM
+    local incoming = { anonVoting = true, mod = 500, by = "Officer" }
+    local gated = L:GateConfigInherit(L:ConfigKey(), incoming, "Officer")
+    ok(gated, "peer config held (not auto-merged) on first load")
+    ok(not L:ConfigRecord(), "config not applied while pending")
+    ok(H.confirm and H.confirm.text:find("Menu"), "inherit prompt shown, naming the guild")
+    L:AcceptInherit()
+    ok(L:ConfigRecord() ~= nil, "config applied on accept")
+    eq(L:GetConfig().anonVoting, true, "inherited settings active")
+    L.db.global.config = {}
+end)
+
+test("Inherit gate: decline keeps defaults + stops asking; GM/solo skip the gate (Feature C)", function()
+    H.inGuild, H.guildName, H.myRank = true, "Menu", 3
+    local incoming = { anonVoting = true, mod = 500, by = "Officer" }
+    ok(L:GateConfigInherit(L:ConfigKey(), incoming, "Officer"), "held for the prompt")
+    L:DeclineInherit()
+    ok(not L:ConfigRecord(), "decline keeps local defaults (no config authored)")
+    ok(not L:GateConfigInherit(L:ConfigKey(), incoming, "Officer"), "stops asking this session after decline")
+
+    -- Escape hatches skip the gate entirely (auto-adopt / nothing to inherit).
+    L._inheritDecided = nil
+    H.myRank = 0
+    ok(not L:GateConfigInherit(L:ConfigKey(), incoming, "Officer"), "GM auto-adopts (no gate)")
+    H.inGuild = false
+    ok(not L:GateConfigInherit("_local", incoming, "Officer"), "solo: nothing to inherit")
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.

@@ -71,3 +71,44 @@ end
 function LCEX:SetConfigField(field, value)
     self:SetConfigFields({ [field] = value })
 end
+
+-- ── Inherit on first load (Feature C, C1/C5; escape hatch C4) ─────────────────
+-- When a peer's config for THIS guild arrives over sync and we have no authored config yet, hold it
+-- as PENDING and ask "Inherit <Guild> from <Player>?" instead of auto-merging (the gate-until-Yes
+-- model). Returns true to SUPPRESS the merge. Escape hatch: never gate when solo/guildless, when we
+-- are the GM (author + edit directly), a different guild's record, or once decided this session.
+function LCEX:GateConfigInherit(key, record, sender)
+    if not IsInGuild() then return false end          -- solo / guildless: nothing to inherit
+    if self:MyGuildRank() == 0 then return false end  -- GM authors; auto-adopt then edit
+    if key ~= self:ConfigKey() then return false end  -- a different guild's record — leave to LWW
+    if self:ConfigRecord() then return false end       -- we already have a config → normal LWW merge
+    if self._inheritDecided then return false end      -- accepted / declined already this session
+    if self._pendingInherit then return true end       -- already prompting — keep the first offer
+    self._pendingInherit = { key = key, record = record, from = sender, guild = self:GuildKey() }
+    self:PromptInherit()
+    return true
+end
+
+-- The inherit confirm (reuses ShowConfirm). Yes adopts the held config; No / dismiss declines and
+-- stops asking this session, keeping local defaults.
+function LCEX:PromptInherit()
+    local p = self._pendingInherit
+    if not p then return end
+    self:ShowConfirm({
+        text = string.format(self.L["Inherit %s loot-council settings from %s?"], p.guild, tostring(p.from)),
+        onAccept = function() self:AcceptInherit() end,
+        onCancel = function() self:DeclineInherit() end,
+    })
+end
+
+function LCEX:AcceptInherit()
+    local p = self._pendingInherit
+    self._pendingInherit, self._inheritDecided = nil, true
+    if not p then return end
+    self:MergeRecord("config", p.key, p.record) -- apply verbatim (keeps the peer's mod/by for LWW)
+    self:Msg(string.format(self.L["Inherited %s loot-council settings from %s."], p.guild, tostring(p.from)))
+end
+
+function LCEX:DeclineInherit()
+    self._pendingInherit, self._inheritDecided = nil, true -- keep local defaults; stop asking this session
+end

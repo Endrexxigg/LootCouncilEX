@@ -213,8 +213,9 @@ per-class usability; `session.rows` seeds at `StartSession`, `cResp` merges via 
 
 ## Feature C — Council/officer access control + guild config inheritance
 
-**Status:** **in progress** (Phase 10) — building in 4 parts. **(1) Council from shared config —
-DONE (v0.33.0, resolves DL-1):** `CouncilConfig` (effective read: shared `config` record if authored,
+**Status:** **✅ SHIPPED (Phase 10, v0.33.0–v0.36.0)** — all four parts complete; pending a 2-client
+in-game pass (non-council hiding, config replication, inherit prompt, guild-switch hide-on-leave).
+**(1) Council from shared config — DONE (v0.33.0, resolves DL-1):** `CouncilConfig` (effective read: shared `config` record if authored,
 else `profile.council` escape hatch) + `SetCouncilConfig` (atomic byRank/rank/extra write via new
 `SetConfigFields`); `ResolveCouncil`, the Session Config roster editor, and `/lcex council add/remove`
 all now read/write the replicated config. **(2) Access control — DONE (v0.34.0):** `Core/Access.lua`
@@ -228,8 +229,18 @@ while see==edit for council; add when Feature B's visibility toggles need it.)* 
 `db.global.<name>` tables (all ~25 readers unchanged); other guilds stash under
 `db.global.guilds[key]`; switching guild swaps them (hide-on-leave). `activeGuild` nil ⇒ one-time
 in-place claim of existing data (**no migration, nothing vanishes**); defers while guilded-but-
-roster-not-loaded. Runs at OnEnable / GUILD_ROSTER_UPDATE / BuildDigest. **(4) TODO:**
-inherit-on-first-load prompt (reuses `ShowConfirm`) + escape hatch. Spec: §6.11, DL-16.
+roster-not-loaded. Runs at OnEnable / GUILD_ROSTER_UPDATE / BuildDigest. **(4) Inherit-on-first-load — DONE (v0.36.0):**
+`GateConfigInherit` (Config.lua) holds a first-load peer config as `_pendingInherit` instead of
+auto-merging (gate-until-Yes); `ShowConfirm` (now with `onCancel`) asks "Inherit `<Guild>` from
+`<Player>`? Y/N"; Yes → `AcceptInherit` (apply verbatim, keep mod/by), No/dismiss → `DeclineInherit`
+(keep defaults, stop asking this session; a new guild resets it). Escape hatch: GM / solo / already-
+authored auto-merge. Spec: §6.11, DL-16.
+
+### ✅ Feature C COMPLETE (v0.33.0 → v0.36.0)
+All four parts shipped: council-from-shared-config (resolves DL-1) · access control (hide Session
+Config + loot window from non-council) · guild-scoped datasets with hide-on-leave (active-flat + stash,
+no migration) · inherit-on-first-load (gated merge). Next in the build order: **Feature B** (Phase 11 —
+Guild Bank; specced §6.12 / DL-17). Reuses `guilds[guildKey]` scoping (C) + `config.visibility` (C7).
 
 **The ask (user's words):** "separate council members from other guild members to prevent showing
 council-only settings to anyone in the raid. … inherit [an existing guild config] from another

@@ -814,6 +814,17 @@ LCEX:RegisterSelfTest("load", "guild scoping active (Feature C, C6)", function(s
     t:Eq(self.db.global.activeGuild, key, "flat datasets scoped to the current guild")
 end)
 
+LCEX:RegisterSelfTest("load", "inherit-on-first-load flow present (Feature C)", function(self, t)
+    for _, fn in ipairs({ "GateConfigInherit", "PromptInherit", "AcceptInherit", "DeclineInherit" }) do
+        t:Ok(type(self[fn]) == "function", "missing inherit function: " .. fn)
+    end
+    -- Safe no-op path: a record for a key other than ours is never gated — returns false before any
+    -- prompt or pending state, so this can't pop a dialog or mutate the real inherit decision.
+    t:Ok(self:GateConfigInherit("__lcex_bogus_key__", { mod = 1 }, "Nobody") == false,
+        "a foreign-key config record is not gated")
+    t:Ok(self._pendingInherit == nil, "no pending inherit left after the no-op check")
+end)
+
 LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C)", function(self, t)
     for _, fn in ipairs({ "CanEditConfig", "CanSeeSessionConfig", "CanSeeLootWindow",
                           "LootWindowOptIn", "MyGuildRank" }) do

@@ -213,22 +213,32 @@ LCEX.dispatch.pSyncReq = function(self, msg, sender)
     end
 end
 
--- A peer sent us a delta — merge it.
+-- A peer sent us a delta — merge it. On first load a `config` record is HELD for the inherit prompt
+-- (Feature C) rather than auto-merged; the gate drops it from the batch and asks instead.
 LCEX.dispatch.pSyncData = function(self, msg, sender)
     if syncGateBad(self, sender) then return end
     local ds = self.datasets[msg.dataset]
     if not ds or type(msg.records) ~= "table" then return end
-    local changed = mergeRecords(ds, msg.records)
+    local records = msg.records
+    if msg.dataset == "config" then
+        records = {}
+        for k, rec in pairs(msg.records) do
+            if not self:GateConfigInherit(k, rec, sender) then records[k] = rec end
+        end
+    end
+    local changed = mergeRecords(ds, records)
     if changed > 0 then
         self:Msg(string.format(self.L["Synced %d %s record(s) from %s."], changed, msg.dataset, sender))
     end
 end
 
--- A live edit from a council member — merge it (LWW protects against a stale overwrite).
+-- A live edit from a council member — merge it (LWW protects against a stale overwrite). A first-load
+-- `config` record is held for the inherit prompt instead of auto-merging (Feature C).
 LCEX.dispatch.pSet = function(self, msg, sender)
     if syncGateBad(self, sender) then return end
     local ds = self.datasets[msg.dataset]
     if not ds or msg.key == nil or type(msg.record) ~= "table" then return end
+    if msg.dataset == "config" and self:GateConfigInherit(msg.key, msg.record, sender) then return end
     if mergeRecords(ds, { [msg.key] = msg.record }) > 0 then
         self:Msg(string.format(self.L["%s updated %s[%s]."], sender, msg.dataset, tostring(msg.key)))
     end

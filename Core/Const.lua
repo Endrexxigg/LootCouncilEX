@@ -192,6 +192,10 @@ L["Disenchanters (D/E), ranked:"]           = "Disenchanters (D/E), ranked:"
 L["Show the loot window to all raiders"]    = "Show the loot window to all raiders"
 L["The loot window is council-only for this guild."] =
     "The loot window is council-only for this guild."
+L["Inherit %s loot-council settings from %s?"] =
+    "Inherit %s loot-council settings from %s?"
+L["Inherited %s loot-council settings from %s."] =
+    "Inherited %s loot-council settings from %s."
 L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
     "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
 

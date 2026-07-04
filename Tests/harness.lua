@@ -209,6 +209,7 @@ function LCEX:HidePoll() end
 function LCEX:ShowLootWindow() end
 function LCEX:HideLootWindow() end
 function LCEX:RefreshLootItem() end
+function LCEX:ShowConfirm(opts) H.confirm = opts end -- capture the inherit/D-E prompt (no frames headless)
 
 -- Reset mutable state between tests.
 function H.reset()
@@ -229,6 +230,7 @@ function H.reset()
     LCEX.pendingLoot = {}
     LCEX.session, LCEX.sessionItems, LCEX.activeSession = nil, nil, nil
     LCEX.recoverableSession, LCEX.sessionTimeout, LCEX.sPingTimer = nil, nil, nil
+    LCEX._pendingInherit, LCEX._inheritDecided, H.confirm = nil, nil, nil
     if LCEX.db.global.pendingTrades then wipe(LCEX.db.global.pendingTrades) end
     if LCEX.db.global.session then wipe(LCEX.db.global.session) end
     LCEX.db.profile.council = { byRank = true, rank = 1, extra = {} }
