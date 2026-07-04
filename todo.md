@@ -71,8 +71,10 @@ EMPTY_SOCKET_* or a tooltip scan. Display today = Players → Gear sub-tab, one 
 
 ## Feature V — Voting-frame award-readiness border (+ session-roster rows, tally, anon, disenchanter)
 
-**Status:** answers locked — **V1 expands the session/candidate model** (rows for all eligible
-players); border is **rail-row only**.
+**Status:** **specced** — PROJECT.md §6.9 (foundations) + §6.10 + Phase 9 + DL-14/DL-15. Session
+model expands (row per present raider, non-rollers dimmed at bottom); rail-row border only. Build
+after G. **Flagged for review:** "present at the kill" is approximated by "present when looted" (no
+boss-kill event; DL-7 auto-loot) — see DL-15 caveat.
 
 **The ask (user's words):** "on the voting frame, add a highlighted border to the item icon if
 it's ready to be awarded. … grey = still waiting for responses, blue = d/e waiting, dark green =
@@ -221,6 +223,9 @@ overlay, etc. remain.)
 - **X4.** **One unified `guildKey`** guild-scoping mechanism (from `GetGuildInfo`) shared by C and B.
 - **X5.** **One unified shared-config** mechanism carrying council config (C1) + visibility rules
   (B5, C7) + anon flag (V7) + preferred disenchanters (V5) + the deferred response set (DL-8).
+  **Specced §6.9 (DL-14)** — the `config[guildKey]` LWW dataset; Feature V populates anon +
+  disenchanters, C moves in rank/extra/responses, B adds visibility. `guildKey` primitive (X4) also
+  specced in §6.9; C does the dataset re-keying (C6).
 - **X6.** New wire messages warrant a `PROTOCOL_VERSION` bump + spec-first §6 updates (ties to X1).
 - **Xd1.** Every feature registers `/lcex selftest` checks in `Core/SelfTest.lua` in the same commit.
 
