@@ -32,10 +32,11 @@
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
 ### v0.25–v0.26 — FEATURE G (gear issues) + FEATURE V (voting readiness, in progress)
-Selftest run **2026-07-04 on v0.26.7: 35 pass / 2 fail / 1 skip.**
+Selftest run **2026-07-04, v0.26.9 → 38 pass / 0 fail / 0 skip — all green.** (The earlier v0.26.7
+run's 2 poll-fixture fails + 1 session-E2E skip are both resolved below.)
 
 - [x] **`GetItemStats` present** on the live client — Feature G's "no comms change" premise holds
-  (X3 resolved; item #30055 reported 0 sockets, so the inherent-vs-unfilled socket semantics still
+  (X3 resolved; item #30056 reported 0 sockets, so the inherent-vs-unfilled socket semantics still
   want a socketed item to confirm, but the API exists and returns a table).
 - [x] **Roster module + Gear Check sub-tab render** (renamed from Players); the `config` dataset is
   registered over its live store and covered by the sync digest.
@@ -43,11 +44,11 @@ Selftest run **2026-07-04 on v0.26.7: 35 pass / 2 fail / 1 skip.**
   *Shoulderpads of the Stranger* (**leather**), not the cloth robe the test assumed — a cloth class
   correctly can't wear it, so the filter was right all along. Fixed the fixture to **30056** (*Robe
   of Hateful Echoes*, the actual universal cloth item) and made the leather case an explicit-class
-  assertion. Re-run to confirm green. *(Also: the `marks[30055]="give to a mage"` in your DB is a
+  assertion. **✓ confirmed green in the v0.26.9 run.** *(Also: the `marks[30055]="give to a mage"` in your DB is a
   stale/wrong note from old testing — clear it with `/lcex mark 30055` if you like; harmless.)*
-- [ ] **⚠ Session E2E SKIPPED** — an unfinished session was pending `/lcex resume`, so the solo
-  start→respond→vote→award→end pipeline (incl. Feature V's new row seeding) did **not** run. Clear
-  it with `/lcex end`, then re-run `/lcex selftest` to exercise V1.
+- [x] **Session E2E ran + PASSED** (v0.26.9, after `/lcex end` cleared the stale session) — the solo
+  start→respond→vote→award→end pipeline, which now pre-seeds `session.rows` via `SeedSessionRows`
+  (Feature V, V1), works on the live client.
 - [ ] **Feature G visual pass**: Roster picker shows a red issue-count badge per player; the Gear
   sub-tab shows per-item tags (No enchant / Empty socket / 50 HP …) in red; the Gear Check sub-tab
   lists offenders worst-first.
