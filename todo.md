@@ -222,8 +222,9 @@ settings that depend on state, and for the configurable-visibility toggles.
 
 ## Feature B — Guild Bank module
 
-**Status:** answers locked — v1 = cache + council/officer annotations + configurable visibility;
-withdrawal-request flow and auto-note-prompt **deferred**.
+**Status:** **specced** — PROJECT.md §6.12 + Phase 11 + DL-17. Guild-scoped scanner + append-only
+ledger + 5-min grouping + council annotations + gold hero card + configurable visibility;
+withdrawal-request flow and auto-note-prompt **deferred**. Build last.
 
 **The ask (user's words):** "include a module for guild bank … cache the guild bank
 items/tabs/gold/logs. log entries can be annotated … when multiple log items occur in a short
