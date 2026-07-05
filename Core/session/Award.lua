@@ -375,7 +375,8 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
     self:EnsureTradeTicker()
     self:SaveOwedTrades() -- persist the new debt immediately (DL-6)
 
-    local ts = time()
+    -- Strictly-increasing per-uid ts so a re-award after a same-second retraction still wins (§6.15).
+    local ts = self:NextHistoryTs(uid)
     local channel = self:GroupChannel()
     if channel then
         self:Send("award", self.session and self.session.sid or nil, {
@@ -436,6 +437,71 @@ function LCEX:AwardGroup(leader, name, forcedResp)
         return false
     end
     return self:AwardItem(idx, name, forcedResp)
+end
+
+-- A history timestamp for `uid` strictly greater than any record already stored under it, so a
+-- same-second correction (award → un-award → re-award) still supersedes under LWW (§6.15 — the
+-- DL-20 second-granularity guard). The ML computes the authoritative ts and BROADCASTS it, so
+-- every client converges on the same value; a first award (no prior record) just gets `time()`.
+function LCEX:NextHistoryTs(uid)
+    local cur = self.db and self.db.global.history and self.db.global.history[uid]
+    local now = time()
+    if cur and (cur.mod or 0) >= now then return (cur.mod or 0) + 1 end
+    return now
+end
+
+-- Is there still an owed (untraded) record for this uid? Drives the un-award confirm wording:
+-- present → pre-trade ("return to the session"); absent → already delivered (record-only fix).
+function LCEX:HasOwedTrade(uid)
+    for _, list in pairs(self.pendingTrades) do
+        for _, r in ipairs(list) do
+            if r.uid == uid then return true end
+        end
+    end
+    return false
+end
+
+-- Un-award a physical copy (§6.15, ML-only): drop the owed trade (no-op if already delivered),
+-- clear the awarded mirror, append a RETRACTED history record (fresh mod so LWW supersedes the
+-- award), broadcast `unaward`, and recompute the group's readiness. Post-trade this only corrects
+-- the record — the in-game item is NOT reversed (the caller's confirm says so). Returns true.
+function LCEX:UnawardItem(physIdx)
+    local s, a = self.session, self.activeSession
+    if not (s and a and a.awarded and a.awarded[physIdx]) then return false end
+    local winner = a.awarded[physIdx]
+    local entry = self.sessionItems and self.sessionItems[physIdx]
+    local uid = s.sid .. ":" .. physIdx
+
+    self:ForgetAward(uid)      -- drop the owed trade if it's still pending
+    a.awarded[physIdx] = nil
+    self:StopTradeTickerIfIdle()
+
+    -- Strictly-increasing per-uid ts so the retraction supersedes the award even in the same second.
+    local ts = self:NextHistoryTs(uid)
+    self:LogAward(uid, {
+        winner = winner, itemID = entry and entry.itemID, itemLink = entry and entry.link,
+        ts = ts, mod = ts, by = UnitName("player"),
+        retracted = true, retractedBy = UnitName("player"),
+    })
+    local channel = self:GroupChannel()
+    if channel then
+        self:Send("unaward", s.sid, {
+            item = entry and entry.link, itemID = entry and entry.itemID,
+            itemIndex = physIdx, winner = winner, ts = ts,
+        }, channel)
+    end
+
+    -- The group's border may leave "awarded" — recompute + rebroadcast (§6.14).
+    local leader = (s.groups and s.groups.leaderOf[physIdx]) or physIdx
+    self:ApplyCUpdate(s.sid, leader, s.rows[leader], self:ComputeItemStatus(leader))
+    self:BroadcastCUpdate(leader)
+
+    local text = string.format(self.L["Award of %s to %s was undone."],
+        (entry and entry.link) or "?", winner)
+    local ch = self:GroupChannel()
+    if self:GetConfig().announceAwards and ch then SendChatMessage(text, ch) else self:Msg(text) end
+    self:RefreshLootItem(physIdx)
+    return true
 end
 
 -- Human-readable award reason for a resp code (§6.10): D/E for a disenchant, the poll response text

@@ -286,7 +286,8 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "OnResponseChosen", "CompetingGear", "SendVote", "ApplyCUpdate",
         "PlayerCanUse", "ClassCanUse",
         "AwardItem", "AwardGroup", "NextAwardableIndex", "BuildItemGroups", "GroupMembers",
-        "GroupFullyAwarded", "LogAward", "ForgetAward", "ScanBags", "BuildCouncilableList",
+        "GroupFullyAwarded", "UnawardItem", "HasOwedTrade", "LogAward", "ForgetAward",
+        "ScanBags", "BuildCouncilableList",
         "WithItemQuality", "WithItemID", "ItemTradeTimeRemaining", "ParseTradeDuration",
         "FormatDuration", "TradeExpiry", "SaveOwedTrades", "RestoreOwedTrades",
         "EnsureTradeTicker", "StopTradeTickerIfIdle",
@@ -1319,6 +1320,24 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     local railRow = self.lootWindow.railList.rows[2]
     t:Ok(railRow and (railRow.badge:GetText() or ""):find("|T", 1, true) ~= nil,
         "awarded rail badge missing the texture escape")
+
+    -- Un-award correction (Phase 12, §6.15): item 1 (→ dummy) reopens — awarded mirror cleared,
+    -- owed trade dropped, and the history record marked retracted (LWW supersedes the award).
+    t:Ok(self:UnawardItem(1), "UnawardItem(1) failed")
+    t:Ok(self.activeSession.awarded[1] == nil, "awarded mirror not cleared on un-award")
+    t:Ok(self.pendingTrades[AWARD_DUMMY:lower()] == nil, "owed trade not dropped on un-award")
+    t:Ok(self.db.global.history[uid1] and self.db.global.history[uid1].retracted == true,
+        "history record not marked retracted")
+    self:LootSelectItem(1)
+    local reRow
+    for _, r in ipairs(self.lootWindow.candList.rows) do
+        if r:IsShown() and r.award:IsShown() then reRow = r; break end
+    end
+    if reRow then t:Ok(reRow.award:IsEnabled(), "award button not re-enabled after un-award") end
+    -- Re-award to a real responder: a fresh record supersedes the retraction (newest mod wins).
+    t:Ok(self:AwardItem(1, meName), "re-award after un-award failed")
+    t:Ok(self.db.global.history[uid1] and not self.db.global.history[uid1].retracted,
+        "re-award did not supersede the retraction")
 
     -- End: both frames close, all session state (incl. the DB mirror) clears.
     self:EndSession()

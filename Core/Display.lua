@@ -211,16 +211,16 @@ function LCEX:BuildPlayerIndex(filter)
 end
 
 -- ── History log (the History module) ─────────────────────────────────────────
--- All award records newest-first, optionally filtered by a winner-name substring.
--- Pure/testable.
+-- All award records newest-first, optionally filtered by a winner-name substring. Each entry is
+-- { uid, rec } so the module can offer a per-record "retract" action (§6.15). Pure/testable.
 function LCEX:BuildHistoryLog(filter)
     filter = (filter and filter ~= "" and filter:lower()) or nil
     local rows = {}
-    for _, rec in pairs(self.db.global.history) do
+    for uid, rec in pairs(self.db.global.history) do
         local key = self:NormalizeName(rec.player) or ""
-        if not filter or key:find(filter, 1, true) then rows[#rows + 1] = rec end
+        if not filter or key:find(filter, 1, true) then rows[#rows + 1] = { uid = uid, rec = rec } end
     end
-    table.sort(rows, function(a, b) return (a.ts or 0) > (b.ts or 0) end)
+    table.sort(rows, function(a, b) return (a.rec.ts or 0) > (b.rec.ts or 0) end)
     return rows
 end
 

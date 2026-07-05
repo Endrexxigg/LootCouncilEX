@@ -327,8 +327,13 @@ function LCEX:BuildLootRailRow(parent)
     row.remove:SetScript("OnLeave", function(b) LCEX:ThemeText(b.fs, "body", "faint") end)
     row.remove:SetScript("OnClick", function() LCEX:LootStageRemove(row.index) end)
 
-    row:SetScript("OnClick", function()
-        LCEX:LootSelectItem(row.index)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function(r, button)
+        if button == "RightButton" then
+            LCEX:LootUnawardMenu(r.index) -- ML-only per-copy correction (§6.15)
+        else
+            LCEX:LootSelectItem(r.index)
+        end
     end)
     -- Hover a grouped row → the per-copy winner breakdown, so a diverged x2 (one awarded, one
     -- still up) is never hidden behind the count (§6.14). Single/unawarded rows show nothing.
@@ -434,9 +439,17 @@ function LCEX:BuildLootCandRow(parent)
     row.nameBtn = CreateFrame("Button", nil, row)
     row.nameBtn:SetPoint("LEFT", 4, 0)
     row.nameBtn:SetSize(110, 24)
-    row.nameBtn:SetScript("OnClick", function()
-        local n = row.name:GetText()
-        if n and n ~= "" then LCEX:OpenPlayerDetail(n) end
+    row.nameBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row.nameBtn:SetScript("OnClick", function(_, button)
+        if button == "RightButton" then
+            -- Right-click a winner → correct that candidate's copy (§6.15), ML-only.
+            local a = LCEX.activeSession
+            if a and LCEX:IsSelf(a.ml) and row._wonIndex then
+                LCEX:ConfirmUnaward(row._wonIndex, a.awarded and a.awarded[row._wonIndex])
+            end
+        elseif row._cleanName and row._cleanName ~= "" then
+            LCEX:OpenPlayerDetail(row._cleanName) -- the clean name (no ✓ texture prefix)
+        end
     end)
 
     row.resp = row:CreateFontString(nil, "OVERLAY")
@@ -476,17 +489,19 @@ function LCEX:FillLootCandRow(row, entry)
     local a = self.activeSession
     local awarded = a and a.awarded
     local members = self:GroupMembers(itemIndex)
-    local awardedCount, isWinner = 0, false
+    local awardedCount, isWinner, wonIndex = 0, false, nil
     for _, m in ipairs(members) do
         local w = awarded and awarded[m]
         if w then
             awardedCount = awardedCount + 1
-            if self:NormalizeName(w) == candKey then isWinner = true end
+            if self:NormalizeName(w) == candKey then isWinner = true; wonIndex = m end
         end
     end
     local groupFull = awardedCount >= #members
+    row._cleanName = DisplayName(data, candKey) -- for OpenPlayerDetail (no ✓ prefix)
+    row._wonIndex = wonIndex                    -- the physical copy this candidate won (right-click un-award)
     -- The winner's row is explicitly marked (item 3): check + success-tinted response below.
-    row.name:SetText((isWinner and (CHECK_TEX .. " ") or "") .. DisplayName(data, candKey))
+    row.name:SetText((isWinner and (CHECK_TEX .. " ") or "") .. row._cleanName)
     local cc = self:ClassColor(self:ClassOf(data.name or candKey) or self:CachedClass(data.name or candKey))
     row.name:SetTextColor(cc[1], cc[2], cc[3])
     -- Dim the "not rolling" tier — declined, ineligible (can't use / missed kill), or left (V1, R3).
@@ -802,6 +817,49 @@ function LCEX:LootDisenchantSelected()
             onAccept = award,
         })
     end
+end
+
+-- ── Award correction (§6.15, ML-only) ────────────────────────────────────────
+-- Right-clicking an awarded rail row opens a per-copy correction menu: one "Un-award <winner>"
+-- entry per awarded physical copy in the group, so the ML picks exactly which to retract.
+function LCEX:LootUnawardMenu(leader)
+    local a = self.activeSession
+    if not (a and self.session and self:IsSelf(a.ml)) then return end
+    local menu = {}
+    for _, m in ipairs(self:GroupMembers(leader)) do
+        local w = a.awarded and a.awarded[m]
+        if w then
+            menu[#menu + 1] = {
+                text = string.format(self.L["Un-award %s"], DisplayName(nil, w)),
+                danger = true,
+                onClick = function() self:ConfirmUnaward(m, w) end,
+            }
+        end
+    end
+    if #menu == 0 then return end -- nothing awarded in this group yet
+    self:ShowContextMenu({ title = self.L["Correct award"], items = menu })
+end
+
+-- Confirm dialog before an un-award. Wording is stateful: with an owed (untraded) record it offers
+-- to return the item to the session; once traded it's a record-only correction (never implies the
+-- item came back).
+function LCEX:ConfirmUnaward(physIdx, winner)
+    if not (self.session and winner) then return end
+    local uid = self.session.sid .. ":" .. physIdx
+    local text
+    if self:HasOwedTrade(uid) then
+        text = string.format(self.L["Un-award %s and reopen the item for awarding?"], DisplayName(nil, winner))
+    else
+        text = string.format(
+            self.L["Correct the record: %s no longer marked as the winner. The item was already traded — this does not reverse the trade."],
+            DisplayName(nil, winner))
+    end
+    self:ShowConfirm({
+        text = text,
+        onAccept = function()
+            if self:UnawardItem(physIdx) then self:RefreshLootWindow() end
+        end,
+    })
 end
 
 -- ── Entry points (Core contract) ─────────────────────────────────────────────

@@ -68,9 +68,11 @@ local function FillDetailRow(row, entry)
         local rec = entry.rec
         row.icon:SetItem(rec.itemLink, GetItemInfoInstant and select(5, GetItemInfoInstant(rec.itemLink)))
         row.icon:Show()
-        LCEX:ThemeText(row.text, "body", "ink")
-        row.text:SetText(string.format("%s  |cff888888%s, %s|r",
-            tostring(rec.itemLink), tostring(rec.boss or "?"), date("%m/%d", rec.ts or 0)))
+        -- Retracted awards (§6.15) dim + carry a "(retracted)" tag; they are kept, not deleted.
+        LCEX:ThemeText(row.text, "body", rec.retracted and "faint" or "ink")
+        local tag = rec.retracted and ("  " .. LCEX.L["(retracted)"]) or ""
+        row.text:SetText(string.format("%s  |cff888888%s, %s|r%s",
+            tostring(rec.itemLink), tostring(rec.boss or "?"), date("%m/%d", rec.ts or 0), tag))
     elseif entry.kind == "bisitem" then
         local id = entry.itemID
         row.loadingID = id

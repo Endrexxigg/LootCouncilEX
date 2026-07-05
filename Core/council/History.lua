@@ -1,13 +1,14 @@
 -- ── LootCouncil EX — council/History.lua ─────────────────────────────────────
--- Plane B: the award-history dataset. Immutable (union merge by uid) — awards are facts, not
--- edits. Every client PRESENT for an award logs it locally from the `award` broadcast (§6.1),
--- so the record needs no central authority; the union sync (Sync.lua) then carries it to
--- council members who were absent. uid = "<sid>:<itemIndex>" (§6.3).
+-- Plane B: the award-history dataset. LWW by `mod` per uid (§6.3, DL-20) — awards are the norm,
+-- but the ML can CORRECT one: an un-award appends a `retracted=true` record with a fresher `mod`,
+-- a re-award appends the new winner with a fresher one still. Nothing is ever deleted; the latest
+-- fact wins. Every client PRESENT for an award/un-award writes the same record locally from the
+-- broadcast (§6.1); the LWW sync (Sync.lua) carries it to absent council. uid = "<sid>:<itemIndex>".
 --
--- Two write paths, one record builder:
---   • The ML logs directly in AwardItem via LCEX:LogAward (doesn't rely on its own echo).
---   • Everyone else logs in the inbound `award` handler below.
--- Both go through MergeRecord (no re-broadcast; union is idempotent on a repeated uid).
+-- Write paths, one record builder:
+--   • The ML logs directly in AwardItem / UnawardItem via LCEX:LogAward (doesn't rely on its echo).
+--   • Everyone else logs in the inbound `award` / `unaward` handlers below.
+-- All go through MergeRecord; a replayed award (equal mod + by) is idempotent.
 --
 -- Loads after Sync.lua (RegisterDataset/MergeRecord) and Comms.lua (dispatch table).
 
@@ -15,21 +16,24 @@ local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
 -- Register at load (store closure is invoked lazily, after the DB exists — same as `dummy`).
-LCEX:RegisterDataset("history", "union", function() return LCEX.db.global.history end)
+LCEX:RegisterDataset("history", "lww", function() return LCEX.db.global.history end)
 
--- The §6.3 history record. `by`/`mod` are extensions kept for display/self-description; union
--- merges purely by key presence, so they never affect the merge.
+-- The §6.3 history record. `mod` drives LWW (defaults to `ts`, the award time — a correction
+-- passes a fresh `mod` so it supersedes without disturbing the displayed award time). `retracted`
+-- marks an un-awarded record (kept, not deleted).
 function LCEX:BuildHistoryRecord(f)
     return {
-        player   = f.winner,
-        itemID   = f.itemID,
-        itemLink = f.itemLink,
-        ts       = f.ts or time(),
-        resp     = f.resp,
-        boss     = f.boss,
-        instance = f.instance,
-        by       = f.by,
-        mod      = f.ts or time(),
+        player      = f.winner,
+        itemID      = f.itemID,
+        itemLink    = f.itemLink,
+        ts          = f.ts or time(),
+        resp        = f.resp,
+        boss        = f.boss,
+        instance    = f.instance,
+        by          = f.by,
+        mod         = f.mod or f.ts or time(),
+        retracted   = f.retracted or nil,
+        retractedBy = f.retractedBy or nil,
     }
 end
 
@@ -63,6 +67,24 @@ LCEX.dispatch.award = function(self, msg, sender)
         a.awarded[msg.itemIndex] = msg.winner
         self:RefreshLootItem(msg.itemIndex)
     end
+end
+
+-- ── Inbound: an award was CORRECTED (un-awarded) by the ML (§6.15, DL-20) ────
+-- Only the bound session ML may retract (DL-11). Write the byte-identical retracted record
+-- (mod = msg.ts) so every client converges, and clear the local awarded mirror.
+LCEX.dispatch.unaward = function(self, msg, sender)
+    if self:IsSelf(sender) then return end -- the ML wrote its own retraction in UnawardItem
+    local a = self.activeSession
+    if not a or msg.sid ~= a.sid then return end
+    if self:NormalizeName(sender) ~= self:NormalizeName(a.ml) then return end
+    if type(msg.itemIndex) ~= "number" then return end
+    local uid = (msg.sid or "nosession") .. ":" .. tostring(msg.itemIndex)
+    self:LogAward(uid, {
+        winner = msg.winner, itemID = msg.itemID, itemLink = msg.item,
+        ts = msg.ts, mod = msg.ts, by = sender, retracted = true, retractedBy = sender,
+    })
+    if a.awarded then a.awarded[msg.itemIndex] = nil end
+    self:RefreshLootItem(msg.itemIndex)
 end
 
 -- Award-history records for a player (normalized key), or ALL when key is nil — newest first.

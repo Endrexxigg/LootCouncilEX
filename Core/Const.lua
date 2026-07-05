@@ -129,6 +129,18 @@ L["Anonymous voting"]                      = "Anonymous voting"
 L["%s was awarded to %s for %s."]          = "%s was awarded to %s for %s."
 L["%s was awarded to %s."]                 = "%s was awarded to %s."
 L["D/E"]                                   = "D/E"
+L["Correct award"]                         = "Correct award"
+L["Un-award %s"]                           = "Un-award %s"
+L["Un-award %s and reopen the item for awarding?"] =
+    "Un-award %s and reopen the item for awarding?"
+L["Correct the record: %s no longer marked as the winner. The item was already traded — this does not reverse the trade."] =
+    "Correct the record: %s no longer marked as the winner. The item was already traded — this does not reverse the trade."
+L["Award of %s to %s was undone."]         = "Award of %s to %s was undone."
+L["(retracted)"]                           = "(retracted)"
+L["Correct record"]                        = "Correct record"
+L["Retract record…"]                       = "Retract record…"
+L["Retract the record of %s → %s? (record only)"] =
+    "Retract the record of %s → %s? (record only)"
 L["Confirm"]                               = "Confirm"
 L["Yes"]                                   = "Yes"
 L["No"]                                    = "No"

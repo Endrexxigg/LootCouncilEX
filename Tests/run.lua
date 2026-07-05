@@ -53,11 +53,28 @@ test("MergeRecord lww", function()
     ok(not L:MergeRecord("notes", "k", { text = "z", mod = 10, by = "Z" }), "tie: later `by` loses")
 end)
 
--- ── Union merge (immutable history) ──────────────────────────────────────────
-test("MergeRecord union (history)", function()
-    ok(L:MergeRecord("history", "u1", { player = "A" }), "first insert")
-    ok(not L:MergeRecord("history", "u1", { player = "B" }), "union keeps existing key")
-    eq(L.db.global.history.u1.player, "A", "immutable")
+-- ── History LWW merge + correction cascade (§6.15, DL-20) ────────────────────
+test("History LWW: award → retract → re-award → replay", function()
+    -- First award (mod=100).
+    ok(L:LogAward("u1", { winner = "Amy", itemID = 1, itemLink = "[X]", ts = 100, by = "ML" }),
+        "first award logs")
+    eq(L.db.global.history.u1.player, "Amy", "Amy recorded")
+    -- Replaying the SAME award (equal mod + by) is idempotent.
+    ok(not L:LogAward("u1", { winner = "Amy", itemID = 1, itemLink = "[X]", ts = 100, by = "ML" }),
+        "replayed award is a no-op")
+    -- Un-award: a retraction with a fresher mod supersedes (LWW).
+    ok(L:LogAward("u1", { winner = "Amy", itemID = 1, itemLink = "[X]", ts = 100, mod = 200,
+        by = "ML", retracted = true, retractedBy = "ML" }), "retraction (newer mod) wins")
+    eq(L.db.global.history.u1.retracted, true, "record now retracted")
+    -- An OLDER-mod write can't resurrect the award.
+    ok(not L:LogAward("u1", { winner = "Amy", itemID = 1, itemLink = "[X]", ts = 100, mod = 150,
+        by = "ML" }), "stale re-award rejected")
+    ok(L.db.global.history.u1.retracted, "still retracted")
+    -- Re-award with an even fresher mod supersedes the retraction.
+    ok(L:LogAward("u1", { winner = "Bob", itemID = 1, itemLink = "[X]", ts = 300, by = "ML" }),
+        "re-award (newest mod) wins")
+    eq(L.db.global.history.u1.player, "Bob", "new winner recorded")
+    eq(L.db.global.history.u1.retracted, nil, "no longer retracted")
 end)
 
 -- ── SetRecord stamps + broadcasts ────────────────────────────────────────────
@@ -1187,15 +1204,31 @@ test("BuildPlayerIndex unions sources + filters", function()
     eq(L:BuildPlayerIndex("bo")[1].key, "bob", "filtered hit")
 end)
 
-test("BuildHistoryLog: newest-first + winner filter", function()
+test("BuildHistoryLog: newest-first + winner filter + {uid,rec}", function()
     L.db.global.history["s:1"] = { player = "Bob", ts = 100 }
     L.db.global.history["s:2"] = { player = "Amy", ts = 300 }
     L.db.global.history["s:3"] = { player = "Bobby", ts = 200 }
     local all = L:BuildHistoryLog("")
     eq(#all, 3, "all records")
-    eq(all[1].ts, 300, "newest first")
+    eq(all[1].rec.ts, 300, "newest first (unwrapped rec)")
+    eq(all[1].uid, "s:2", "entry carries its uid for retract")
     eq(#L:BuildHistoryLog("bob"), 2, "substring filter matches Bob + Bobby")
     eq(#L:BuildHistoryLog("zzz"), 0, "unmatched filter -> empty")
+end)
+
+-- dispatch.unaward: a bound-ML retraction clears the local awarded mirror + writes the retracted
+-- record; a non-ML / foreign-sid sender is ignored (§6.15, DL-11).
+test("dispatch.unaward: bound ML clears award + writes retraction", function()
+    L.activeSession = { sid = "S1", ml = "Boss", viewLevel = "full", awarded = { [2] = "Amy" } }
+    -- Wrong sender: ignored.
+    L.dispatch.unaward(L, { sid = "S1", itemIndex = 2, winner = "Amy", item = "[X]", ts = 500 }, "Rando")
+    eq(L.activeSession.awarded[2], "Amy", "non-ML unaward ignored")
+    -- Bound ML: applies.
+    L.dispatch.unaward(L, { sid = "S1", itemIndex = 2, winner = "Amy", item = "[X]", itemID = 9, ts = 500 }, "Boss")
+    eq(L.activeSession.awarded[2], nil, "awarded mirror cleared")
+    eq(L.db.global.history["S1:2"].retracted, true, "retracted history record written")
+    eq(L.db.global.history["S1:2"].mod, 500, "record mod = broadcast ts (all clients converge)")
+    L.activeSession = nil
 end)
 
 -- ── Self-test runner (Core/SelfTest.lua) ─────────────────────────────────────

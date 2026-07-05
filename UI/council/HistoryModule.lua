@@ -28,7 +28,9 @@ LCEX:RegisterCouncilModule({
         panel.list = LCEX:CreateScrollList(panel, {
             rowHeight = 24, fillHeight = true, zebra = true,
             buildRow = function(parent)
-                local row = CreateFrame("Frame", nil, parent)
+                local row = CreateFrame("Button", nil, parent)
+                row:RegisterForClicks("RightButtonUp")
+                row:SetScript("OnClick", function(r) LCEX:HistoryRecordMenu(r._uid, r._rec) end)
                 row.icon = LCEX:CreateItemIcon(row, 18)
                 row.icon:SetPoint("LEFT", 6, 0)
                 row.item = row:CreateFontString(nil, "OVERLAY")
@@ -50,15 +52,25 @@ LCEX:RegisterCouncilModule({
                 row.meta:SetJustifyH("LEFT"); row.meta:SetWordWrap(false)
                 return row
             end,
-            fillRow = function(row, rec)
+            fillRow = function(row, entry)
+                local rec = entry.rec
+                row._uid, row._rec = entry.uid, rec
                 local icon = GetItemInfoInstant and rec.itemLink
                     and select(5, GetItemInfoInstant(rec.itemLink))
                 row.icon:SetItem(rec.itemLink, icon)
                 row.item:SetText(rec.itemLink or ("item:" .. tostring(rec.itemID)))
                 row.winner:SetText(tostring(rec.player or "?"))
-                local cc = LCEX:ClassColor(LCEX:ClassOf(rec.player) or LCEX:CachedClass(rec.player))
-                row.winner:SetTextColor(cc[1], cc[2], cc[3])
-                row.resp:SetText(LCEX:ResponseText(rec.resp))
+                -- Retracted records (§6.15) render dimmed with a "(retracted)" suffix — kept, not deleted.
+                if rec.retracted then
+                    LCEX:ThemeText(row.item, "body", "faint")
+                    LCEX:ThemeText(row.winner, "body", "faint")
+                    row.resp:SetText(LCEX.L["(retracted)"])
+                else
+                    LCEX:ThemeText(row.item, "body", "ink")
+                    local cc = LCEX:ClassColor(LCEX:ClassOf(rec.player) or LCEX:CachedClass(rec.player))
+                    row.winner:SetTextColor(cc[1], cc[2], cc[3])
+                    row.resp:SetText(LCEX:ResponseText(rec.resp))
+                end
                 row.meta:SetText(string.format("%s · %s",
                     tostring(rec.boss or "?"), date("%m/%d %H:%M", rec.ts or 0)))
             end,
@@ -71,3 +83,31 @@ LCEX:RegisterCouncilModule({
         panel.list:SetData(LCEX:BuildHistoryLog(panel.filterBox:GetText()))
     end,
 })
+
+-- Right-click a history record → the post-session correction path (§6.15, record-only): "Retract
+-- record…" is offered only to the ML who LOGGED it (IsSelf(rec.by)) and only when not already
+-- retracted. SetRecord stamps a fresh mod/by and propagates over pSet/pSync (LWW).
+function LCEX:HistoryRecordMenu(uid, rec)
+    if not (uid and rec) or rec.retracted then return end
+    if not self:IsSelf(rec.by) then return end
+    self:ShowContextMenu({ title = self.L["Correct record"], items = { {
+        text = self.L["Retract record…"], danger = true,
+        onClick = function()
+            self:ShowConfirm({
+                text = string.format(self.L["Retract the record of %s → %s? (record only)"],
+                    tostring(rec.itemLink or "?"), tostring(rec.player or "?")),
+                onAccept = function()
+                    local copy = {}
+                    for k, v in pairs(rec) do copy[k] = v end
+                    copy.retracted, copy.retractedBy = true, UnitName("player")
+                    self:SetRecord("history", uid, copy) -- stamps mod/by, broadcasts pSet
+                    if self.councilWindow and self.councilWindow.panels
+                        and self.councilWindow.panels.history then
+                        local p = self.councilWindow.panels.history
+                        p.list:SetData(self:BuildHistoryLog(p.filterBox:GetText()))
+                    end
+                end,
+            })
+        end,
+    } } })
+end
