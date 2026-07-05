@@ -31,6 +31,23 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.37–v0.39 — FEATURE B COMPLETE (guild bank) — **needs a live scan**
+Headless-tested: the pure ledger (uid dedup, elapsed→absolute, 5-min/xN grouping), accessors, log
+visibility, and annotation round-trip; a selftest API contract (all guild-bank APIs exist) + a module
+render check. **The scanner + real replication need a live bank** — the selftest can't open one:
+
+- [ ] **Scan on open**: open your guild bank in-game → the `Guild Bank` council module fills the gold
+  **hero card**, per-tab **Contents** grid, and the **Log** (grouped newest-first, "xN" stacks). Watch
+  BugSack — the money-transaction loop is bounded to avoid the documented out-of-range **crash**.
+- [ ] **Replication (B1)**: a second officer sees your scanned contents / gold / log after a sync
+  (bounded by when your client re-advertises — `SyncHello` fires after a scan ingests new entries).
+- [ ] **Annotations (B5)**: click a Log group → add a note → it shows inline and replicates to another
+  officer. Non-council can't edit.
+- [ ] **Visibility (B5)**: as a raider, the module shows **Contents + gold** but **no Log** tab; flip
+  "Show the guild-bank log to all raiders" (Session Config) → the Log tab appears for raiders too.
+- [ ] **Hour-granular dedup caveat**: two officers scanning in different clock hours may double-log a
+  transaction (accepted API limitation) — sanity-check the log isn't wildly duplicated.
+
 ### v0.33–v0.36 — FEATURE C COMPLETE (access control + guild scoping + inherit)
 Selftest **green through v0.35.0 (43 pass / 0 fail)**; `guild scoping active` passed and `activeGuild
 = "Menu"` with existing history intact — the guild-scope **claim-in-place did not lose data**. v0.36.0
