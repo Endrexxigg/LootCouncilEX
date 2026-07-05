@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.37.0
+## Version: 0.38.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -56,6 +56,8 @@ UI\council\BrowserModule.lua
 UI\council\RosterModule.lua
 UI\council\HistoryModule.lua
 UI\council\SessionConfigModule.lua
+# Guild bank viewer (Feature B): hero gold card + tab selector + Contents/Log sub-tabs.
+UI\council\GbankModule.lua
 
 # User-level settings (schema-driven).
 UI\ConfigWindow.lua

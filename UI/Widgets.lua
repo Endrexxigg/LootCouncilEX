@@ -32,6 +32,16 @@ function LCEX:CreateItemIcon(parent, size)
         iconBtn.itemLink = link
         iconBtn.tex:SetTexture(icon or "Interface\\Icons\\INV_Misc_QuestionMark")
     end
+    -- Optional stack-count overlay (Feature B "xN"): outlined white, bottom-right. Hidden unless > 1.
+    btn.count = btn:CreateFontString(nil, "OVERLAY")
+    btn.count:SetFont(self.Theme.font, 10, "OUTLINE")
+    btn.count:SetTextColor(1, 1, 1)
+    btn.count:SetPoint("BOTTOMRIGHT", -1, 1)
+    btn.count:Hide()
+    function btn.SetCount(iconBtn, n)
+        if n and n > 1 then iconBtn.count:SetText("x" .. n); iconBtn.count:Show()
+        else iconBtn.count:Hide() end
+    end
     return btn
 end
 

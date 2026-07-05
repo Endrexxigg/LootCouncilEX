@@ -288,9 +288,13 @@ settings that depend on state, and for the configurable-visibility toggles.
 (`GbankGold`/`GbankTabs`/`GbankLogEntries`); live scanner on `GUILDBANKFRAME_OPENED` (throttled
 `QueryGuildBankTab`/`QueryGuildBankLog`, debounced `CacheAllTabs`/`IngestAllLogs`, crash-safe money-txn
 bound). **All guild-bank APIs verified BCC-tagged on warcraft.wiki.gg (X3)** + a selftest API contract.
-Headless tests for the pure logic. **(2) TODO:** `UI/council/GbankModule.lua` (hero gold card + tab
-selector + Contents/Log sub-tabs + xN icon overlay). **(3) TODO:** annotations (`gbankNotes` on a
-group) + `config.visibility` gbank toggles. Withdrawal-request + auto-note-prompt **deferred**. §6.12, DL-17.
+Headless tests for the pure logic. **(2) Module UI — DONE (v0.38.0):** `UI/council/GbankModule.lua`
+(order 50) — gold **hero card** (`GetCoinTextureString` + "cached Nm ago"), pooled **tab selector**,
+**Contents** 14×7 item grid + **Log** grouped-newest-first sub-tabs; added an **"xN" stack overlay** to
+`CreateItemIcon` (`SetCount`). Reads only the cache/ledger (works offline; "not cached" empty state).
+Selftest render check. **(3) TODO:** annotations (`gbankNotes` on a group, council-only) +
+`config.visibility` gbank toggles (logs/annotations hidden from non-council). Withdrawal-request +
+auto-note-prompt **deferred**. §6.12, DL-17.
 
 **The ask (user's words):** "include a module for guild bank … cache the guild bank
 items/tabs/gold/logs. log entries can be annotated … when multiple log items occur in a short

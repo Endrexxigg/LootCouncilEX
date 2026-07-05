@@ -199,6 +199,21 @@ L["Inherited %s loot-council settings from %s."] =
 L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
     "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
 
+-- The guild bank module (Feature B).
+L["Guild Bank"]                            = "Guild Bank"
+L["not cached"]                            = "not cached"
+L["cached just now"]                       = "cached just now"
+L["cached %dm ago"]                        = "cached %dm ago"
+L["Contents"]                              = "Contents"
+L["Log"]                                   = "Log"
+L["Tab %d"]                                = "Tab %d"
+L["deposited"]                             = "deposited"
+L["withdrew"]                              = "withdrew"
+L["moved"]                                 = "moved"
+L["repaired"]                              = "repaired"
+L["No transactions logged yet."]           = "No transactions logged yet."
+L["Open the guild bank in-game to scan it."] = "Open the guild bank in-game to scan it."
+
 -- The config window.
 L["Configuration"]                          = "Configuration"
 L["Appearance"]                             = "Appearance"

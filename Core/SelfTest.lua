@@ -861,6 +861,23 @@ LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C)", function(
     if self:AmCouncil() then t:Ok(self:CanSeeLootWindow(), "council must always see the loot window") end
 end)
 
+LCEX:RegisterSelfTest("ui", "guild bank module renders (Feature B)", function(self, t)
+    self:OpenCouncilModule("gbank")
+    local f = self.councilWindow
+    local gp = f and f.panels and f.panels.gbank
+    if t:Ok(gp and gp:IsShown(), "gbank panel not shown") then
+        t:Ok(gp.hero ~= nil and gp.grid ~= nil and gp.logList ~= nil, "gbank controls missing")
+        t:Eq(#gp.gridIcons, 98, "contents grid has 14x7 slots")
+        t:Ok(gp.hero.gold:GetText() ~= nil, "hero gold rendered from the cache")
+        -- Switch to the Log sub-tab (exercises BuildGbankGroups over the live ledger) and back.
+        for _, b in ipairs(gp.subTabs) do if b.subKey == "log" then b:Click() end end
+        t:Ok(gp.logList:IsShown(), "log sub-tab shows the grouped list")
+        for _, b in ipairs(gp.subTabs) do if b.subKey == "contents" then b:Click() end end
+    end
+end, { cleanup = function(self)
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
+
 LCEX:RegisterSelfTest("ui", "confirm popup + loot-window D/E control (Feature V)", function(self, t)
     -- The reusable confirm (D/E send; later Feature C's inherit prompt): accept fires onAccept with
     -- the input text when a manual-target field is shown, and dismisses. No DB writes here.
