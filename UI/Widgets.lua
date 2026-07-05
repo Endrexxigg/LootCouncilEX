@@ -202,9 +202,13 @@ function LCEX:CreateWindowV2(name, opts)
     f:SetSize(opts.width or 420, opts.height or 320)
     local def = opts.defaultPos
     f:SetPoint("CENTER", UIParent, "CENTER", (def and def.x) or 0, (def and def.y) or 0)
-    f:SetFrameStrata("DIALOG")
+    f:SetFrameStrata(opts.strata or "DIALOG")
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
+    -- Bring a window to the front of its strata whenever it's shown or clicked, so overlapping
+    -- LCEX windows (all DIALOG) stop hiding under each other. Modal popups pass a higher strata.
+    f:HookScript("OnShow", function(w) w:Raise() end)
+    f:SetScript("OnMouseDown", function(w) w:Raise() end)
     self:Surface(f, "page")
     self:SoftEdge(f)
 
@@ -231,7 +235,8 @@ function LCEX:CreateWindowV2(name, opts)
     f:SetMovable(true)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
-    bar:SetScript("OnDragStart", function() f:StartMoving() end)
+    bar:SetScript("OnMouseDown", function() f:Raise() end) -- the bar captures the click, so raise here too
+    bar:SetScript("OnDragStart", function() f:Raise(); f:StartMoving() end)
     bar:SetScript("OnDragStop", function()
         f:StopMovingOrSizing()
         SavePlacement(addon, f, opts.savedKey, opts.resizable)
@@ -543,7 +548,10 @@ function LCEX:ShowConfirm(opts)
     opts = opts or {}
     local f = self._confirmFrame
     if not f then
-        f = self:CreateWindowV2("LCEX_Confirm", { width = 360, height = 150, title = self.L["Confirm"] })
+        -- FULLSCREEN_DIALOG so the modal-ish confirm (e.g. the browser Leave-note editor) always
+        -- sits ABOVE the DIALOG-strata windows it's launched from, instead of clipping under them.
+        f = self:CreateWindowV2("LCEX_Confirm",
+            { width = 360, height = 150, title = self.L["Confirm"], strata = "FULLSCREEN_DIALOG" })
 
         f.msg = f:CreateFontString(nil, "OVERLAY")
         self:ThemeText(f.msg, "body", "ink")
