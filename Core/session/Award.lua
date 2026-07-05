@@ -250,12 +250,24 @@ function LCEX:BuildCouncilableList()
     return list
 end
 
--- Find an item's current { bag, slot } by link (slots move as bags change).
-function LCEX:FindItemInBags(link)
+-- Find an item's current { bag, slot } by link (slots move as bags change). With `skipLocked`,
+-- skip a slot mid-move (its item is being placed elsewhere); with `avoid` = { ["bag:slot"]=true },
+-- skip slots already claimed this pass — so two identical copies resolve to two distinct stacks
+-- instead of both grabbing the first (§6.14 duplicate hand-off).
+function LCEX:FindItemInBags(link, skipLocked, avoid)
     for bag = 0, 4 do
         for slot = 1, (GetContainerNumSlots(bag) or 0) do
             if GetContainerItemLink(bag, slot) == link then
-                return bag, slot
+                local key = bag .. ":" .. slot
+                local locked = false
+                if skipLocked then
+                    local info = GetContainerItemInfo(bag, slot)
+                    if type(info) == "table" then locked = info.isLocked and true or false
+                    else locked = select(3, GetContainerItemInfo(bag, slot)) and true or false end
+                end
+                if not locked and not (avoid and avoid[key]) then
+                    return bag, slot
+                end
             end
         end
     end
@@ -395,9 +407,35 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
     if a and self.session and a.sid == self.session.sid then
         a.awarded = a.awarded or {}
         a.awarded[itemIndex] = name
+        -- Recompute + rebroadcast the GROUP's readiness (§6.14): the border flips to "awarded"
+        -- only when the last copy lands, and partial-award progress reaches every client.
+        local leader = (self.session.groups and self.session.groups.leaderOf[itemIndex]) or itemIndex
+        self:ApplyCUpdate(self.session.sid, leader, self.session.rows[leader], self:ComputeItemStatus(leader))
+        self:BroadcastCUpdate(leader)
         self:RefreshLootItem(itemIndex)
     end
     return true
+end
+
+-- The next unawarded physical copy of a group (§6.14): its leader first, then members in order;
+-- nil when every copy is awarded. Reads activeSession.awarded (client-safe) with GroupMembers.
+function LCEX:NextAwardableIndex(leader)
+    local a = self.activeSession
+    for _, m in ipairs(self:GroupMembers(leader)) do
+        if not (a and a.awarded and a.awarded[m] ~= nil) then return m end
+    end
+    return nil
+end
+
+-- Award `name` the next available copy of a group (§6.14). The UI awards through this so a
+-- duplicate stack hands out distinct physical indices (uid = sid:physIdx) across copies.
+function LCEX:AwardGroup(leader, name, forcedResp)
+    local idx = self:NextAwardableIndex(leader)
+    if not idx then
+        self:Msg(self.L["Every copy of that item is already awarded."])
+        return false
+    end
+    return self:AwardItem(idx, name, forcedResp)
 end
 
 -- Human-readable award reason for a resp code (§6.10): D/E for a disenchant, the poll response text
@@ -449,50 +487,63 @@ function LCEX:CmdAward(rest)
     self:AwardItem(itemIndex, name)
 end
 
--- Is `link` already sitting in one of the player's six trade slots? (Slot 7 is the
--- will-not-be-traded slot and is never used for hand-offs.)
-function LCEX:TradeHasItem(link)
+-- How many of `link` are currently sitting in the player's six trade slots. (Slot 7 is the
+-- will-not-be-traded slot and is never used for hand-offs.) Counts duplicates, so owing a winner
+-- two identical copies fills two slots, not one (§6.14).
+function LCEX:TradeItemCount(link)
+    local n = 0
     for i = 1, 6 do
-        if GetTradePlayerItemLink(i) == link then
-            return true
-        end
+        if GetTradePlayerItemLink(i) == link then n = n + 1 end
     end
-    return false
+    return n
 end
 
--- Try ONCE to drop a single owed item into the open trade window. UseContainerItem places a
--- bag item into the first free trade slot — but ONLY while a trade is open; with no trade it
--- would equip/consume the item, hence the IsShown guard. Returns true once the item shows in
--- a trade slot. No user message: FillOwedTrades decides when to report success/failure.
-function LCEX:PlaceItemInTrade(rec)
-    if self:TradeHasItem(rec.link) then return true end
-    if not (TradeFrame and TradeFrame:IsShown()) then return false end
-    if CursorHasItem() then ClearCursor() end
-    local bag, slot = self:FindItemInBags(rec.link)
-    if not bag then return false end
-    UseContainerItem(bag, slot)
-    if CursorHasItem() then ClearCursor() end -- never strand the cursor on a failed add
-    return self:TradeHasItem(rec.link)
-end
-
--- Load every item owed to the current trade partner into the window. UseContainerItem can
--- silently no-op while a just-looted item is still bag-locked, so retry a few times a beat
--- apart before falling back to a manual-drag prompt. Stops if the trade window closes.
+-- Load every item owed to the current trade partner into the window. Owed records are grouped by
+-- link and placed COUNTED — for k copies of one link already showing `present` copies, place the
+-- k − present remaining, each from a distinct bag slot (§6.14: two identical items no longer
+-- collapse onto one trade slot). UseContainerItem can silently no-op while a just-looted item is
+-- still bag-locked, so anything that doesn't take retries a beat later, then falls back to a
+-- manual-drag prompt. Stops if the trade window closes.
 function LCEX:FillOwedTrades(attempt)
     local list = self.tradePartnerKey and self.pendingTrades[self.tradePartnerKey]
     if not list or #list == 0 then return end
     if not (TradeFrame and TradeFrame:IsShown()) then return end
 
-    local stuck = {}
+    local byLink = {}
     for _, rec in ipairs(list) do
-        if self:PlaceItemInTrade(rec) then
-            if not rec.filled then
-                rec.filled = true
-                self:Msg(string.format(self.L["Auto-filled %s into the trade with %s."],
-                    rec.link, rec.winner))
+        byLink[rec.link] = byLink[rec.link] or {}
+        table.insert(byLink[rec.link], rec)
+    end
+
+    local stuck, used = {}, {}
+    for link, recs in pairs(byLink) do
+        local present = self:TradeItemCount(link)
+        for i, rec in ipairs(recs) do
+            if i <= present then
+                -- Already in a trade slot (from a prior pass or a manual drag) — just announce once.
+                if not rec.filled then
+                    rec.filled = true
+                    self:Msg(string.format(self.L["Auto-filled %s into the trade with %s."],
+                        rec.link, rec.winner))
+                end
+            else
+                if CursorHasItem() then ClearCursor() end
+                local bag, slot = self:FindItemInBags(link, true, used)
+                local before = self:TradeItemCount(link)
+                if bag then
+                    UseContainerItem(bag, slot)
+                    if CursorHasItem() then ClearCursor() end -- never strand the cursor
+                end
+                if bag and self:TradeItemCount(link) > before then
+                    used[bag .. ":" .. slot] = true
+                    present = self:TradeItemCount(link)
+                    rec.filled = true
+                    self:Msg(string.format(self.L["Auto-filled %s into the trade with %s."],
+                        rec.link, rec.winner))
+                else
+                    stuck[#stuck + 1] = rec
+                end
             end
-        else
-            stuck[#stuck + 1] = rec
         end
     end
 

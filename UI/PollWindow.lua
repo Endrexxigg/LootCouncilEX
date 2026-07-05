@@ -39,12 +39,14 @@ function LCEX:_PollQueueRemove(queue, itemIndex)
     return queue
 end
 
--- The usable subset of a session's wire items, as item INDICES in session order. Pure given
--- PlayerCanUse — headless-tested.
+-- The usable subset of a session's wire items, as GROUP-LEADER indices in session order (§6.14):
+-- duplicate copies share one card, so a raider responds once per distinct item. Pure given
+-- PlayerCanUse + BuildItemGroups — headless-tested.
 function LCEX:_BuildPollQueue(items)
+    local groups = self:BuildItemGroups(items)
     local queue = {}
-    for i, it in ipairs(items or {}) do
-        if self:PlayerCanUse(it.link) then queue[#queue + 1] = i end
+    for _, leader in ipairs(groups.leaders) do
+        if self:PlayerCanUse(items[leader].link) then queue[#queue + 1] = leader end
     end
     return queue
 end
@@ -130,6 +132,10 @@ function LCEX:FillPollCard(card, itemIndex, item, responses)
 
     local icon = GetItemInfoInstant and select(5, GetItemInfoInstant(item.link))
     card.icon:SetItem(item.link, icon)
+    -- "xN" when this card stands in for a duplicate stack (§6.14); hidden at 1.
+    local a = self.activeSession
+    local members = a and a.groups and a.groups.members[itemIndex]
+    card.icon:SetCount(members and #members or 1)
 
     local q = self:QualityColor(item.quality)
     card.name:SetText(tostring(item.link):match("%[(.-)%]") or item.link)

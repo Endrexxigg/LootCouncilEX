@@ -149,6 +149,62 @@ function LCEX:NewSessionID()
     return UnitName("player") .. "-" .. time() .. "-" .. counter
 end
 
+-- ── Duplicate-item grouping (§6.14, DL-19) ───────────────────────────────────
+-- Group session items by identical link so duplicate drops share one poll card / one candidate
+-- table (RCLC-style), while each award still consumes a DISTINCT physical index. Pure and
+-- deterministic: the ML and every client derive the same groups from the same broadcast `items`
+-- list, so nothing new rides the wire. leader = the lowest index of each link.
+--   { leaderOf = {[i]=leader}, members = {[leader]={i,...}}, leaders = {leadersAsc} }
+function LCEX:BuildItemGroups(items)
+    local leaderOf, members, leaders, firstByLink = {}, {}, {}, {}
+    for i, it in ipairs(items or {}) do
+        local link = it.link
+        local leader = firstByLink[link]
+        if not leader then
+            firstByLink[link] = i
+            leader = i
+            members[i] = {}
+            leaders[#leaders + 1] = i
+        end
+        leaderOf[i] = leader
+        members[leader][#members[leader] + 1] = i
+    end
+    return { leaderOf = leaderOf, members = members, leaders = leaders }
+end
+
+-- Union of several {name,class} rosters, deduped by normalized name (first seen wins). A group's
+-- kill set is the union of every member copy's captured roster — "more data is better" (R1). Pure.
+function LCEX:_UnionRosters(rosters)
+    local seen, out = {}, {}
+    for _, roster in ipairs(rosters or {}) do
+        for _, m in ipairs(roster or {}) do
+            local k = self:NormalizeName(m.name)
+            if k and not seen[k] then seen[k] = true; out[#out + 1] = m end
+        end
+    end
+    return out
+end
+
+-- The physical member indices of a leader's group, CLIENT-SAFE (reads activeSession.groups, which
+-- every client derives). Falls back to { leader } when there is no grouping. Used by the UI.
+function LCEX:GroupMembers(leader)
+    local a = self.activeSession
+    local m = a and a.groups and a.groups.members[leader]
+    return m or { leader }
+end
+
+-- The deduped kill roster for a group leader: union the captured roster of every member copy.
+function LCEX:GroupKillRoster(leader)
+    local s = self.session
+    local members = (s and s.groups and s.groups.members[leader]) or { leader }
+    local rosters = {}
+    for _, m in ipairs(members) do
+        local r = self.sessionItems and self.sessionItems[m] and self.sessionItems[m].roster
+        if r then rosters[#rosters + 1] = r end
+    end
+    return self:_UnionRosters(rosters)
+end
+
 -- Build the pre-seeded candidate rows for one session item (V1, PROJECT.md §6.10). The row list is
 -- the union (deduped by normalized name) of the KILL roster — who was present when the item dropped
 -- — and the CURRENT raid, so both latecomers and leavers show. Each row carries a `reason` until
@@ -189,11 +245,13 @@ function LCEX:SeedSessionRows()
     local s = self.session
     if not s then return end
     local nowRoster = self:PresentRoster()
-    for i, it in ipairs(s.items) do
-        local killRoster = self.sessionItems and self.sessionItems[i] and self.sessionItems[i].roster
-        s.rows[i] = self:SeedRows(killRoster, nowRoster, it.link)
-        self:ApplyCUpdate(s.sid, i, s.rows[i], self:ComputeItemStatus(i)) -- the ML's own voting frame
-        self:BroadcastCUpdate(i)                                          -- and the council (no-op solo)
+    -- Seed LEADERS only (§6.14): duplicate copies share the leader's rows. The kill set is the
+    -- union of every member copy's captured roster.
+    for _, leader in ipairs(s.groups.leaders) do
+        local killRoster = self:GroupKillRoster(leader)
+        s.rows[leader] = self:SeedRows(killRoster, nowRoster, s.items[leader].link)
+        self:ApplyCUpdate(s.sid, leader, s.rows[leader], self:ComputeItemStatus(leader)) -- ML's own frame
+        self:BroadcastCUpdate(leader)                                                    -- + council (no-op solo)
     end
 end
 
@@ -223,6 +281,7 @@ function LCEX:StartSession(items)
     self.session = {
         sid = sid, items = items, council = council, councilSet = councilSet,
         rows = {}, voters = {}, startedAt = time(), anon = anon,
+        groups = self:BuildItemGroups(items), -- duplicate grouping (§6.14)
     }
 
     -- Optional response deadline (Session Config): rides sStart as a DURATION so receivers
@@ -319,6 +378,7 @@ function LCEX:ResumeSession()
     self.session = {
         sid = saved.sid, items = saved.items, council = saved.council, councilSet = councilSet,
         rows = {}, voters = {}, startedAt = saved.startedAt or time(), anon = anon,
+        groups = self:BuildItemGroups(saved.items), -- duplicate grouping (§6.14)
     }
     self.sessionItems = saved.sessionItems
 
@@ -412,6 +472,9 @@ LCEX.dispatch.cResp = function(self, msg, sender)
     if not self:InGroupWith(sender) then return end
     local index = msg.item
     if type(index) ~= "number" or not s.items[index] then return end
+    -- Aggregate under the group LEADER (§6.14): duplicate copies share one candidate table.
+    -- Identity mapping when no duplicates exist, so a non-grouped session is byte-unchanged.
+    index = (s.groups and s.groups.leaderOf[index]) or index
 
     local rows = s.rows[index] or {}
     s.rows[index] = rows

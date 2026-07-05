@@ -285,7 +285,8 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "EnterSession", "LeaveSession", "ResumeSession", "RestoreSession", "SaveSession",
         "OnResponseChosen", "CompetingGear", "SendVote", "ApplyCUpdate",
         "PlayerCanUse", "ClassCanUse",
-        "AwardItem", "LogAward", "ForgetAward", "ScanBags", "BuildCouncilableList",
+        "AwardItem", "AwardGroup", "NextAwardableIndex", "BuildItemGroups", "GroupMembers",
+        "GroupFullyAwarded", "LogAward", "ForgetAward", "ScanBags", "BuildCouncilableList",
         "WithItemQuality", "WithItemID", "ItemTradeTimeRemaining", "ParseTradeDuration",
         "FormatDuration", "TradeExpiry", "SaveOwedTrades", "RestoreOwedTrades",
         "EnsureTradeTicker", "StopTradeTickerIfIdle",
@@ -1341,6 +1342,64 @@ end, { cleanup = function(self)
     end
     -- No live session ⇒ sessionItems must be nil (EndSession's invariant). Covers the edge
     -- where StartSession threw after the fake records were staged but before a sid existed.
+    if not self.session then self.sessionItems = nil end
+    self:StopTradeTickerIfIdle()
+end })
+
+-- Duplicate grouping (Phase 12, §6.14): two identical items run as ONE poll card / ONE candidate
+-- table (RCLC-style), but each award consumes a DISTINCT physical index (uid = sid:index). Solo,
+-- so nothing broadcasts. Mirrors the headless coverage against the live client.
+LCEX:RegisterSelfTest("session", "duplicate grouping: one card, two physical awards", function(self, t)
+    if self.session or self.activeSession then return t:Skip("a session is already open") end
+    if self.recoverableSession then return t:Skip("an unfinished session is pending /lcex resume") end
+    if self:GroupChannel() then return t:Skip("grouped — run the self-test solo so nothing broadcasts") end
+
+    -- Two copies of the SAME universal item (30056 cloth robe) + one distinct item.
+    local dup = FakeWireItem(2)
+    local items = { { link = dup.link, quality = dup.quality },
+                    { link = dup.link, quality = dup.quality },
+                    FakeWireItem(1) }
+    self.sessionItems = {}
+    for i, it in ipairs(items) do
+        self.sessionItems[i] = { link = it.link, itemID = it.itemID or dup.itemID, quality = it.quality,
+                                 boss = "Self-Test", lootedAt = time() }
+    end
+    self:StartSession({ { link = items[1].link, quality = items[1].quality },
+                        { link = items[2].link, quality = items[2].quality },
+                        { link = items[3].link, quality = items[3].quality } })
+    local s = self.session
+    if not t:Ok(s ~= nil, "StartSession did not open") then return end
+    self._selfTestSid = s.sid
+
+    -- Grouping: copies 1&2 collapse to leader 1; the distinct item is its own group.
+    t:Eq(s.groups.leaderOf[2], 1, "copy 2 groups under leader 1")
+    t:Ok(s.rows[2] == nil, "member copy has no separate rows")
+    -- Poll: one card per group → 2 cards for 3 items (the dup collapses).
+    t:Eq(#(self.pollQueue or {}), 2, "one poll card per group (dup collapsed)")
+    -- Rail: the grouped row carries the x2 count overlay.
+    local entries = self:LootRailEntries()
+    t:Eq(#entries, 2, "rail shows one row per group")
+    t:Eq(entries[1].count, 2, "grouped rail row count = 2")
+    t:Ok(self.lootWindow.railList.rows[1].icon.count:IsShown(), "x2 overlay shown for the dup")
+
+    -- Two AwardGroup calls consume distinct physical copies with distinct uids.
+    t:Ok(self:AwardGroup(1, AWARD_DUMMY), "award copy 1")
+    t:Ok(not self:GroupFullyAwarded(1), "group not full after one copy")
+    t:Ok(self:AwardGroup(1, AWARD_DUMMY), "award copy 2")
+    t:Ok(self:GroupFullyAwarded(1), "group full after both copies")
+    t:Ok(self.db.global.history[s.sid .. ":1"] and self.db.global.history[s.sid .. ":2"],
+        "two distinct physical history uids")
+    self:EndSession()
+end, { cleanup = function(self)
+    local sid = self._selfTestSid
+    self._selfTestSid = nil
+    if self.session and sid and self.session.sid == sid then self:EndSession() end
+    if sid then
+        for i = 1, 2 do
+            self:ForgetAward(sid .. ":" .. i)
+            self.db.global.history[sid .. ":" .. i] = nil
+        end
+    end
     if not self.session then self.sessionItems = nil end
     self:StopTradeTickerIfIdle()
 end })

@@ -116,6 +116,19 @@ function LCEX:VotesCastOn(index)
     return #self:VotersOn(index)
 end
 
+-- True once every physical copy in a group is awarded (§6.14). Reads session.groups (ML) +
+-- activeSession.awarded. A non-grouped item is "full" once its own index is awarded.
+function LCEX:GroupFullyAwarded(leader)
+    local a = self.activeSession
+    local awarded = a and a.awarded
+    local s = self.session
+    local members = (s and s.groups and s.groups.members[leader]) or { leader }
+    for _, m in ipairs(members) do
+        if not (awarded and awarded[m] ~= nil) then return false end
+    end
+    return true
+end
+
 -- ML-side glue: gather the live facts for item `index` and run the calculator. Nil when there is
 -- no session / no rows for the item (the caller then sends no status — receivers keep their last).
 function LCEX:ComputeItemStatus(index)
@@ -123,8 +136,9 @@ function LCEX:ComputeItemStatus(index)
     if not s then return nil end
     local rows = s.rows[index]
     if not rows then return nil end
-    local a = self.activeSession
-    local awarded = (a and a.awarded and a.awarded[index] ~= nil) or false
+    -- Group-aware (§6.14): the border only reads "awarded" once EVERY copy is awarded; a
+    -- partially-awarded group keeps computing live status for the copies still up for grabs.
+    local awarded = self:GroupFullyAwarded(index)
     local voters = self:VotersOn(index)
     local status = self:ReadinessStatus({
         rows           = rows,

@@ -1060,6 +1060,64 @@ test("AwardItem forcedResp tags a D/E award (reason renders D/E)", function()
     L:EndSession()
 end)
 
+-- ── Duplicate grouping (§6.14, DL-19) ────────────────────────────────────────
+test("Duplicate grouping: shared responses + per-copy awards", function()
+    H.inRaid, H.group = true, { "Amy", "Bob", "Tester" }
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 1 } -- cloth chest: usable by the mock
+    local items = { { link = "item:100", quality = 4 }, { link = "item:100", quality = 4 },
+                    { link = "item:200", quality = 4 } }
+
+    -- BuildItemGroups: copies 1&2 group under leader 1; item 3 is its own group.
+    local g = L:BuildItemGroups(items)
+    eq(g.leaderOf[2], 1, "copy 2 groups under leader 1")
+    eq(g.leaderOf[3], 3, "distinct item is its own leader")
+    eq(#g.leaders, 2, "two groups")
+    eq(#g.members[1], 2, "leader 1 has two members")
+
+    -- One poll card per group (leaders only), order preserved.
+    eq(table.concat(L:_BuildPollQueue(items), ","), "1,3", "one poll card per group")
+
+    -- _UnionRosters dedups by normalized name.
+    local u = L:_UnionRosters({ { { name = "Amy", class = "MAGE" } },
+                                { { name = "Amy" }, { name = "Bob", class = "WARRIOR" } } })
+    eq(#u, 2, "union dedups Amy across copies")
+
+    L.sessionItems = {
+        { link = "item:100", itemID = 100, quality = 4, roster = { { name = "Amy", class = "MAGE" } } },
+        { link = "item:100", itemID = 100, quality = 4, roster = { { name = "Bob", class = "WARRIOR" } } },
+        { link = "item:200", itemID = 200, quality = 4, roster = { { name = "Amy", class = "MAGE" } } },
+    }
+    L:StartSession(items)
+    local s = L.session
+    ok(s.rows[1] ~= nil and s.rows[3] ~= nil, "leaders seeded")
+    ok(s.rows[2] == nil, "member copy not separately seeded")
+    ok(s.rows[1]["amy"] and s.rows[1]["bob"], "group 1 kill set unions both copies' rosters")
+
+    -- cResp on a MEMBER index (2) aggregates under the leader (1).
+    L.dispatch.cResp(L, { sid = s.sid, item = 2, resp = 1 }, "Amy")
+    eq(s.rows[1]["amy"].resp, 1, "cResp on a member index lands under the leader")
+    ok(s.rows[2] == nil, "no rows created under the member index")
+
+    -- vVote on a member index also remaps to the leader.
+    L.dispatch.vVote(L, { sid = s.sid, item = 2, candidate = "amy", vote = 1 }, "Tester")
+    eq(s.rows[1]["amy"].votes, 1, "vVote on a member index tallies under the leader")
+
+    -- Per-copy awards: leader first, then the next member; distinct uids; group-full gating.
+    eq(L:NextAwardableIndex(1), 1, "first award -> leader copy")
+    ok(L:AwardGroup(1, "Amy"), "award copy 1 to Amy")
+    eq(L.activeSession.awarded[1], "Amy", "copy 1 -> Amy")
+    ok(not L:GroupFullyAwarded(1), "group not full after one of two")
+    eq(L:NextAwardableIndex(1), 2, "next award -> the second copy")
+    ok(L:AwardGroup(1, "Bob"), "award copy 2 to Bob")
+    eq(L.activeSession.awarded[2], "Bob", "copy 2 -> Bob")
+    ok(L:GroupFullyAwarded(1), "group full once both copies are awarded")
+    ok(not L:AwardGroup(1, "Amy"), "no copies left -> AwardGroup refuses")
+    ok(L.db.global.history[s.sid .. ":1"] and L.db.global.history[s.sid .. ":2"],
+        "two distinct physical history uids")
+    L:EndSession()
+    H.instant = nil
+end)
+
 -- ── Poll queue (UI/PollWindow.lua pure helpers) ──────────────────────────────
 test("Poll queue: filtered build + value-remove advance", function()
     local function instant(classID, subClassID)

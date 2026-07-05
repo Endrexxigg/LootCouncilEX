@@ -78,6 +78,8 @@ LCEX.dispatch.vVote = function(self, msg, sender)
     if not self:IsCouncil(sender) then return end
     local index, candKey = msg.item, msg.candidate
     if type(index) ~= "number" or not s.items[index] then return end
+    -- Votes live under the group LEADER (§6.14), matching the shared candidate table.
+    index = (s.groups and s.groups.leaderOf[index]) or index
     local row = s.rows[index] and s.rows[index][candKey]
     if not row then return end -- can't vote for someone who hasn't responded
 

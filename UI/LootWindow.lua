@@ -54,6 +54,37 @@ function LCEX:LootRailItems()
     return self.stagingItems, false
 end
 
+-- Rail entries: one per GROUP in a live session (§6.14 — duplicate copies collapse to a single
+-- row carrying `count`, `awardedCount`, and per-copy `winners`), else one per staging item (1:1).
+-- `leaderIndex` is the selection key (a real item index — always a leader in-session). Returns
+-- (entries, inSession).
+function LCEX:LootRailEntries()
+    local a = self.activeSession
+    if a and a.items and a.groups then
+        local out = {}
+        for _, leader in ipairs(a.groups.leaders) do
+            local members = a.groups.members[leader]
+            local awardedCount, winners = 0, {}
+            for _, m in ipairs(members) do
+                local w = a.awarded and a.awarded[m]
+                winners[m] = w
+                if w then awardedCount = awardedCount + 1 end
+            end
+            out[#out + 1] = {
+                link = a.items[leader].link, quality = a.items[leader].quality,
+                leaderIndex = leader, count = #members,
+                awardedCount = awardedCount, winners = winners, members = members,
+            }
+        end
+        return out, true
+    end
+    local out = {}
+    for i, it in ipairs(self.stagingItems) do
+        out[i] = { link = it.link, quality = it.quality, leaderIndex = i, count = 1 }
+    end
+    return out, false
+end
+
 -- ── Frame shell ──────────────────────────────────────────────────────────────
 function LCEX:EnsureLootWindow()
     if self.lootWindow then return self.lootWindow end
@@ -299,13 +330,36 @@ function LCEX:BuildLootRailRow(parent)
     row:SetScript("OnClick", function()
         LCEX:LootSelectItem(row.index)
     end)
+    -- Hover a grouped row → the per-copy winner breakdown, so a diverged x2 (one awarded, one
+    -- still up) is never hidden behind the count (§6.14). Single/unawarded rows show nothing.
+    row:SetScript("OnEnter", function(r)
+        local e = r.entry
+        if not (e and e.count and e.count > 1 and (e.awardedCount or 0) > 0) then return end
+        GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(LinkName(e.link))
+        for i, m in ipairs(e.members or {}) do
+            local w = e.winners and e.winners[m]
+            if w then
+                GameTooltip:AddDoubleLine(string.format(LCEX.L["Copy %d"], i),
+                    DisplayName(nil, w), 0.8, 0.8, 0.8,
+                    LCEX.Theme.success[1], LCEX.Theme.success[2], LCEX.Theme.success[3])
+            else
+                GameTooltip:AddDoubleLine(string.format(LCEX.L["Copy %d"], i),
+                    LCEX.L["unawarded"], 0.8, 0.8, 0.8, 0.6, 0.6, 0.6)
+            end
+        end
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return row
 end
 
-function LCEX:FillLootRailRow(row, entry, index)
-    row.index = index
+function LCEX:FillLootRailRow(row, entry)
+    row.index = entry.leaderIndex -- selection key (a leader index in-session; staging position otherwise)
+    row.entry = entry
     local icon = GetItemInfoInstant and select(5, GetItemInfoInstant(entry.link))
     row.icon:SetItem(entry.link, icon)
+    row.icon:SetCount(entry.count or 1) -- "xN" for duplicate stacks; hidden at 1 (§6.14, item 10)
     local q = self:QualityColor(entry.quality)
     row.name:SetText(LinkName(entry.link))
     row.name:SetTextColor(q[1], q[2], q[3])
@@ -318,28 +372,38 @@ function LCEX:FillLootRailRow(row, entry, index)
     row.badge:SetPoint("RIGHT", a and -6 or -24, 0)
     if a then
         row.remove:Hide()
-        -- Award-readiness border (Feature V, §6.10): awarded items force "awarded" directly off the
-        -- existing award flow (so it lights the instant `award` lands, no cUpdate round-trip); every
-        -- other state rides the ML-broadcast status mirrored into voteStatus.
         local statusKind
-        local awardedTo = a.awarded and a.awarded[index]
-        if awardedTo then
-            row.badge:SetText(CHECK_TEX .. " " .. DisplayName(nil, awardedTo))
+        local awardedCount, count = entry.awardedCount or 0, entry.count or 1
+        if awardedCount > 0 then
+            -- Winner badge: a single item shows its winner; a partially/fully awarded stack shows
+            -- "a/N" (the per-copy tooltip breaks out who won which). Fully-awarded forces the
+            -- "awarded" border directly; a partial group keeps the live status.
+            if count == 1 then
+                local only = entry.winners and entry.winners[entry.leaderIndex]
+                row.badge:SetText(CHECK_TEX .. " " .. DisplayName(nil, only))
+            else
+                row.badge:SetText(CHECK_TEX .. " " .. awardedCount .. "/" .. count)
+            end
             row.badge:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
-            statusKind = "awarded"
+            if awardedCount >= count then
+                statusKind = "awarded"
+            else
+                local st = self.voteStatus and self.voteStatus[entry.leaderIndex]
+                statusKind = st and st.kind
+            end
         else
             -- Response count is full-view only (DL-18): a list-level spectator's rail shows
             -- item + award state + winner, never how many (or who) responded.
             if a.viewLevel == "full" then
                 local n = 0
-                local rows = self.voteRows and self.voteRows[index]
+                local rows = self.voteRows and self.voteRows[entry.leaderIndex]
                 if rows then for _ in pairs(rows) do n = n + 1 end end
                 row.badge:SetText(tostring(n))
                 self:ThemeText(row.badge, "caption", "faint")
             else
                 row.badge:SetText("")
             end
-            local st = self.voteStatus and self.voteStatus[index]
+            local st = self.voteStatus and self.voteStatus[entry.leaderIndex]
             statusKind = st and st.kind
         end
         SetIconBorder(row.statusBorder, self:StatusColor(statusKind))
@@ -349,7 +413,7 @@ function LCEX:FillLootRailRow(row, entry, index)
         SetIconBorder(row.statusBorder, nil)
     end
 
-    if f and f.selectedIndex == index then
+    if f and f.selectedIndex == entry.leaderIndex then
         self:Surface(row, "overlay")
         row.sel:Show()
     else
@@ -407,9 +471,20 @@ end
 
 function LCEX:FillLootCandRow(row, entry)
     local itemIndex, candKey, data = entry.itemIndex, entry.candKey, entry.data
-    local awardedTo = self.activeSession and self.activeSession.awarded
-        and self.activeSession.awarded[itemIndex]
-    local isWinner = awardedTo and self:NormalizeName(awardedTo) == candKey
+    -- Group-aware award state (§6.14): a candidate is a winner if they took ANY copy; the group is
+    -- "full" once every copy is awarded. itemIndex is the group leader (the shared candidate table).
+    local a = self.activeSession
+    local awarded = a and a.awarded
+    local members = self:GroupMembers(itemIndex)
+    local awardedCount, isWinner = 0, false
+    for _, m in ipairs(members) do
+        local w = awarded and awarded[m]
+        if w then
+            awardedCount = awardedCount + 1
+            if self:NormalizeName(w) == candKey then isWinner = true end
+        end
+    end
+    local groupFull = awardedCount >= #members
     -- The winner's row is explicitly marked (item 3): check + success-tinted response below.
     row.name:SetText((isWinner and (CHECK_TEX .. " ") or "") .. DisplayName(data, candKey))
     local cc = self:ClassColor(self:ClassOf(data.name or candKey) or self:CachedClass(data.name or candKey))
@@ -455,7 +530,6 @@ function LCEX:FillLootCandRow(row, entry)
     else self:ThemeText(row.votes, "body", "dim") end
 
     -- Own pending vote → gold-tint the matching button's label.
-    local a = self.activeSession
     local mine = a and a.myVotes and a.myVotes[itemIndex] and a.myVotes[itemIndex][candKey]
     local plusFs, minusFs = row.plus:GetFontString(), row.minus:GetFontString()
     if plusFs then
@@ -476,8 +550,8 @@ function LCEX:FillLootCandRow(row, entry)
     -- Award is the ML's action only — only the ML's award is authoritative.
     if a and self:IsSelf(a.ml) then
         row.award:Show()
-        if awardedTo then
-            -- Already awarded: grey out so it can't be casually re-clicked (item 3). The
+        if groupFull then
+            -- Every copy awarded: grey out so it can't be casually re-clicked (item 3). The
             -- deliberate correction path is the right-click un-award, not this button.
             row.award:SetText(self.L["Awarded"])
             row.award:SetFlatEnabled(false)
@@ -485,8 +559,9 @@ function LCEX:FillLootCandRow(row, entry)
         else
             row.award:SetText(self.L["Award"])
             row.award:SetFlatEnabled(true)
+            -- AwardGroup hands out the next unawarded physical copy (§6.14).
             row.award:SetScript("OnClick", function()
-                if self:AwardItem(itemIndex, data.name or candKey) then
+                if self:AwardGroup(itemIndex, data.name or candKey) then
                     self:RefreshLootWindow()
                 end
             end)
@@ -525,21 +600,27 @@ function LCEX:RefreshLootWindow()
     local f = self.lootWindow
     if not f or not f:IsShown() then return end
     local items, inSession = self:LootRailItems()
+    local railEntries = self:LootRailEntries()
 
     -- Full layout only for a live session at the full view level (DL-18): spectators keep the
     -- rail-only form, as does the pre-session staging list for everyone.
     local fullView = inSession and self.activeSession and self.activeSession.viewLevel == "full"
     self:ApplyLootLayout(f, fullView and "full" or "rail")
 
-    -- Clamp/derive selection.
+    -- Selection is a group LEADER (rows/header live under leaders, §6.14). Snap a stale member
+    -- selection up to its leader, then clamp to the first rail entry.
+    local a = self.activeSession
+    if inSession and a and a.groups and f.selectedIndex then
+        f.selectedIndex = a.groups.leaderOf[f.selectedIndex] or f.selectedIndex
+    end
     if not f.selectedIndex or not items[f.selectedIndex] then
-        f.selectedIndex = items[1] and 1 or nil
+        f.selectedIndex = railEntries[1] and railEntries[1].leaderIndex or nil
     end
 
     f.railHeader:SetText(inSession and self.L["SESSION ITEMS"] or self.L["STAGED ITEMS"])
     -- In-session the staging-control band (scan/add, 58px) is reclaimed by the list.
     f.railList:SetPoint("BOTTOMRIGHT", -2, inSession and 6 or 58)
-    f.railList:SetData(items)
+    f.railList:SetData(railEntries)
 
     if inSession then
         f.scanBtn:Hide(); f.addBox:Hide()
@@ -570,7 +651,10 @@ function LCEX:RefreshLootWindow()
         local q = self:QualityColor(entry.quality)
         f.itemName:SetText(LinkName(entry.link))
         f.itemName:SetTextColor(q[1], q[2], q[3])
-        f.itemCount:SetText(string.format("%d / %d", f.selectedIndex, #items))
+        -- Position among the RAIL entries (groups), not physical items, so "2 / 3" matches the list.
+        local pos = 1
+        for i, e in ipairs(railEntries) do if e.leaderIndex == f.selectedIndex then pos = i; break end end
+        f.itemCount:SetText(string.format("%d / %d", pos, #railEntries))
     else
         f.itemIcon:Hide()
         f.itemName:SetText("")
@@ -699,7 +783,8 @@ function LCEX:LootDisenchantSelected()
 
     local function award(name)
         name = strtrim(name or "")
-        if name ~= "" and self:AwardItem(index, name, self.STATUS.DISENCHANT) then
+        -- AwardGroup so a D/E on a duplicate stack consumes the next physical copy (§6.14).
+        if name ~= "" and self:AwardGroup(index, name, self.STATUS.DISENCHANT) then
             self:RefreshLootWindow()
         end
     end

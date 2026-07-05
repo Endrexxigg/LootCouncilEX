@@ -125,6 +125,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
         responses = responses or self.RESPONSES,
         council = set, amCouncil = amCouncil, viewLevel = viewLevel, myVotes = {},
         awarded = {}, -- pre-created so persistence can mirror it by reference (§6.16)
+        groups = self:BuildItemGroups(items), -- duplicate grouping, derived client-side (§6.14)
         deadlineAt = timeout and (GetTime() + timeout) or nil,
         anon = anon and true or false,
     }
