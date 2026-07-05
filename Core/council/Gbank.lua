@@ -169,10 +169,15 @@ end
 -- Re-cache the gold total (LWW). Fired by GUILDBANK_UPDATE_MONEY and once on open. Debounced —
 -- the event can burst as the server streams the value.
 function LCEX:CacheGbankMoney()
-    if GetGuildBankMoney then
-        self:SetRecord("gbankCache", MONEY_KEY, { gold = GetGuildBankMoney() or 0 })
-        if self.RefreshGbankHero then self:RefreshGbankHero() end -- live-update the open hero card
+    if not GetGuildBankMoney then return end
+    local gold = GetGuildBankMoney() or 0
+    local cur = self.db.global.gbankCache and self.db.global.gbankCache[MONEY_KEY]
+    -- Only write (and broadcast pSet) when the total actually changed — this runs on every
+    -- slots-changed event, so an unguarded SetRecord would spam the sync channel.
+    if not cur or cur.gold ~= gold then
+        self:SetRecord("gbankCache", MONEY_KEY, { gold = gold })
     end
+    if self.RefreshGbankHero then self:RefreshGbankHero() end -- live-update the open hero card
 end
 
 function LCEX:OnGuildBankMoney()
@@ -210,6 +215,12 @@ function LCEX:CacheAllTabs()
     -- truncate their multi-return to one value (the classic `and` trap — isViewable/count → nil).
     if not (GetNumGuildBankTabs and GetGuildBankTabInfo and GetGuildBankItemLink
             and GetGuildBankItemInfo) then return end
+    -- GUILDBANKFRAME_OPENED doesn't fire reliably on Anniversary — but GUILDBANKBAGSLOTS_CHANGED
+    -- (which drives this) does, so anchor the elapsed→absolute clock and read the gold here too, or
+    -- the hero card would sit at 0/"not cached" forever. SetRecord only when the total changed, so a
+    -- burst of slot events doesn't spam pSet.
+    if not self._gbankCapturedAt then self._gbankCapturedAt = time() end
+    self:CacheGbankMoney()
     for tab = 1, (GetNumGuildBankTabs() or 0) do
         local name, icon, isViewable = GetGuildBankTabInfo(tab)
         if isViewable then
