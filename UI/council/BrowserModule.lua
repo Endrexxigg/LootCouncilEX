@@ -1,12 +1,12 @@
 -- ── LootCouncil EX — UI/council/BrowserModule.lua ────────────────────────────
--- Council module: the loot browser, rebuilt for readability. Phase buttons across the top;
--- one reflowing list where raid headers read gold-on-raised bars, bosses indent below them,
--- and items indent further with QUALITY-COLORED names. Marks render inline as dim text; a
--- single editor at the bottom edits the SELECTED item's mark (click a row to select) —
--- replacing the old one-editbox-per-row noise. Mark commits go through SetMark (council-gated,
--- broadcasts pSet).
+-- Council module: the loot browser. Phase buttons across the top; one reflowing list where
+-- raid headers read gold-on-raised bars, bosses indent below them, and items indent further
+-- with QUALITY-COLORED names. Raid/boss headers fold (item 13, default collapsed, in-memory
+-- state). Marks render inline as dim text with a note-icon indicator (item 14); they're edited
+-- via the right-click "Leave note…" flow (item 17 — the shared confirm-with-input), never an
+-- always-visible box. Mark commits go through SetMark (council-gated, broadcasts pSet).
 --
--- Data: Core/Display.lua BuildBrowserDisplay(phase) → {kind=raid/boss/item} rows;
+-- Data: Core/Display.lua BuildBrowserDisplay(phase, expanded) → {kind=raid/boss/item} rows;
 -- names/qualities resolve async through WithItemID. Loads after UI/CouncilWindow.lua.
 
 local LCEX = LootCouncilEX
@@ -57,9 +57,14 @@ local function BuildRow(panel)
     row.noteIcon:SetPoint("RIGHT", row.mark, "LEFT", -4, 0)
     row.noteIcon:Hide()
 
-    row:SetScript("OnClick", function(r)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function(r, button)
         if r.itemID then
-            LCEX:BrowserSelectItem(r.panel, r.itemID)
+            if button == "RightButton" then
+                LCEX:BrowserItemMenu(r.panel, r.itemID, r.itemLink) -- note flow (item 17)
+            else
+                LCEX:BrowserSelectItem(r.panel, r.itemID)
+            end
         elseif r.toggleKey then
             LCEX:BrowserToggle(r.panel, r.kind, r.toggleKey) -- raid/boss headers fold (item 13)
         end
@@ -141,18 +146,39 @@ function LCEX:BrowserToggle(panel, kind, key)
     panel.list:SetData(self:BuildBrowserDisplay(self.browserPhase, self.browserExpanded))
 end
 
--- Click-to-select: the bottom editor targets this item's mark.
+-- Click-to-select: moves the selection bar (the note editor is the right-click flow below).
 function LCEX:BrowserSelectItem(panel, itemID)
     panel.selectedItemID = itemID
-    local mark = self.db.global.marks[itemID]
-    panel.markBox:SetText((mark and mark.text) or "")
-    self:WithItemID(itemID, function(name, _, quality)
-        if panel.selectedItemID ~= itemID then return end
-        local q = self:QualityColor(quality)
-        panel.markLabel:SetText(string.format(self.L["Mark — %s:"], name or ("item:" .. itemID)))
-        panel.markLabel:SetTextColor(q[1], q[2], q[3])
-    end)
     panel.list:Refresh() -- move the selection bar
+end
+
+-- Right-click note flow (item 17) — replaces the old always-visible bottom mark box. "Leave
+-- note…" opens the shared confirm-with-input as a compact editor pre-filled with the current
+-- mark; "Clear note" appears only when one exists. Commits still route through SetMark
+-- (council-gated, broadcasts pSet); clearing writes text="" so the clear replicates (LWW).
+function LCEX:BrowserItemMenu(panel, itemID, link)
+    self:BrowserSelectItem(panel, itemID)
+    local label = (link and link:match("%[(.-)%]")) or ("item:" .. itemID)
+    local items = {
+        { text = self.L["Leave note…"], onClick = function()
+            self:ShowConfirm({
+                text = string.format(self.L["Note for %s:"], label),
+                input = self:BrowserMarkText(itemID),
+                accept = self.L["Save"],
+                onAccept = function(text)
+                    self:SetMark(itemID, strtrim(text or ""))
+                    panel.list:Refresh()
+                end,
+            })
+        end },
+    }
+    if self:HasUserMark(itemID) then
+        items[#items + 1] = { text = self.L["Clear note"], danger = true, onClick = function()
+            self:SetMark(itemID, "")
+            panel.list:Refresh()
+        end }
+    end
+    self:ShowContextMenu({ title = label, items = items })
 end
 
 local function ShowPhase(panel, phase)
@@ -186,31 +212,15 @@ LCEX:RegisterCouncilModule({
             x = x + 50
         end
 
-        -- The browse list fills the space between phase buttons and the mark editor.
+        -- The browse list fills everything below the phase buttons — the old always-visible
+        -- mark editor is gone; notes are edited via the right-click menu (item 17).
         panel.list = LCEX:CreateScrollList(panel, {
             rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function() return BuildRow(panel) end,
             fillRow  = function(row, entry) FillRow(panel, row, entry) end,
         })
         panel.list:SetPoint("TOPLEFT", 4, -34)
-        panel.list:SetPoint("BOTTOMRIGHT", -4, 40)
-
-        -- Mark editor for the selected item.
-        panel.markLabel = panel:CreateFontString(nil, "OVERLAY")
-        LCEX:ThemeText(panel.markLabel, "caption", "dim")
-        panel.markLabel:SetPoint("BOTTOMLEFT", 10, 22)
-        panel.markLabel:SetText(LCEX.L["Mark — click an item:"])
-
-        panel.markBox = LCEX:CreateEditBox(panel, {
-            width = 320,
-            onCommit = function(text)
-                if panel.selectedItemID then
-                    LCEX:SetMark(panel.selectedItemID, text)
-                    panel.list:Refresh()
-                end
-            end,
-        })
-        panel.markBox:SetPoint("BOTTOMLEFT", 14, 2)
+        panel.list:SetPoint("BOTTOMRIGHT", -4, 4)
     end,
 
     show = function(panel)

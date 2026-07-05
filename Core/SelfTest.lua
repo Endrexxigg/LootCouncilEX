@@ -1067,6 +1067,34 @@ LCEX:RegisterSelfTest("ui", "context menu: rows render, disabled row inert, clic
     t:Ok(found, "context menu not registered for ESC-close")
 end, { cleanup = function(self) self:HideContextMenu() end })
 
+-- Phase 12 (item 17): the right-click note flow replaces the bottom mark box. The mark is
+-- planted directly in the dataset (NOT via SetMark — that would broadcast pSet) and restored
+-- synchronously in cleanup.
+LCEX:RegisterSelfTest("ui", "browser: right-click note menu (leave/clear)", function(self, t)
+    self:OpenCouncilModule("browser")
+    local panel = self.councilWindow and self.councilWindow.panels and self.councilWindow.panels.browser
+    if not t:Ok(panel ~= nil, "browser panel missing") then return end
+    t:Ok(panel.markBox == nil, "the always-visible mark box must be gone")
+
+    self:BrowserItemMenu(panel, TEST_ITEM_ID, nil)
+    local menu = self._contextMenu
+    if not t:Ok(menu and menu:IsShown(), "note menu did not open") then return end
+    t:Eq(menu.rows[1].fs:GetText(), self.L["Leave note…"], "first entry is Leave note")
+    t:Ok(not (menu.rows[2] and menu.rows[2]:IsShown()), "Clear entry must not show without a mark")
+    self:HideContextMenu()
+
+    self._selfTestMarkStash = self.db.global.marks[TEST_ITEM_ID]
+    self.db.global.marks[TEST_ITEM_ID] = { text = "selftest", mod = time(), by = "SelfTest" }
+    self:BrowserItemMenu(panel, TEST_ITEM_ID, nil)
+    t:Ok(menu.rows[2] and menu.rows[2]:IsShown()
+        and menu.rows[2].fs:GetText() == self.L["Clear note"], "Clear note entry with a mark")
+end, { cleanup = function(self)
+    self.db.global.marks[TEST_ITEM_ID] = self._selfTestMarkStash
+    self._selfTestMarkStash = nil
+    self:HideContextMenu()
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
+
 -- ── comm: the real receive path + the real wire ───────────────────────────────
 -- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
 -- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so
