@@ -37,12 +37,15 @@ local DB_DEFAULTS = {
         minQuality         = 4,
         selfReport         = true,
         showGearIssues     = false, -- Feature G: show the gear-issue callouts on the Roster tab
+        tradeTimersAuto    = true,  -- Phase 12: auto-show the trade-timer window when loot is tradeable
 
         ui                 = {
-            poll    = {},
-            loot    = {},
-            council = {},
-            config  = {},
+            poll        = {},
+            loot        = {},
+            council     = {},
+            config      = {},
+            mini        = {},
+            tradeTimers = {},
         },
         -- Poll response deadline in seconds (0 = none). Set by the ML in Session Config;
         -- rides sStart so every candidate's poll counts down.
@@ -241,6 +244,8 @@ function LCEX:HandleSlash(input)
         self:EndSession() -- explicit ML end/abort — the ONLY way a session is destroyed (§6.16)
     elseif cmd == "resume" then
         self:CmdResume()
+    elseif cmd == "timers" then
+        self:ToggleTradeTimerWindow() -- Phase 12: Gargul-style trade-timer window (§6.17)
     elseif cmd == "session" then
         self:CmdSession()
     elseif cmd == "config" or cmd == "options" then

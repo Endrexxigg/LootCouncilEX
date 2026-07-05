@@ -1494,3 +1494,41 @@ LCEX:RegisterSelfTest("api", "trade timers: scanner shape + item-GUID probe", fu
     t.info = "GetItemGUID available: " .. tostring(guidOk)
         .. "; tradeable bag items scanned: " .. #entries
 end)
+
+-- Trade-timer window (Phase 12, §6.17): injected entries render as bars, sorted soonest-first;
+-- minimize collapses to one bar + a "+N"; shift+double-click (simulated) hides an item.
+LCEX:RegisterSelfTest("ui", "trade-timer window: render / sort / minimize / hide", function(self, t)
+    local now = time()
+    self._selfTestTradeSaved = self.tradeTimerEntries
+    local prevAuto = self.db.profile.tradeTimersAuto
+    self.db.profile.tradeTimersAuto = true
+    self._tradeUserClosed, self._tradeMinimized, self.tradeTimerHidden = false, false, {}
+    self.tradeTimerEntries = {
+        { key = "e1", link = select(2, GetItemInfo(30056)) or "item:30056", itemID = 30056, expireAt = now + 3600 },
+        { key = "e2", link = select(2, GetItemInfo(28830)) or "item:28830", itemID = 28830, expireAt = now + 600 },
+    }
+    self:UpdateTradeTimerWindow()
+    local f = self.tradeTimerWindow
+    if not t:Ok(f and f:IsShown(), "trade-timer window did not auto-open") then return end
+    t:Ok(f.rows[1] and f.rows[1]:IsShown() and f.rows[2] and f.rows[2]:IsShown(), "two bars not rendered")
+    t:Eq(f.rows[1].key, "e2", "bars not sorted soonest-first (600s item on top)")
+
+    self._tradeMinimized = true
+    self:UpdateTradeTimerWindow()
+    t:Ok(f.rows[1]:IsShown() and not (f.rows[2] and f.rows[2]:IsShown()), "minimize did not collapse to one bar")
+    t:Ok(f.more:IsShown(), "minimize missing the +N indicator")
+    self._tradeMinimized = false
+
+    self.tradeTimerHidden["e2"] = true -- shift+double-click, simulated
+    self:UpdateTradeTimerWindow()
+    t:Eq(#self:_VisibleTradeEntries(), 1, "hidden item still counted visible")
+    t:Eq(f.rows[1].key, "e1", "wrong item on top after hiding the soonest")
+    self.db.profile.tradeTimersAuto = prevAuto
+end, { cleanup = function(self)
+    self.tradeTimerEntries = self._selfTestTradeSaved or {}
+    self._selfTestTradeSaved = nil
+    self.tradeTimerHidden = nil
+    self._tradeMinimized, self._tradeUserClosed = false, false
+    self:_StopTradeTimerTick()
+    if self.tradeTimerWindow then self.tradeTimerWindow:Hide() end
+end })

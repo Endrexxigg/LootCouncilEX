@@ -52,6 +52,12 @@ local function BuildSchema(self)
         { type = "checkbox", label = self.L["Broadcast my gear/professions (self-report)"],
           get = function() return p.selfReport end,
           set = function(v) p.selfReport = v end },
+        { type = "checkbox", label = self.L["Auto-show trade timers"],
+          get = function() return p.tradeTimersAuto end,
+          set = function(v)
+              p.tradeTimersAuto = v
+              if self.UpdateTradeTimerWindow then self:UpdateTradeTimerWindow() end
+          end },
     }
 end
 

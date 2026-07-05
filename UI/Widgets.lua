@@ -299,7 +299,9 @@ function LCEX:CreateWindowV2(name, opts)
     end
     f:RefreshAppearance()
 
-    tinsert(UISpecialFrames, name) -- ESC closes it
+    if not opts.noEscClose then
+        tinsert(UISpecialFrames, name) -- ESC closes it (opt out for passive windows, e.g. trade timers)
+    end
     f:Hide()
     return f
 end
