@@ -279,6 +279,61 @@ test("Candidate watchdog closes a dropped ML's session", function()
     -- The ML's OWN client never watchdogs itself.
     L:EnterSession("S2", "Tester", { { link = "[X]", quality = 4 } }, L.RESPONSES, {})
     ok(not L.sessionTimeout, "no watchdog when we are the session ML")
+    L:LeaveSession("S2")
+end)
+
+-- ── Candidate rejoin (§6.16 sReq/sJoin) ──────────────────────────────────────
+test("sReq: unknown-sid sPing triggers one throttled rejoin request", function()
+    L.activeSession, L._sReqAt = nil, nil
+    L.dispatch.sPing(L, { sid = "S9" }, "BossML")
+    eq(#H.sent, 1, "one sReq whispered on an unknown-sid ping")
+    eq(H.sent[1].msg.cmd, "sReq", "the request is sReq")
+    eq(H.sent[1].dist, "WHISPER", "sent by whisper")
+    eq(H.sent[1].target, "BossML", "whispered to the pinging ML")
+    L.dispatch.sPing(L, { sid = "S9" }, "BossML")
+    eq(#H.sent, 1, "a repeat ping within the throttle window sends nothing")
+    L.activeSession = { sid = "OTHER", ml = "X" }
+    L.dispatch.sPing(L, { sid = "S9" }, "BossML")
+    eq(#H.sent, 1, "viewing another session -> no request")
+    L.activeSession = nil
+end)
+
+test("sJoin: enter, merge same-sid awarded, never supersede a different session", function()
+    L.activeSession = nil
+    L.dispatch.sJoin(L, { sid = "S9", items = { { link = "[X]", quality = 4 } },
+        responses = L.RESPONSES, council = {}, awarded = { [1] = "Amy" } }, "BossML")
+    ok(L.activeSession and L.activeSession.sid == "S9", "entered the session from sJoin")
+    eq(L.activeSession.ml, "BossML", "ML bound to the sJoin sender (DL-11)")
+    eq(L.activeSession.awarded[1], "Amy", "awarded snapshot applied")
+    L.dispatch.sJoin(L, { sid = "S9", items = { { link = "[X]", quality = 4 } },
+        responses = L.RESPONSES, council = {}, awarded = { [2] = "Bob" } }, "BossML")
+    eq(L.activeSession.awarded[2], "Bob", "same-sid sJoin merges more awards")
+    L.dispatch.sJoin(L, { sid = "OTHER", items = { { link = "[Y]", quality = 4 } },
+        responses = L.RESPONSES, council = {} }, "OtherML")
+    eq(L.activeSession.sid, "S9", "a different live session is never superseded")
+    L:LeaveSession("S9")
+end)
+
+test("dispatch.sReq: ML whispers back sJoin + per-leader cUpdate", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    L.sessionItems = { { link = "[X]", itemID = 1, quality = 4 } }
+    L:StartSession({ { link = "[X]", quality = 4 } })
+    H.sent = {} -- ignore the sStart from StartSession
+    L.dispatch.sReq(L, { sid = L.session.sid }, "Amy")
+    ok(#H.sent >= 1, "ML replied to sReq")
+    eq(H.sent[1].msg.cmd, "sJoin", "first reply is the sJoin snapshot")
+    eq(H.sent[1].dist, "WHISPER", "sJoin whispered")
+    eq(H.sent[1].target, "Amy", "sJoin to the requester")
+    ok(H.sent[1].msg.items and #H.sent[1].msg.items == 1, "sJoin carries the item list")
+    local sawUpdate = false
+    for _, e in ipairs(H.sent) do
+        if e.msg.cmd == "cUpdate" and e.target == "Amy" then sawUpdate = true end
+    end
+    ok(sawUpdate, "ML followed with a whispered cUpdate")
+    H.sent = {}
+    L.dispatch.sReq(L, { sid = "nope" }, "Amy")
+    eq(#H.sent, 0, "foreign sid -> no reply")
+    L:EndSession()
 end)
 
 test("PlayerIsML tracks loot when grouped (Anniversary has no master-loot API)", function()

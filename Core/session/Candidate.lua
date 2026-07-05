@@ -210,12 +210,48 @@ LCEX.dispatch.sEnd = function(self, msg, sender)
     end
 end
 
--- The ML's liveness heartbeat (DL-6): only the bound ML for our session resets the watchdog.
--- (Ignore our own echo — the ML doesn't watchdog its own session.)
+-- The ML's liveness heartbeat (DL-6): the bound ML for our session resets the watchdog. If we
+-- hear a ping for a session we're NOT in and we have no session at all (a fresh reload / a
+-- mid-session joiner), request to (re)join it (§6.16 sReq/sJoin). (Ignore our own echo.)
 LCEX.dispatch.sPing = function(self, msg, sender)
     if self:IsSelf(sender) then return end
     local a = self.activeSession
     if a and msg.sid == a.sid and self:NormalizeName(sender) == self:NormalizeName(a.ml) then
         self:ResetSessionTimeout()
+        return
+    end
+    if not a then self:MaybeRequestSession(msg.sid, sender) end
+end
+
+-- Whisper the pinging ML an sReq to (re)join its session — throttled per sid so a burst of pings
+-- can't spam it (§6.16). Only ever sent when we hold no session view of our own.
+function LCEX:MaybeRequestSession(sid, ml)
+    if not sid or self.activeSession then return end
+    self._sReqAt = self._sReqAt or {}
+    local now = GetTime()
+    if self._sReqAt[sid] and (now - self._sReqAt[sid]) < 60 then return end
+    self._sReqAt[sid] = now
+    self:Send("sReq", sid, {}, "WHISPER", ml)
+end
+
+-- The ML answered our sReq with a session snapshot (§6.16). Enter it (binding the ML to the
+-- sender, DL-11) unless we're already viewing a session: a duplicate reply for the SAME sid just
+-- merges the awarded snapshot; a DIFFERENT live session is never superseded.
+LCEX.dispatch.sJoin = function(self, msg, sender)
+    if type(msg.items) ~= "table" or #msg.items == 0 then return end
+    local a = self.activeSession
+    if a then
+        if a.sid == msg.sid and type(msg.awarded) == "table" then
+            a.awarded = a.awarded or {}
+            for i, w in pairs(msg.awarded) do a.awarded[i] = w end
+            self:RefreshLootItem()
+        end
+        return -- same-sid merged above; a different live session is left untouched
+    end
+    self:EnterSession(msg.sid, sender, msg.items, msg.responses, msg.council, msg.timeout, msg.anon)
+    if type(msg.awarded) == "table" and self.activeSession then
+        self.activeSession.awarded = self.activeSession.awarded or {}
+        for i, w in pairs(msg.awarded) do self.activeSession.awarded[i] = w end
+        self:RefreshLootItem()
     end
 end

@@ -283,6 +283,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         -- Session plane
         "ResolveCouncil", "GetCouncil", "IsCouncil", "InGroupWith", "StartSession", "EndSession",
         "EnterSession", "LeaveSession", "ResumeSession", "RestoreSession", "SaveSession",
+        "ShowResumePrompt", "CountSavedResponses", "_OverlaySavedRows", "MaybeRequestSession",
         "OnResponseChosen", "CompetingGear", "SendVote", "ApplyCUpdate",
         "PlayerCanUse", "ClassCanUse",
         "AwardItem", "AwardGroup", "NextAwardableIndex", "BuildItemGroups", "GroupMembers",
@@ -324,7 +325,8 @@ end)
 
 LCEX:RegisterSelfTest("load", "comm dispatch handlers registered", function(self, t)
     local cmds = { "vCheck", "vReply", "sStart", "sEnd", "sPing", "cResp", "cUpdate", "vVote",
-                   "award", "pHello", "pSyncReq", "pSyncData", "pSet", "pReport", "tEcho" }
+                   "award", "unaward", "sReq", "sJoin", "pHello", "pSyncReq", "pSyncData",
+                   "pSet", "pReport", "tEcho" }
     for _, cmd in ipairs(cmds) do
         t:Ok(type(self.dispatch[cmd]) == "function", "missing dispatch handler: " .. cmd)
     end

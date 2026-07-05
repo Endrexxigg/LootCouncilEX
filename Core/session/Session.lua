@@ -574,3 +574,32 @@ LCEX.dispatch.cResp = function(self, msg, sender)
     self:ApplyCUpdate(s.sid, index, s.rows[index], self:ComputeItemStatus(index)) -- ML's own frame now
     self:BroadcastCUpdate(index)
 end
+
+-- ── ML inbound: a rejoin request (§6.16) ─────────────────────────────────────
+-- A reloaded / mid-session-joining candidate heard our sPing and asked to (re)join. Whisper back
+-- a session snapshot (sJoin) plus the current per-leader cUpdate, so they re-enter without a
+-- full raid re-broadcast. Gated to a real group member for our open session.
+LCEX.dispatch.sReq = function(self, msg, sender)
+    local s = self.session
+    if not s or msg.sid ~= s.sid then return end
+    if not self:InGroupWith(sender) then return end
+    local a = self.activeSession
+    -- Remaining deadline as a fresh DURATION (no clock-skew), like sStart.
+    local timeout
+    if a and a.deadlineAt then
+        local left = a.deadlineAt - GetTime()
+        if left and left > 0 then timeout = left end
+    end
+    self:Send("sJoin", s.sid, {
+        items = s.items, council = s.council, responses = self:ResponseSet(),
+        timeout = timeout, anon = s.anon, awarded = (a and a.awarded) or {},
+    }, "WHISPER", sender)
+    -- Then the live aggregate per group leader (AceComm keeps per-target order, so sJoin lands first).
+    for _, leader in ipairs(s.groups.leaders) do
+        if s.rows[leader] then
+            self:Send("cUpdate", s.sid,
+                { item = leader, rows = s.rows[leader], status = self:ComputeItemStatus(leader) },
+                "WHISPER", sender)
+        end
+    end
+end
