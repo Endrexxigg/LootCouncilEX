@@ -160,6 +160,23 @@ function LCEX:SetupGbank()
     self:RegisterEvent("GUILDBANKFRAME_OPENED", "OnGuildBankOpened")
     self:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED", "OnGuildBankSlots")
     self:RegisterEvent("GUILDBANKLOG_UPDATE", "OnGuildBankLog")
+    -- Gold is NOT populated when the frame first opens — the server sends it moments later via
+    -- GUILDBANK_UPDATE_MONEY. Cache it on that event (and re-cache on every change) so the hero
+    -- card stops reading 0.
+    self:RegisterEvent("GUILDBANK_UPDATE_MONEY", "OnGuildBankMoney")
+end
+
+-- Re-cache the gold total (LWW). Fired by GUILDBANK_UPDATE_MONEY and once on open. Debounced —
+-- the event can burst as the server streams the value.
+function LCEX:CacheGbankMoney()
+    if GetGuildBankMoney then
+        self:SetRecord("gbankCache", MONEY_KEY, { gold = GetGuildBankMoney() or 0 })
+        if self.RefreshGbankHero then self:RefreshGbankHero() end -- live-update the open hero card
+    end
+end
+
+function LCEX:OnGuildBankMoney()
+    gbankDebounce(self, "money", 0.3, function() self:CacheGbankMoney() end)
 end
 
 -- The guild bank opened (B6): snapshot the moment for elapsed→absolute, cache gold, and request each

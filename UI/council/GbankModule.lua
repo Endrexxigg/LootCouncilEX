@@ -11,9 +11,12 @@ local LCEX = LootCouncilEX
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
-local GRID_COLS = 14
-local GRID_ROWS = 7
-local ICON      = 30
+-- The real guild-bank tab is 7 columns × 14 rows (98 slots), and WoW numbers slots COLUMN-MAJOR
+-- (slots 1-14 = column 1 top→bottom, 15-28 = column 2, …). Match that shape + order so items land
+-- where they sit in-game (previously 14×7 row-major, which transposed everything).
+local GRID_COLS = 7
+local GRID_ROWS = 14
+local ICON      = 26
 local MAX_TABS  = 8 -- pooled tab buttons (BCC guild banks cap at 8 tabs)
 
 local SUBTABS = { { key = "contents", text = LCEX.L["Contents"] }, { key = "log", text = LCEX.L["Log"] } }
@@ -131,8 +134,10 @@ local function EditNote(panel, uid, player)
     })
 end
 
-local function BuildLogRow(panel)
-    local row = CreateFrame("Button", nil, panel)
+local function BuildLogRow(panel, listFrame)
+    -- Parent the row to the SCROLL-LIST frame (not the panel) so hiding the list on the Contents
+    -- tab actually hides its rows — otherwise the log stayed drawn over the item grid.
+    local row = CreateFrame("Button", nil, listFrame or panel)
     row.time = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.time, "caption", "faint")
     row.time:SetPoint("LEFT", 6, 0); row.time:SetWidth(74); row.time:SetJustifyH("LEFT")
@@ -239,7 +244,8 @@ LCEX:RegisterCouncilModule({
         panel.grid = grid
         panel.gridIcons = {}
         for i = 1, GRID_COLS * GRID_ROWS do
-            local col, r = (i - 1) % GRID_COLS, math.floor((i - 1) / GRID_COLS)
+            -- Slot i (1-98) is column-major: column = ⌊(i-1)/14⌋, row = (i-1) mod 14 (WoW's numbering).
+            local col, r = math.floor((i - 1) / GRID_ROWS), (i - 1) % GRID_ROWS
             local ic = LCEX:CreateItemIcon(grid, ICON)
             ic:SetPoint("TOPLEFT", col * (ICON + 2), -r * (ICON + 2))
             ic:Hide()
@@ -249,7 +255,7 @@ LCEX:RegisterCouncilModule({
         -- Log list (grouped transactions).
         panel.logList = LCEX:CreateScrollList(panel, {
             rowHeight = 24, fillHeight = true, zebra = true,
-            buildRow = function() return BuildLogRow(panel) end,
+            buildRow = function(list) return BuildLogRow(panel, list) end,
             fillRow = function(row, g) FillLogRow(row, g) end,
         })
         panel.logList:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", 4, -58)
@@ -263,6 +269,7 @@ LCEX:RegisterCouncilModule({
     end,
 
     show = function(panel)
+        LCEX._gbankPanel = panel -- so Core can live-refresh the hero on GUILDBANK_UPDATE_MONEY
         RefreshHero(panel)
         RefreshTabBar(panel)
         -- Log + annotations are officer-only by default (B5); hide the sub-tab for non-council unless
@@ -276,3 +283,9 @@ LCEX:RegisterCouncilModule({
         SelectSubTab(panel, sub)
     end,
 })
+
+-- Live-refresh the hero gold card when the module is open (called from the money event in Core).
+function LCEX:RefreshGbankHero()
+    local panel = self._gbankPanel
+    if panel and panel:IsShown() then RefreshHero(panel) end
+end
