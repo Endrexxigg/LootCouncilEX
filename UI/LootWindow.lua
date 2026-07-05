@@ -17,7 +17,7 @@ local LCEX = LootCouncilEX
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
 local FRAME_NAME = "LCEX_LootWindow"
-local RAIL_W     = 236
+local RAIL_W     = 280 -- widened from 236 so item names truncate less (handoff item 11)
 local BAR_H      = 34 -- bottom bar
 
 -- Awarded marker: an inline texture escape (the ready-check tick), NOT a "✓" glyph —
@@ -56,7 +56,7 @@ end
 function LCEX:EnsureLootWindow()
     if self.lootWindow then return self.lootWindow end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = 780, height = 470,
+        width = 824, height = 470, -- 824 = the widened rail (280) + the unchanged 536px pane
         title = self.L["Loot Session"],
         savedKey = "loot",
         defaultPos = { x = 0, y = 40 },
@@ -295,6 +295,10 @@ function LCEX:FillLootRailRow(row, entry, index)
 
     local f = self.lootWindow
     local a = self.activeSession
+    -- The badge's right inset is dynamic: staging leaves 24px for the remove ×; in-session the
+    -- × is hidden, so the badge (and the name chained to it) reclaim that width (item 11).
+    row.badge:ClearAllPoints()
+    row.badge:SetPoint("RIGHT", a and -6 or -24, 0)
     if a then
         row.remove:Hide()
         -- Award-readiness border (Feature V, §6.10): awarded items force "awarded" directly off the
