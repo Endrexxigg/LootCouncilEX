@@ -102,6 +102,17 @@ test("CmdMark parse", function()
         "link with spaces in name")
 end)
 
+-- ── Browser mark column (Phase 12, item 16) ──────────────────────────────────
+test("BrowserMarkText: user mark only, never (token) metadata", function()
+    local tokenID = next(L.TierTokens) -- any shipped token
+    ok(tokenID ~= nil, "TierTokens data present")
+    eq(L:BrowserMarkText(tokenID), "", "token without a mark shows nothing")
+    L.db.global.marks[tokenID] = { text = "save for tanks", mod = 1, by = "X" }
+    eq(L:BrowserMarkText(tokenID), "save for tanks", "marked token shows the mark text only")
+    L.db.global.marks[tokenID] = nil
+    eq(L:BrowserMarkText(12345), "", "unmarked item shows nothing")
+end)
+
 -- ── Notes command write + read ───────────────────────────────────────────────
 test("CmdNote write + read", function()
     L.db.profile.council = { byRank = false, extra = { "Tester" } }

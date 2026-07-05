@@ -25,6 +25,13 @@ function LCEX:BuildBrowserDisplay(phase)
     return out
 end
 
+-- The inline mark text for a browser item row: the USER'S mark only (handoff item 16). Token
+-- membership is reference data, not a note — it must not render in the mark column. Pure/testable.
+function LCEX:BrowserMarkText(itemID)
+    local mark = self.db.global.marks[itemID]
+    return (mark and mark.text) or ""
+end
+
 -- ── Player detail displays (gear / history / professions) ────────────────────
 function LCEX:BuildGearDisplay(player)
     local key = self:NormalizeName(player)

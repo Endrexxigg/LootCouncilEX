@@ -91,12 +91,7 @@ local function FillRow(panel, row, entry)
             row.icon:SetItem(link, instantIcon)
         end)
 
-        local token = LCEX:FindTokenForItem(id)
-        local mark = LCEX.db.global.marks[id]
-        local bits = {}
-        if token then bits[#bits + 1] = LCEX.L["(token)"] end
-        if mark and mark.text and mark.text ~= "" then bits[#bits + 1] = mark.text end
-        row.mark:SetText(table.concat(bits, "  "))
+        row.mark:SetText(LCEX:BrowserMarkText(id))
 
         if panel.selectedItemID == id then row.sel:Show() end
     end
