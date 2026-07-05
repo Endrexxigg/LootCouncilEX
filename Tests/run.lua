@@ -206,13 +206,22 @@ test("ParseTradeDuration + TradeExpiry + missing-API fallback", function()
     eq(L:ItemTradeTimeRemaining(0, 1), nil, "no API/string -> nil (fallback)")
 end)
 
--- ── ML-disconnect session recovery (A3, DL-6) ────────────────────────────────
-test("Session persist → restore → resume → end", function()
+-- ── ML-disconnect session recovery (A3, DL-6; persistence v2 §6.16) ──────────
+test("Session persist → restore → resume → end (rows/votes/awards survive)", function()
     L.sessionItems = { { link = "[Axe]", itemID = 1, quality = 4 } }
     L:StartSession({ { link = "[Axe]", quality = 4 } })
     local sid = L.session.sid
     ok(L.db.global.session.tester, "open session mirrored to the DB under the owner")
     eq(L.db.global.session.tester.sid, sid, "stored sid matches")
+
+    -- Collect a response + votes + an award — all held BY REFERENCE in the DB mirror (§6.16).
+    L.session.rows[1] = L.session.rows[1] or {}
+    L.session.rows[1]["bob"] = { name = "Bob", class = "WARRIOR", resp = 1, votes = 2 }
+    L.session.voters[1] = { bob = { tester = 1, amy = 1 } }
+    L.activeSession.awarded = { [1] = "Bob" }
+    L:SaveSession()
+    eq(L.db.global.session.tester.rows[1]["bob"].resp, 1, "response mirrored by reference")
+    eq(L:CountSavedResponses(L.db.global.session.tester), 1, "resume dialog counts one response")
 
     -- Simulate a /reload: in-memory session gone, DB record remains.
     L.session, L.sessionItems, L.activeSession = nil, nil, nil
@@ -222,10 +231,34 @@ test("Session persist → restore → resume → end", function()
     ok(L:ResumeSession(), "resume succeeds")
     eq(L.session.sid, sid, "resumed with the SAME sid (history uids stay stable)")
     ok(L.sessionItems and L.sessionItems[1].link == "[Axe]", "ML award records restored")
+    -- The collected aggregate survived the reload (seed → overlay).
+    eq(L.session.rows[1]["bob"].resp, 1, "saved response survived resume")
+    eq(L.session.rows[1]["bob"].votes, 2, "saved votes survived resume")
+    ok(L.session.voters[1] and L.session.voters[1].bob, "per-voter map restored")
+    eq(L.activeSession.awarded[1], "Bob", "saved award survived resume")
     ok(not L.recoverableSession, "recoverable cleared after resume")
 
     L:EndSession()
     ok(not L.db.global.session.tester, "end clears the persisted session")
+end)
+
+-- Overlay merge (§6.16): saved responses win; a seeded non-responder keeps its reason; a saved
+-- responder missing from the seed re-enters "left".
+test("_OverlaySavedRows: saved wins, non-responder kept, missing → left", function()
+    local seeded = {
+        amy = { name = "Amy", class = "MAGE", reason = "pending", votes = 0 },
+        cid = { name = "Cid", class = "ROGUE", reason = "pending", votes = 0 },
+    }
+    local saved = {
+        amy = { name = "Amy", resp = 1, note = "n", votes = 3 }, -- responded before the reload
+        bob = { name = "Bob", resp = 2, votes = 1 },             -- responded then LEFT the raid
+    }
+    local out = L:_OverlaySavedRows(seeded, saved)
+    eq(out.amy.resp, 1, "saved response overlays the seed")
+    eq(out.amy.reason, nil, "responder's reason cleared")
+    eq(out.amy.votes, 3, "saved votes win")
+    eq(out.cid.reason, "pending", "seeded non-responder keeps its reason")
+    ok(out.bob ~= nil and out.bob.resp == 2, "saved responder missing from the seed re-enters")
 end)
 
 test("Recoverable session can be discarded with /lcex end", function()

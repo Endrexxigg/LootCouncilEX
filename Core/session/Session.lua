@@ -339,9 +339,15 @@ function LCEX:SaveSession()
     local owner = self:OwnerKey()
     local s = self.session
     if not owner or not s then return end
+    local a = self.activeSession
+    -- rows/voters/awarded are stored BY REFERENCE (the sessionItems trick, §6.16 / DL-21): every
+    -- later mutation is already durable at the next SavedVariables write, so responses, votes, and
+    -- awards survive a /reload with no extra save plumbing.
     self.db.global.session[owner] = {
         sid = s.sid, items = s.items, council = s.council,
         sessionItems = self.sessionItems, startedAt = s.startedAt,
+        rows = s.rows, voters = s.voters, anon = s.anon,
+        awarded = a and a.awarded, savedAt = time(),
     }
 end
 
@@ -356,9 +362,44 @@ function LCEX:RestoreSession()
     local saved = owner and self.db and self.db.global.session[owner]
     if not saved or type(saved.items) ~= "table" or #saved.items == 0 then return end
     self.recoverableSession = saved
-    self:Msg(string.format(
-        self.L["Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."],
-        #saved.items))
+    -- A themed resume dialog (§6.16) after a short delay so the UI + roster settle post-login;
+    -- also surface the recovery pill immediately.
+    self:ScheduleTimer("ShowResumePrompt", 3)
+    self:UpdateMiniFrame()
+end
+
+-- Responses collected in a saved session's aggregate (rows carrying an actual resp), for the
+-- resume dialog. Pure/testable.
+function LCEX:CountSavedResponses(saved)
+    local n = 0
+    if saved and saved.rows then
+        for _, rows in pairs(saved.rows) do
+            for _, d in pairs(rows) do
+                if type(d) == "table" and d.resp ~= nil then n = n + 1 end
+            end
+        end
+    end
+    return n
+end
+
+-- The resume dialog (§6.16): age + item/response counts, Resume to re-open. Declining keeps the
+-- session recoverable (the /lcex resume · /lcex end · /lcex abort commands still work). Falls back
+-- to chat if the confirm frame is already busy (e.g. Feature C's inherit prompt).
+function LCEX:ShowResumePrompt()
+    local saved = self.recoverableSession
+    if not saved then return end
+    local msg = string.format(
+        self.L["Unfinished loot session from %s — %d item(s), %d response(s) collected."],
+        self:RelTime(saved.savedAt or saved.startedAt), #saved.items, self:CountSavedResponses(saved))
+    if self._confirmFrame and self._confirmFrame:IsShown() then
+        self:Msg(msg .. " " .. self.L["/lcex resume to re-open, /lcex end to discard."])
+        return
+    end
+    self:ShowConfirm({
+        text = msg,
+        accept = self.L["Resume"],
+        onAccept = function() self:ResumeSession() end,
+    })
 end
 
 function LCEX:ResumeSession()
@@ -372,12 +413,12 @@ function LCEX:ResumeSession()
 
     local councilSet = {}
     for _, n in ipairs(saved.council or {}) do councilSet[n] = true end
-    -- Re-snapshot anon from the current shared config (it isn't persisted — a config setting, so
-    -- reading it fresh on resume is correct).
-    local anon = self:GetConfig().anonVoting and true or false
+    -- anon is restored from the SAVE (it was snapshotted onto the session at start, §6.16) — not
+    -- re-read from config, so the session's anonymity can't silently change across a reload.
+    local anon = saved.anon and true or false
     self.session = {
         sid = saved.sid, items = saved.items, council = saved.council, councilSet = councilSet,
-        rows = {}, voters = {}, startedAt = saved.startedAt or time(), anon = anon,
+        rows = {}, voters = saved.voters or {}, startedAt = saved.startedAt or time(), anon = anon,
         groups = self:BuildItemGroups(saved.items), -- duplicate grouping (§6.14)
     }
     self.sessionItems = saved.sessionItems
@@ -390,13 +431,50 @@ function LCEX:ResumeSession()
             items = saved.items, council = saved.council, responses = self:ResponseSet(),
             timeout = timeout, anon = anon,
         }, channel)
+    else
+        self:Msg(self.L["Resuming locally — you're not in a group, so this is read-only recovery."])
     end
     self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout, anon)
-    self:SeedSessionRows()
-    self:SaveSession()
-    self:StartHeartbeat()
+    -- Restore the awarded mirror BEFORE seeding so ComputeItemStatus sees it (border/tally correct).
+    if self.activeSession then self.activeSession.awarded = saved.awarded or {} end
+    self:SeedSessionRows() -- fresh seed (late joiners appear) …
+    -- … then overlay the saved aggregate so collected responses/votes survive (§6.16), and re-push.
+    for _, leader in ipairs(self.session.groups.leaders) do
+        self.session.rows[leader] = self:_OverlaySavedRows(self.session.rows[leader],
+            saved.rows and saved.rows[leader])
+        self:ApplyCUpdate(self.session.sid, leader, self.session.rows[leader],
+            self:ComputeItemStatus(leader))
+        self:BroadcastCUpdate(leader)
+    end
+    self:SaveSession()    -- re-mirror with the new live references
+    self:StartHeartbeat() -- no-op out of a group; re-arms on the next roster update with a channel
+    self:UpdateMiniFrame()
     self:Msg(string.format(self.L["Resumed session (%s) — %d item(s)."], saved.sid, #saved.items))
     return true
+end
+
+-- Overlay a saved per-item aggregate onto freshly-seeded rows (§6.16): a saved responder's
+-- resp/note/gear/votes win (their reason clears); a seeded non-responder keeps its class/reason; a
+-- saved responder no longer in the seed roster re-enters marked "left" (accumulate, never drop —
+-- R5). Pure given the two row maps.
+function LCEX:_OverlaySavedRows(seeded, saved)
+    local out = {}
+    for k, r in pairs(seeded or {}) do out[k] = r end
+    for k, sr in pairs(saved or {}) do
+        local base = out[k]
+        if base then
+            if sr.resp ~= nil then
+                base.resp, base.reason, base.note, base.gear = sr.resp, nil, sr.note, sr.gear
+            end
+            base.votes = sr.votes or base.votes or 0
+        else
+            local copy = {}
+            for kk, vv in pairs(sr) do copy[kk] = vv end
+            if copy.resp == nil then copy.reason = "left" end
+            out[k] = copy
+        end
+    end
+    return out
 end
 
 -- /lcex resume — re-open the session that was open before a /reload.
@@ -414,6 +492,7 @@ function LCEX:EndSession()
     if not self.session then
         if self.recoverableSession then
             self:ClearSavedSession()
+            self:UpdateMiniFrame() -- clear the recovery pill (§6.16)
             self:Msg(self.L["Discarded the unfinished session."])
         else
             self:Msg(self.L["No active session."])

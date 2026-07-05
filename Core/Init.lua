@@ -174,6 +174,11 @@ function LCEX:OnRosterUpdate()
     -- with at our last report (e.g. our login report) now receive it. pReport is only cached by
     -- current group members, so a login-time report is dropped by people who join us later.
     self:DebouncedSend("pReport", function() self:SendSelfReport() end)
+    -- A session resumed out of a group (local recovery, §6.16) has no heartbeat yet — arm it the
+    -- moment we're back in a group so candidates start hearing us again.
+    if self.session and not self.sPingTimer and self:GroupChannel() then
+        self:StartHeartbeat()
+    end
 end
 
 -- /lcex <subcommand> [args]. The first token is the command (lowercased); the
@@ -226,8 +231,8 @@ function LCEX:HandleSlash(input)
         self:Msg("Debug tracing " .. (self.debug and "ON" or "OFF"))
     elseif cmd == "award" then
         self:CmdAward(rest)
-    elseif cmd == "end" then
-        self:EndSession()
+    elseif cmd == "end" or cmd == "abort" then
+        self:EndSession() -- explicit ML end/abort — the ONLY way a session is destroyed (§6.16)
     elseif cmd == "resume" then
         self:CmdResume()
     elseif cmd == "session" then

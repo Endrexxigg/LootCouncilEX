@@ -1432,3 +1432,47 @@ end, { cleanup = function(self)
     if not self.session then self.sessionItems = nil end
     self:StopTradeTickerIfIdle()
 end })
+
+-- Persistence v2 (Phase 12, §6.16): a collected response + an award survive a simulated /reload
+-- (drop the live refs, RestoreSession, ResumeSession) via the by-reference DB mirror + seed→overlay.
+LCEX:RegisterSelfTest("session", "persistence: save → wipe → resume restores responses/awards", function(self, t)
+    if self.session or self.activeSession or self.recoverableSession then
+        return t:Skip("session state busy")
+    end
+    if self:GroupChannel() then return t:Skip("grouped — run the self-test solo") end
+    local it = FakeWireItem(1)
+    self.sessionItems = { { link = it.link, itemID = it.itemID, quality = it.quality,
+                            boss = "Self-Test", lootedAt = time() } }
+    self:StartSession({ { link = it.link, quality = it.quality } })
+    local s = self.session
+    if not t:Ok(s ~= nil, "StartSession failed") then return end
+    self._selfTestSid = s.sid
+
+    -- Collect a response + an award (held by reference in the DB mirror).
+    s.rows[1] = s.rows[1] or {}
+    s.rows[1]["bob"] = { name = "Bob", resp = self.RESPONSES[1].id, votes = 1 }
+    self.activeSession.awarded = { [1] = "Bob" }
+    self:SaveSession()
+    t:Ok(self:CountSavedResponses(self.db.global.session[self:OwnerKey()]) >= 1,
+        "resume dialog would count the response")
+
+    -- Simulate a /reload: drop the live refs (NOT EndSession — that clears the DB), then recover.
+    local savedSid = s.sid
+    self.session, self.sessionItems, self.activeSession = nil, nil, nil
+    self:RestoreSession()
+    if not t:Ok(self.recoverableSession ~= nil, "no recoverable session after wipe") then return end
+    t:Ok(self:ResumeSession(), "resume failed")
+    t:Eq(self.session.sid, savedSid, "resumed with the same sid")
+    t:Ok(self.session.rows[1] and self.session.rows[1]["bob"]
+        and self.session.rows[1]["bob"].resp ~= nil, "collected response not restored")
+    t:Eq(self.activeSession.awarded[1], "Bob", "award state not restored")
+    self:EndSession()
+end, { cleanup = function(self)
+    local sid = self._selfTestSid
+    self._selfTestSid = nil
+    if self.session and sid and self.session.sid == sid then self:EndSession() end
+    self:ClearSavedSession()
+    self.recoverableSession = nil
+    if not self.session then self.sessionItems = nil end
+    self:StopTradeTickerIfIdle()
+end })

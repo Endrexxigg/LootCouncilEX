@@ -75,8 +75,13 @@ L["Session %s — %d item(s):"]               = "Session %s — %d item(s):"
 L["Session ended."]                         = "Session ended."
 L["No active session."]                     = "No active session."
 -- Phase 7 — session recovery on ML disconnect (DL-6).
-L["Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."] =
-    "Unfinished session from before reload (%d item(s)). /lcex resume to re-open, /lcex end to discard."
+L["Unfinished loot session from %s — %d item(s), %d response(s) collected."] =
+    "Unfinished loot session from %s — %d item(s), %d response(s) collected."
+L["/lcex resume to re-open, /lcex end to discard."] =
+    "/lcex resume to re-open, /lcex end to discard."
+L["Resume"]                                 = "Resume"
+L["Resuming locally — you're not in a group, so this is read-only recovery."] =
+    "Resuming locally — you're not in a group, so this is read-only recovery."
 L["Resumed session (%s) — %d item(s)."]     = "Resumed session (%s) — %d item(s)."
 L["Discarded the unfinished session."]      = "Discarded the unfinished session."
 L["No session to resume."]                  = "No session to resume."
