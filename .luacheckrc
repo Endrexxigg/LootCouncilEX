@@ -56,7 +56,7 @@ read_globals = {
     "PickupContainerItem", "ClickTradeButton", "GetTradePlayerItemLink",
     "CursorHasItem", "ClearCursor", "BIND_TRADE_TIME_REMAINING",
     -- Items / gear / professions
-    "Item", "C_Item", "GetItemInfoInstant", "GetItemStats",
+    "Item", "C_Item", "ItemLocation", "GetItemInfoInstant", "GetItemStats",
     "GetInventoryItemLink", "GetInventorySlotInfo", "GetItemInfo", "GetAverageItemLevel",
     "GetNumSkillLines", "GetSkillLineInfo",
     -- Talents (self-reported spec)

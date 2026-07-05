@@ -156,6 +156,9 @@ function LCEX:OnEnable()
     -- Feature B — guild bank scanner (council/Gbank.lua): cache + ledger on GUILDBANKFRAME_OPENED.
     self:SetupGbank()
 
+    -- Phase 12 — trade timers (Core/TradeTimers.lua): bag-scan tradeable loot on BAG_UPDATE_DELAYED.
+    self:SetupTradeTimers()
+
     -- The minimap launcher (Core/Minimap.lua): left=loot, right=council, ctrl=config.
     self:SetupMinimapButton()
 
@@ -166,6 +169,9 @@ end
 -- (e.g. several loading screens) results in a single vCheck broadcast.
 function LCEX:OnEnterWorld()
     self:DebouncedSend("vCheck", function() self:AutoBroadcastVCheck() end)
+    -- Trade timers: a delayed rescan after a loading screen (bags settle late; §6.17). AceEvent
+    -- allows one handler per event per object, so this rides OnEnterWorld rather than re-registering.
+    self:ScheduleTimer("RescanTradeTimers", 5)
 end
 
 function LCEX:OnRosterUpdate()

@@ -180,6 +180,7 @@ local FILES = {
     "Core/Data/GearRules.lua",
     "Core/Display.lua",
     "Core/session/Session.lua", "Core/session/Readiness.lua", "Core/session/Award.lua",
+    "Core/TradeTimers.lua",
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua", "Core/council/Config.lua",

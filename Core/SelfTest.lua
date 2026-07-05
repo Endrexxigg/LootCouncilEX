@@ -1478,3 +1478,19 @@ end, { cleanup = function(self)
     if not self.session then self.sessionItems = nil end
     self:StopTradeTickerIfIdle()
 end })
+
+-- Trade-timer scanner (Phase 12, §6.17): the bag scan returns well-formed entries, and the
+-- item-GUID keying is PROBED on the live Anniversary client (the X-item — with a fallback either
+-- way). Read-only: ScanTradeTimers touches no state and arms no timer.
+LCEX:RegisterSelfTest("api", "trade timers: scanner shape + item-GUID probe", function(self, t)
+    local entries = self:ScanTradeTimers()
+    if not t:Ok(type(entries) == "table", "ScanTradeTimers did not return a table") then return end
+    for _, e in ipairs(entries) do
+        t:Ok(e.key and e.link and e.expireAt, "malformed entry (needs key/link/expireAt)")
+    end
+    t:Ok(self:TradeBarColor(3600, 7200) ~= nil, "TradeBarColor returned nil")
+    -- X-item: is C_Item.GetItemGUID usable on Anniversary? Record it (informational, not a fail).
+    local guidOk = (C_Item and C_Item.GetItemGUID and _G.ItemLocation) and true or false
+    t.info = "GetItemGUID available: " .. tostring(guidOk)
+        .. "; tradeable bag items scanned: " .. #entries
+end)

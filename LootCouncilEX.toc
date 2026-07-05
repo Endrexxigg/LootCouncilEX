@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.49.0
+## Version: 0.50.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -42,6 +42,8 @@ Core\session\Session.lua
 # Award-readiness calculator (Feature V) — pure status cascade + ML glue; rides cUpdate.
 Core\session\Readiness.lua
 Core\session\Award.lua
+# Trade timers (Phase 12): bag-scan tradeable loot; data layer for the timer window. After Award.
+Core\TradeTimers.lua
 
 # UI — native frames (no AceGUI). Theme is the design language (tones/fonts/paint helpers);
 # Widgets builds the primitives on it; the frame modules build on both.

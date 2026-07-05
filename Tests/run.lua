@@ -206,6 +206,56 @@ test("ParseTradeDuration + TradeExpiry + missing-API fallback", function()
     eq(L:ItemTradeTimeRemaining(0, 1), nil, "no API/string -> nil (fallback)")
 end)
 
+-- ── Trade timers (§6.17, DL-22 — pure helpers) ───────────────────────────────
+test("TradeBarColor: green ≥60%, gold ≥30%, red below", function()
+    eq(L:TradeBarColor(7200, 7200), L.Theme.success, "full window -> green")
+    eq(L:TradeBarColor(4400, 7200), L.Theme.success, "≥60% -> green")
+    eq(L:TradeBarColor(3000, 7200), L.Theme.accent, "≥30% -> gold")
+    eq(L:TradeBarColor(600, 7200), L.Theme.danger, "<30% -> red")
+    eq(L:TradeBarColor(nil, 7200), L.Theme.danger, "nil remaining -> red")
+end)
+
+test("_TradeKeyFor: GUID exact, else bucketed expiry + ordinal", function()
+    eq(L:_TradeKeyFor(100, 5000, "abc", 0), "g:abc", "GUID wins when present")
+    -- 4920 and 5000 both fall in the [4920, 5040) 120s bucket.
+    eq(L:_TradeKeyFor(100, 4920, nil, 0), L:_TradeKeyFor(100, 5000, nil, 0),
+        "same 120s bucket -> same fallback key")
+    ok(L:_TradeKeyFor(100, 4920, nil, 0) ~= L:_TradeKeyFor(100, 5040, nil, 0),
+        "next bucket -> different key")
+    ok(L:_TradeKeyFor(100, 5000, nil, 0) ~= L:_TradeKeyFor(100, 5000, nil, 1),
+        "ordinal disambiguates a same-bucket collision")
+end)
+
+test("_ReconcileTradeEntries: inherit stable keys across drift", function()
+    local prev = { { key = "k1", itemID = 100, expireAt = 5000, guid = "g1" },
+                   { key = "k2", itemID = 100, expireAt = 5000 } }
+    -- GUID match despite a big expiry drift; itemID+near-expiry match for the GUID-less one.
+    local scanned = { { key = "new1", itemID = 100, expireAt = 4000, guid = "g1" },
+                      { key = "new2", itemID = 100, expireAt = 5090 } }
+    L:_ReconcileTradeEntries(prev, scanned)
+    eq(scanned[1].key, "k1", "GUID match inherits the prior key")
+    eq(scanned[2].key, "k2", "itemID + |Δexpire|≤180 inherits the prior key")
+    -- A far-off expiry with no GUID is a NEW item (keeps its own key).
+    local scanned2 = { { key = "fresh", itemID = 100, expireAt = 9999 } }
+    L:_ReconcileTradeEntries(prev, scanned2)
+    eq(scanned2[1].key, "fresh", "expiry beyond the window -> not matched")
+end)
+
+test("_AnnotateTradeWinners: greedy expiry pairing per link", function()
+    local entries = { { link = "[Tok]", itemID = 1, expireAt = 200 },
+                      { link = "[Tok]", itemID = 1, expireAt = 100 },
+                      { link = "[Solo]", itemID = 2, expireAt = 300 } }
+    local owed = { amy = { { link = "[Tok]", winner = "Amy", expireAt = 90 } },
+                   bob = { { link = "[Tok]", winner = "Bob", expireAt = 250 } } }
+    L:_AnnotateTradeWinners(entries, owed)
+    -- Both sides sort by expiry: earliest [Tok] (100) ↔ Amy (90); later [Tok] (200) ↔ Bob (250).
+    local byExpire = {}
+    for _, e in ipairs(entries) do byExpire[e.expireAt] = e.winner end
+    eq(byExpire[100], "Amy", "earliest copy owed to the earliest winner")
+    eq(byExpire[200], "Bob", "later copy owed to the later winner")
+    eq(byExpire[300], nil, "un-owed loot stays blank")
+end)
+
 -- ── ML-disconnect session recovery (A3, DL-6; persistence v2 §6.16) ──────────
 test("Session persist → restore → resume → end (rows/votes/awards survive)", function()
     L.sessionItems = { { link = "[Axe]", itemID = 1, quality = 4 } }
