@@ -725,16 +725,33 @@ LCEX:RegisterSelfTest("ui", "council window: browser module + resize + offset re
     if not t:Ok(panel and panel:IsShown(), "browser panel not shown") then return end
     local phase = self.browserPhase
     if not t:Ok(phase ~= nil, "no phase selected") then return end
-    t:Eq(#panel.list.items, #self:BuildBrowserDisplay(phase), "browser row count for " .. tostring(phase))
+    t:Eq(#panel.list.items, #self:BuildBrowserDisplay(phase, self.browserExpanded),
+        "browser row count for " .. tostring(phase))
     t:Ok(panel.list.rows[1] and panel.list.rows[1]:IsShown(), "first browser row not rendered")
+    -- Collapse state (Phase 12, item 13): toggling a raid header adds its boss rows and folds
+    -- them back away; the round-trip restores the starting count.
+    local before = #panel.list.items
+    local head = panel.list.items[1]
+    if t:Ok(head and head.kind == "raid" and head.key ~= nil, "first row is a toggleable raid header") then
+        self._selfTestFoldKey = self.browserExpanded.raids[head.key] == nil and head.key or nil
+        self:BrowserToggle(panel, "raid", head.key)
+        t:Ok(#panel.list.items ~= before, "toggling a raid did not change the row count")
+        self:BrowserToggle(panel, "raid", head.key)
+        t:Eq(#panel.list.items, before, "toggle round-trip did not restore the count")
+        self._selfTestFoldKey = nil
+    end
     -- The CLAUDE.md FauxScrollFrame gotcha, exercised for real: poison the offset, repopulate —
     -- the list must render from the top, never empty.
     panel.list.scroll.offset = 500
-    panel.list:SetData(self:BuildBrowserDisplay(phase))
+    panel.list:SetData(self:BuildBrowserDisplay(phase, self.browserExpanded))
     t:Eq(panel.list.scroll.offset, 0, "SetData did not reset the poisoned scroll offset")
     t:Ok(panel.list.rows[1] and panel.list.rows[1]:IsShown(), "list rendered empty after offset poison")
     self.browserPhase = prevPhase or self.browserPhase
 end, { cleanup = function(self)
+    if self._selfTestFoldKey then -- a failed toggle round-trip may leak an expanded raid
+        self.browserExpanded.raids[self._selfTestFoldKey] = nil
+        self._selfTestFoldKey = nil
+    end
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 

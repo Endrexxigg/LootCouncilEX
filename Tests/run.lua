@@ -389,6 +389,33 @@ test("LootBrowser BuildBrowserDisplay", function()
     eq(#L:BuildBrowserDisplay("P9"), 0, "empty phase -> empty array")
 end)
 
+-- Collapse state (Phase 12, item 13): absent key = collapsed; children of a collapsed node are
+-- skipped entirely; nil `expanded` keeps the legacy always-expanded behavior (asserted above).
+test("LootBrowser collapse/expand matrix", function()
+    local exp = { raids = {}, bosses = {} }
+    local d = L:BuildBrowserDisplay("P2", exp)
+    eq(#d, 2, "fresh state -> raid headers only")
+    eq(d[1].kind, "raid", "raid header first")
+    ok(d[1].key ~= nil, "raid row carries its toggle key")
+    eq(d[1].expanded, false, "raid starts collapsed")
+
+    exp.raids[d[1].key] = true -- expand SSC
+    d = L:BuildBrowserDisplay("P2", exp)
+    eq(#d, 8, "expanded raid shows its 6 bosses, still folded (2 raids + 6 bosses)")
+    eq(d[2].kind, "boss", "boss header under the expanded raid")
+    eq(d[2].expanded, false, "bosses start collapsed")
+
+    exp.bosses[d[2].key] = true -- expand Hydross
+    d = L:BuildBrowserDisplay("P2", exp)
+    ok(#d > 8, "expanded boss shows its items")
+    eq(d[3].kind, "item", "items directly under the expanded boss")
+    eq(d[3].itemID, 30056, "Hydross's first item")
+
+    exp.raids[d[1].key] = nil -- collapse the raid again
+    d = L:BuildBrowserDisplay("P2", exp)
+    eq(#d, 2, "collapsing the raid hides bosses AND their items")
+end)
+
 -- ── Widgets: tab-strip state (Phase 6) ───────────────────────────────────────
 test("Widgets _TabSelect", function()
     local st = { active = "a", valid = { a = true, b = true, c = true } }

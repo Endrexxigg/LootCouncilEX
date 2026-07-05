@@ -10,15 +10,26 @@ local LCEX = LootCouncilEX
 
 -- ── Loot browser display ─────────────────────────────────────────────────────
 -- Flat display array for a phase: { {kind="raid",text}, {kind="boss",text}, {kind="item",itemID}, ... }
--- in raid (alpha) → boss (kill order) → item order.
-function LCEX:BuildBrowserDisplay(phase)
+-- in raid (alpha) → boss (kill order) → item order. `expanded` (Phase 12, item 13) is
+-- { raids = {key=true}, bosses = {key=true} } — an ABSENT key means collapsed, so a fresh
+-- session starts fully collapsed; nil `expanded` keeps the old always-expanded behavior.
+-- Raid/boss rows carry their toggle `key` + current `expanded` flag for the UI.
+function LCEX:BuildBrowserDisplay(phase, expanded)
     local out = {}
     for _, raid in ipairs(self:GetRaidsForPhase(phase)) do
-        out[#out + 1] = { kind = "raid", text = raid }
-        for _, boss in ipairs(self:GetBossesForRaid(phase, raid)) do
-            out[#out + 1] = { kind = "boss", text = boss }
-            for _, itemID in ipairs(self:GetItemsForBoss(phase, raid, boss)) do
-                out[#out + 1] = { kind = "item", itemID = itemID }
+        local rKey = phase .. ":" .. raid
+        local rOpen = expanded == nil or (expanded.raids and expanded.raids[rKey]) == true
+        out[#out + 1] = { kind = "raid", text = raid, key = rKey, expanded = rOpen }
+        if rOpen then
+            for _, boss in ipairs(self:GetBossesForRaid(phase, raid)) do
+                local bKey = rKey .. ":" .. boss
+                local bOpen = expanded == nil or (expanded.bosses and expanded.bosses[bKey]) == true
+                out[#out + 1] = { kind = "boss", text = boss, key = bKey, expanded = bOpen }
+                if bOpen then
+                    for _, itemID in ipairs(self:GetItemsForBoss(phase, raid, boss)) do
+                        out[#out + 1] = { kind = "item", itemID = itemID }
+                    end
+                end
             end
         end
     end

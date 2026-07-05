@@ -15,6 +15,14 @@ local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemIn
 
 local INDENT_BOSS, INDENT_ITEM = 14, 30
 
+-- Collapse state (item 13): absent key = collapsed, so every play session starts folded to the
+-- raid headers. In-memory on purpose — a persisted tree would go stale across phase releases.
+LCEX.browserExpanded = LCEX.browserExpanded or { raids = {}, bosses = {} }
+
+-- +/− fold indicators as texture escapes (glyph-safe, like CHECK_TEX in the loot window).
+local FOLD_OPEN   = "|TInterface\\Buttons\\UI-MinusButton-Up:14:14:0:0|t "
+local FOLD_CLOSED = "|TInterface\\Buttons\\UI-PlusButton-Up:14:14:0:0|t "
+
 local function BuildRow(panel)
     local row = CreateFrame("Button", nil, panel)
     row.bg = row:CreateTexture(nil, "BACKGROUND")
@@ -42,7 +50,11 @@ local function BuildRow(panel)
     row.mark:SetWordWrap(false)
 
     row:SetScript("OnClick", function(r)
-        if r.itemID then LCEX:BrowserSelectItem(r.panel, r.itemID) end
+        if r.itemID then
+            LCEX:BrowserSelectItem(r.panel, r.itemID)
+        elseif r.toggleKey then
+            LCEX:BrowserToggle(r.panel, r.kind, r.toggleKey) -- raid/boss headers fold (item 13)
+        end
     end)
     row.panel = panel
     return row
@@ -51,12 +63,16 @@ end
 local function FillRow(panel, row, entry)
     row.loadingID = nil
     row.itemID = nil
+    row.kind = entry.kind
+    row.toggleKey = entry.key
     row.bg:Hide()
     row.sel:Hide()
     row.icon:Hide()
     row.mark:SetText("")
     row.text:ClearAllPoints()
 
+    local fold = (entry.kind == "raid" or entry.kind == "boss")
+        and (entry.expanded and FOLD_OPEN or FOLD_CLOSED) or ""
     if entry.kind == "raid" then
         row.bg:Show()
         LCEX:ApplyGradient(row.bg, LCEX.Theme.tone.raised.top, LCEX.Theme.tone.raised.bottom)
@@ -64,12 +80,12 @@ local function FillRow(panel, row, entry)
         row.text:SetTextColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3])
         row.text:SetPoint("LEFT", 8, 0)
         row.text:SetPoint("RIGHT", -8, 0)
-        row.text:SetText(entry.text:upper())
+        row.text:SetText(fold .. entry.text:upper())
     elseif entry.kind == "boss" then
         LCEX:ThemeText(row.text, "body", "ink")
         row.text:SetPoint("LEFT", INDENT_BOSS, 0)
         row.text:SetPoint("RIGHT", -8, 0)
-        row.text:SetText(entry.text)
+        row.text:SetText(fold .. entry.text)
     else -- item
         row.itemID = entry.itemID
         row.icon:Show()
@@ -95,6 +111,14 @@ local function FillRow(panel, row, entry)
 
         if panel.selectedItemID == id then row.sel:Show() end
     end
+end
+
+-- Fold/unfold a raid or boss header (item 13) and rebuild the list. Collapsing a raid hides its
+-- bosses AND their items in one step (the display builder skips children of collapsed nodes).
+function LCEX:BrowserToggle(panel, kind, key)
+    local set = (kind == "raid") and self.browserExpanded.raids or self.browserExpanded.bosses
+    set[key] = (not set[key]) and true or nil
+    panel.list:SetData(self:BuildBrowserDisplay(self.browserPhase, self.browserExpanded))
 end
 
 -- Click-to-select: the bottom editor targets this item's mark.
@@ -123,7 +147,7 @@ local function ShowPhase(panel, phase)
             end
         end
     end
-    panel.list:SetData(LCEX:BuildBrowserDisplay(phase))
+    panel.list:SetData(LCEX:BuildBrowserDisplay(phase, LCEX.browserExpanded))
 end
 
 LCEX:RegisterCouncilModule({
