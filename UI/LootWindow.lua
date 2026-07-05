@@ -328,11 +328,17 @@ function LCEX:FillLootRailRow(row, entry, index)
             row.badge:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
             statusKind = "awarded"
         else
-            local n = 0
-            local rows = self.voteRows and self.voteRows[index]
-            if rows then for _ in pairs(rows) do n = n + 1 end end
-            row.badge:SetText(tostring(n))
-            self:ThemeText(row.badge, "caption", "faint")
+            -- Response count is full-view only (DL-18): a list-level spectator's rail shows
+            -- item + award state + winner, never how many (or who) responded.
+            if a.viewLevel == "full" then
+                local n = 0
+                local rows = self.voteRows and self.voteRows[index]
+                if rows then for _ in pairs(rows) do n = n + 1 end end
+                row.badge:SetText(tostring(n))
+                self:ThemeText(row.badge, "caption", "faint")
+            else
+                row.badge:SetText("")
+            end
             local st = self.voteStatus and self.voteStatus[index]
             statusKind = st and st.kind
         end
@@ -520,7 +526,10 @@ function LCEX:RefreshLootWindow()
     if not f or not f:IsShown() then return end
     local items, inSession = self:LootRailItems()
 
-    self:ApplyLootLayout(f, inSession and "full" or "rail")
+    -- Full layout only for a live session at the full view level (DL-18): spectators keep the
+    -- rail-only form, as does the pre-session staging list for everyone.
+    local fullView = inSession and self.activeSession and self.activeSession.viewLevel == "full"
+    self:ApplyLootLayout(f, fullView and "full" or "rail")
 
     -- Clamp/derive selection.
     if not f.selectedIndex or not items[f.selectedIndex] then
@@ -535,6 +544,9 @@ function LCEX:RefreshLootWindow()
     if inSession then
         f.scanBtn:Hide(); f.addBox:Hide()
         f.startBtn:Hide(); f.endBtn:Show()
+        -- Contextual label (DL-18): only the ML ends the session for everyone; anyone else
+        -- (council or spectator) merely leaves their own view of it.
+        f.endBtn:SetText(self.session and self.L["End session"] or self.L["Leave session"])
         -- D/E is the ML's action only (it awards on the ML-authoritative session).
         if self.activeSession and self:IsSelf(self.activeSession.ml) then f.deBtn:Show() else f.deBtn:Hide() end
         f.status:SetText(string.format(self.L["Session active — %d item(s)."], #items))
@@ -709,15 +721,8 @@ end
 
 -- ── Entry points (Core contract) ─────────────────────────────────────────────
 function LCEX:ShowLootWindow()
-    -- Access gate (C7): during a session, honor the session's own council membership (+ opt-in),
-    -- decided in EnterSession; out of a session (staging / manual open), the Plane-B predicate. The
-    -- default keeps the window council-only — raiders see just the poll + award chat.
-    local a = self.activeSession
-    local allowed = (a and a.canSeeLoot) or (not a and self:CanSeeLootWindow())
-    if not allowed then
-        self:Msg(self.L["The loot window is council-only for this guild."])
-        return
-    end
+    -- Everyone may open the window (Phase 12, DL-18): what renders is decided by the VIEW level
+    -- — rail-only list view for non-council raiders, the full two-pane for council/opted-in.
     local f = self:EnsureLootWindow()
     f.selectedIndex = nil -- re-derive from the current item list
     f:Show()

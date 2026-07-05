@@ -187,9 +187,8 @@ L["Include guild ranks at or above:"]       = "Include guild ranks at or above:"
 L["Rank cutoff (0 = GM)"]                   = "Rank cutoff (0 = GM)"
 L["Extra members (any guild rank):"]        = "Extra members (any guild rank):"
 L["Disenchanters (D/E), ranked:"]           = "Disenchanters (D/E), ranked:"
-L["Show the loot window to all raiders"]    = "Show the loot window to all raiders"
-L["The loot window is council-only for this guild."] =
-    "The loot window is council-only for this guild."
+L["Show the full loot window (responses & votes) to all raiders"] =
+    "Show the full loot window (responses & votes) to all raiders"
 L["Inherit %s loot-council settings from %s?"] =
     "Inherit %s loot-council settings from %s?"
 L["Inherited %s loot-council settings from %s."] =

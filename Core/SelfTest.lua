@@ -871,15 +871,16 @@ LCEX:RegisterSelfTest("load", "inherit-on-first-load flow present (Feature C)", 
     t:Ok(self._pendingInherit == nil, "no pending inherit left after the no-op check")
 end)
 
-LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C)", function(self, t)
-    for _, fn in ipairs({ "CanEditConfig", "CanSeeSessionConfig", "CanSeeLootWindow",
+LCEX:RegisterSelfTest("load", "access predicates resolve (Feature C / DL-18)", function(self, t)
+    for _, fn in ipairs({ "CanEditConfig", "CanSeeSessionConfig", "LootViewLevel",
                           "LootWindowOptIn", "MyGuildRank" }) do
         t:Ok(type(self[fn]) == "function", "missing access predicate: " .. fn)
     end
     t:Ok(type(self:CanSeeSessionConfig()) == "boolean", "CanSeeSessionConfig returns a boolean")
-    t:Ok(type(self:CanSeeLootWindow()) == "boolean", "CanSeeLootWindow returns a boolean")
-    -- Council always sees the loot window (the opt-in only matters for non-council raiders).
-    if self:AmCouncil() then t:Ok(self:CanSeeLootWindow(), "council must always see the loot window") end
+    local lvl = self:LootViewLevel()
+    t:Ok(lvl == "full" or lvl == "list", "LootViewLevel must be full|list (got " .. tostring(lvl) .. ")")
+    -- Council always gets the full view (the opt-in only matters for non-council raiders).
+    if self:AmCouncil() then t:Eq(lvl, "full", "council must resolve the full view") end
 end)
 
 LCEX:RegisterSelfTest("ui", "guild bank module renders (Feature B)", function(self, t)

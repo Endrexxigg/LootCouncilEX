@@ -215,9 +215,10 @@ LCEX:RegisterCouncilModule({
         panel.rosterList:SetPoint("TOPLEFT", 4, -210)
         panel.rosterList:SetPoint("BOTTOMRIGHT", -4, 64)
 
-        -- Loot-window visibility (C7) — a SHARED-config toggle. Off by default (raiders see only the
-        -- poll + award chat); on opts the whole raid into watching the voting process.
-        panel.vis = LCEX:CreateCheckbox(panel, LCEX.L["Show the loot window to all raiders"],
+        -- Loot-window visibility — a SHARED-config toggle, repurposed by Phase 12 (DL-18). Off:
+        -- raiders get the rail-only list view (items/award state/winners). On: raiders get the
+        -- FULL read-only view, responses and votes included.
+        panel.vis = LCEX:CreateCheckbox(panel, LCEX.L["Show the full loot window (responses & votes) to all raiders"],
             function() local v = LCEX:GetConfig().visibility; return v and v.lootWindow end,
             function(v)
                 local cur = LCEX:GetConfig().visibility or {}

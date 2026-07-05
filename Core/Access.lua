@@ -33,17 +33,22 @@ function LCEX:CanSeeSessionConfig()
     return self:CanEditConfig()
 end
 
--- Has the guild opted into showing the loot/voting window to all raiders (C7)? Off by default.
+-- Has the guild opted into showing the FULL loot/voting window to all raiders? Off by default.
+-- Phase 12 repurposed this (DL-18): it now upgrades non-council from the list view to the full
+-- view — it no longer gates whether the window opens at all.
 function LCEX:LootWindowOptIn()
     local vis = self:GetConfig().visibility
     return (vis and vis.lootWindow) == true
 end
 
--- May the local player OPEN the loot/voting window OUT of a session (staging / manual / minimap)?
--- Council always; other raiders only under the opt-in. During a live session the gate uses the
--- session's own council membership instead (activeSession.canSeeLoot), set in EnterSession.
-function LCEX:CanSeeLootWindow()
-    return self:AmCouncil() or self:LootWindowOptIn()
+-- The loot window's VIEW level for the local player (Phase 12, DL-18 — supersedes the C7 open
+-- gate): everyone may OPEN the window; council and opted-in raiders get the full two-pane view
+-- ("full"), everyone else the rail-only spectator view ("list" — items, quantities, award state,
+-- winners; never responses/votes/notes). During a live session the level is snapshotted per
+-- session (activeSession.viewLevel, EnterSession); this predicate seeds that snapshot and covers
+-- the out-of-session case.
+function LCEX:LootViewLevel()
+    return (self:AmCouncil() or self:LootWindowOptIn()) and "full" or "list"
 end
 
 -- May the local player see the guild-bank LOG + annotations (Feature B, B5)? Council always; other

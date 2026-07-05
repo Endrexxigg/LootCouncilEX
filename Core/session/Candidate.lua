@@ -114,15 +114,17 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
         if nn then set[nn] = true end
     end
     local amCouncil = set[self:NormalizeName(UnitName("player"))] == true
-    -- Loot-window access for THIS session (C7): council members, plus any raider when the guild has
-    -- opted into a transparent process. Default raiders get the poll only, not the loot window.
-    local canSeeLoot = amCouncil or self:LootWindowOptIn()
+    -- View level for THIS session (Phase 12, DL-18): council + opted-in raiders get the full
+    -- two-pane view; everyone else the rail-only list view. Snapshotted at entry so a
+    -- mid-session config flip can't retroactively expose earlier deliberation.
+    local viewLevel = (amCouncil or self:LootWindowOptIn()) and "full" or "list"
     timeout = tonumber(timeout)
     if timeout and timeout <= 0 then timeout = nil end
     self.activeSession = {
         sid = sid, ml = ml, items = items,
         responses = responses or self.RESPONSES,
-        council = set, amCouncil = amCouncil, canSeeLoot = canSeeLoot, myVotes = {},
+        council = set, amCouncil = amCouncil, viewLevel = viewLevel, myVotes = {},
+        awarded = {}, -- pre-created so persistence can mirror it by reference (§6.16)
         deadlineAt = timeout and (GetTime() + timeout) or nil,
         anon = anon and true or false,
     }
@@ -135,7 +137,9 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
     if self.pollQueue and #self.pollQueue > 0 and PlaySound and SOUNDKIT and SOUNDKIT.READY_CHECK then
         PlaySound(SOUNDKIT.READY_CHECK, "Master")
     end
-    if canSeeLoot then
+    -- Auto-open only at the full level: list-view spectators reach the window on demand
+    -- (minimap / mini pill / slash) — a raid-wide popup on every sStart would be spam.
+    if viewLevel == "full" then
         self:ShowLootWindow()
     end
     -- Watch for the ML going quiet — but not on the ML's own client (it doesn't time itself

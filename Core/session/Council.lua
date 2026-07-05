@@ -15,18 +15,24 @@ local LCEX = LootCouncilEX
 LCEX.dispatch = LCEX.dispatch or {}
 
 -- Mirror the ML's broadcast of one item's rows (+ readiness status) into our local voting view and
--- refresh the frame. Council-only and gated to the active session's sid (a stale/foreign sid is
--- ignored). On the ML this is fed directly from session.rows + ComputeItemStatus; on council from
--- the received cUpdate. `status` (Feature V, §6.10) may be nil — the rail-row border then clears.
+-- refresh the frame. Gated to the active session's sid (a stale/foreign sid is ignored). On the ML
+-- this is fed directly from session.rows + ComputeItemStatus; on council from the received cUpdate.
+-- `status` (Feature V, §6.10) may be nil — the rail-row border then clears.
+--
+-- View levels (Phase 12, DL-18): the full view (council + opted-in raiders) mirrors everything; a
+-- list-level spectator stores ONLY the readiness kind — responses, votes, notes, and the who-voted
+-- list are never mirrored into client state, not merely left unpainted.
 function LCEX:ApplyCUpdate(sid, index, rows, status)
     local a = self.activeSession
-    -- Populate the local voting view for council AND any opted-in raider watching (C7) — otherwise a
-    -- transparency viewer's loot window would render empty. Non-council can view but not vote.
-    if not a or sid ~= a.sid or not (a.amCouncil or a.canSeeLoot) then return end
-    self.voteRows = self.voteRows or {}
-    self.voteRows[index] = rows
+    if not a or sid ~= a.sid then return end
     self.voteStatus = self.voteStatus or {}
-    self.voteStatus[index] = status
+    if a.viewLevel == "full" then
+        self.voteRows = self.voteRows or {}
+        self.voteRows[index] = rows
+        self.voteStatus[index] = status
+    else
+        self.voteStatus[index] = status and { kind = status.kind } or nil
+    end
     self:RefreshLootItem(index)
 end
 

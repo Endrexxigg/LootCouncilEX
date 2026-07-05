@@ -715,13 +715,36 @@ test("Access predicates: edit/see gating with the C4 escape hatch (Feature C)", 
     ok(L:AmCouncil(), "Tester now council")
     ok(L:CanEditConfig(), "council member can edit")
 
-    -- Loot-window visibility (C7): council always; a raider only under the opt-in.
+    -- Loot-window VIEW level (Phase 12, DL-18 — supersedes the C7 open gate): council -> full,
+    -- raider -> list by default, opt-in upgrades the raider to full.
+    ok(L:LootViewLevel() == "full", "council -> full view")
     L:SetCouncilConfig({ extra = {} }) -- Tester off council again
     H.myRank = 5
-    ok(not L:CanSeeLootWindow(), "raider, opt-in off -> loot window hidden")
+    eq(L:LootViewLevel(), "list", "raider, opt-in off -> list view")
     L:SetConfigField("visibility", { lootWindow = true })
-    ok(L:CanSeeLootWindow(), "raider, opt-in on -> loot window visible")
+    eq(L:LootViewLevel(), "full", "raider, opt-in on -> full view")
     L.db.global.config = {}
+end)
+
+-- ── ApplyCUpdate view-level stripping (Phase 12, item 1 / DL-18) ─────────────
+test("ApplyCUpdate: list-level spectators never store rows/tally", function()
+    L.activeSession = { sid = "S1", ml = "Boss", viewLevel = "list", amCouncil = false }
+    L.voteRows, L.voteStatus = nil, nil
+    L:ApplyCUpdate("S1", 1, { bob = { resp = 1, votes = 2, note = "secret" } },
+        { kind = "voting", voted = { n = 1, of = 3, names = { "Amy" } } })
+    ok(L.voteRows == nil or L.voteRows[1] == nil, "list level must not store rows")
+    ok(L.voteStatus and L.voteStatus[1] and L.voteStatus[1].kind == "voting",
+        "list level keeps the readiness kind")
+    ok(L.voteStatus[1].voted == nil, "list level strips the vote tally + who-voted names")
+
+    L.activeSession.viewLevel = "full"
+    L:ApplyCUpdate("S1", 1, { bob = { resp = 1 } }, { kind = "ready", voted = { n = 1, of = 1 } })
+    ok(L.voteRows and L.voteRows[1] and L.voteRows[1].bob ~= nil, "full level stores rows")
+    ok(L.voteStatus[1].voted ~= nil, "full level keeps the tally")
+
+    L:ApplyCUpdate("OTHER", 1, {}, nil)
+    ok(L.voteRows[1].bob ~= nil, "foreign sid ignored")
+    L.activeSession, L.voteRows, L.voteStatus = nil, nil, nil
 end)
 
 test("SyncGuildScope: claim-in-place, stash on switch, restore on rejoin (Feature C, C6)", function()
