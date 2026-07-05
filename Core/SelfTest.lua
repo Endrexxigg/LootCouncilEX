@@ -941,6 +941,37 @@ LCEX:RegisterSelfTest("ui", "all windows registered for ESC-close", function(sel
     end
 end)
 
+-- Phase 12 (DL-23): CreateScrollList must resolve the Faux template's scrollbar and re-anchor it
+-- INSIDE the list frame (items 12/18) — otherwise it renders across the owning panel's divider.
+LCEX:RegisterSelfTest("ui", "scroll list: scrollbar re-anchored inside the list", function(self, t)
+    local host = CreateFrame("Frame", nil, UIParent)
+    host:SetSize(200, 120)
+    host:Hide()
+    self._selfTestScrollHost = host
+    local list = self:CreateScrollList(host, {
+        rowHeight = 20, visibleRows = 4, width = 200,
+        buildRow = function(parent) return CreateFrame("Button", nil, parent) end,
+        fillRow  = function() end,
+    })
+    list:SetPoint("TOPLEFT", 0, 0)
+    if not t:Ok(list.scrollBar ~= nil, "scrollbar not resolved (template parentKey + child scan both failed)") then
+        return
+    end
+    t:Ok(list.scrollBar:IsObjectType("Slider"), "resolved scrollbar is not a Slider")
+    local inside = 0
+    for i = 1, list.scrollBar:GetNumPoints() do
+        local _, rel = list.scrollBar:GetPoint(i)
+        if rel == list then inside = inside + 1 end
+    end
+    t:Eq(inside, 2, "scrollbar anchor points referencing the list frame")
+end, { cleanup = function(self)
+    if self._selfTestScrollHost then
+        self._selfTestScrollHost:Hide()
+        self._selfTestScrollHost:SetParent(nil)
+        self._selfTestScrollHost = nil
+    end
+end })
+
 -- ── comm: the real receive path + the real wire ───────────────────────────────
 -- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
 -- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so

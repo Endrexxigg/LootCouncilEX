@@ -75,6 +75,24 @@ function LCEX:CreateScrollList(parent, opts)
     sf:SetAllPoints(list)
     list.scroll = sf
 
+    -- The template anchors its scrollbar OUTSIDE the scrollframe's right edge, so a list flush
+    -- against a panel border renders its bar across the divider (handoff items 12/18). Re-anchor
+    -- it INSIDE the list, in the 24px gutter the rows already leave free. `sf.ScrollBar` is the
+    -- template's parentKey; the Slider-child scan covers a client where only the name differs.
+    local bar = sf.ScrollBar
+    if not bar then
+        for _, child in ipairs({ sf:GetChildren() }) do
+            if child:IsObjectType("Slider") then bar = child; break end
+        end
+    end
+    if bar then
+        bar:ClearAllPoints()
+        -- ±16 leaves room for the template's up/down arrows, which hang off the slider's ends.
+        bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -16)
+        bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 16)
+    end
+    list.scrollBar = bar
+
     local function Refresh()
         FauxScrollFrame_Update(sf, #list.items, list.visibleRows, rowHeight)
         local offset = FauxScrollFrame_GetOffset(sf)
