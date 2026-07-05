@@ -384,7 +384,11 @@ end
 
 function LCEX:FillLootCandRow(row, entry)
     local itemIndex, candKey, data = entry.itemIndex, entry.candKey, entry.data
-    row.name:SetText(DisplayName(data, candKey))
+    local awardedTo = self.activeSession and self.activeSession.awarded
+        and self.activeSession.awarded[itemIndex]
+    local isWinner = awardedTo and self:NormalizeName(awardedTo) == candKey
+    -- The winner's row is explicitly marked (item 3): check + success-tinted response below.
+    row.name:SetText((isWinner and (CHECK_TEX .. " ") or "") .. DisplayName(data, candKey))
     local cc = self:ClassColor(self:ClassOf(data.name or candKey) or self:CachedClass(data.name or candKey))
     row.name:SetTextColor(cc[1], cc[2], cc[3])
     -- Dim the "not rolling" tier — declined, ineligible (can't use / missed kill), or left (V1, R3).
@@ -401,6 +405,9 @@ function LCEX:FillLootCandRow(row, entry)
         -- No response yet: show the seeded reason (Waiting / Can't use / Missed kill / Left), dimmed.
         row.resp:SetText(self:ReasonText(data.reason))
         self:ThemeText(row.resp, "body", "faint")
+    end
+    if isWinner then
+        row.resp:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
     end
 
     local gear = data.gear or {}
@@ -446,11 +453,21 @@ function LCEX:FillLootCandRow(row, entry)
     -- Award is the ML's action only — only the ML's award is authoritative.
     if a and self:IsSelf(a.ml) then
         row.award:Show()
-        row.award:SetScript("OnClick", function()
-            if self:AwardItem(itemIndex, data.name or candKey) then
-                self:RefreshLootWindow()
-            end
-        end)
+        if awardedTo then
+            -- Already awarded: grey out so it can't be casually re-clicked (item 3). The
+            -- deliberate correction path is the right-click un-award, not this button.
+            row.award:SetText(self.L["Awarded"])
+            row.award:SetFlatEnabled(false)
+            row.award:SetScript("OnClick", nil)
+        else
+            row.award:SetText(self.L["Award"])
+            row.award:SetFlatEnabled(true)
+            row.award:SetScript("OnClick", function()
+                if self:AwardItem(itemIndex, data.name or candKey) then
+                    self:RefreshLootWindow()
+                end
+            end)
+        end
     else
         row.award:Hide()
     end

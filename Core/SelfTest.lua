@@ -1248,6 +1248,23 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Ok(owed and owed[1] and owed[1].expireAt ~= nil, "owed trade lacks its 2h expiry anchor")
     t:Ok(self.db.global.pendingTrades[me] ~= nil, "owed trades not persisted to the DB")
 
+    -- Awarded feedback (Phase 12, item 3): the award button greys out, the winner's row is
+    -- check-marked, and the rail badge carries the texture escape (item 9) — never a glyph.
+    self:LootSelectItem(2) -- item 2's winner (us) has a rendered candidate row
+    local awardRow
+    for _, r in ipairs(self.lootWindow.candList.rows) do
+        if r:IsShown() and r.award:IsShown() then awardRow = r; break end
+    end
+    if t:Ok(awardRow ~= nil, "no candidate row with an award button after award") then
+        t:Ok(not awardRow.award:IsEnabled(), "award button still enabled on an awarded item")
+        t:Eq(awardRow.award:GetText(), self.L["Awarded"], "award button label after award")
+        t:Ok((awardRow.name:GetText() or ""):find("|T", 1, true) ~= nil,
+            "winner's candidate row not check-marked")
+    end
+    local railRow = self.lootWindow.railList.rows[2]
+    t:Ok(railRow and (railRow.badge:GetText() or ""):find("|T", 1, true) ~= nil,
+        "awarded rail badge missing the texture escape")
+
     -- End: both frames close, all session state (incl. the DB mirror) clears.
     self:EndSession()
     t:Ok(self.session == nil and self.activeSession == nil, "session state not cleared")
