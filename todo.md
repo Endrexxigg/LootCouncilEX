@@ -281,7 +281,8 @@ settings that depend on state, and for the configurable-visibility toggles.
 
 ## Feature B — Guild Bank module
 
-**Status:** **in progress** (Phase 11) — building in 3 commits. **(1) Data layer — DONE (v0.37.0):**
+**Status:** **✅ SHIPPED (Phase 11, v0.37.0–v0.39.0)** — pending a 2-client in-game pass (scan on
+open, replication between officers, annotations, non-council log hiding). **(1) Data layer — DONE (v0.37.0):**
 `Core/council/Gbank.lua` — three guild-scoped datasets (`gbankCache` lww / `gbankLog` union /
 `gbankNotes` lww); pure ledger logic (`GbankNormalizeKind`, `GbankTxnHour` elapsed→absolute hour,
 `GbankTxnUid` content-hash, `IngestTxnList` dedup, `BuildGbankGroups` 5-min/xN grouping); accessors
@@ -292,9 +293,18 @@ Headless tests for the pure logic. **(2) Module UI — DONE (v0.38.0):** `UI/cou
 (order 50) — gold **hero card** (`GetCoinTextureString` + "cached Nm ago"), pooled **tab selector**,
 **Contents** 14×7 item grid + **Log** grouped-newest-first sub-tabs; added an **"xN" stack overlay** to
 `CreateItemIcon` (`SetCount`). Reads only the cache/ledger (works offline; "not cached" empty state).
-Selftest render check. **(3) TODO:** annotations (`gbankNotes` on a group, council-only) +
-`config.visibility` gbank toggles (logs/annotations hidden from non-council). Withdrawal-request +
-auto-note-prompt **deferred**. §6.12, DL-17.
+Selftest render check. **(3) Annotations + visibility — DONE (v0.39.0):** council click-to-annotate a
+log group (`gbankNotes` LWW, keyed by lead uid; reuses `ShowConfirm`); `CanSeeGbankLog` gates the Log
+sub-tab (council + `config.visibility.gbankLog` opt-in; contents+gold stay public); a "Show the
+guild-bank log to all raiders" toggle in Session Config. Withdrawal-request + auto-note-prompt
+**deferred** (see Deferred list). §6.12, DL-17.
+
+### ✅ Feature B COMPLETE (v0.37.0 → v0.39.0) — and with it, the WHOLE probe backlog
+All four probed features are now shipped: **G** (gear issues, v0.25.x) · **V** (voting readiness,
+v0.27–v0.32) · **C** (access control + guild scoping, v0.33–v0.36) · **B** (guild bank, v0.37–v0.39).
+Cross-cutting X1–X6 all satisfied. Remaining: 2-client in-game validation passes (per feature, in
+TESTING.md) + the Deferred/future-probes list below (withdrawal requests, enchant-mat helper, sync
+notification prints, auto note-prompt, enchant-name tooltip, G v1.1 boss-conditional/meta-gem).
 
 **The ask (user's words):** "include a module for guild bank … cache the guild bank
 items/tabs/gold/logs. log entries can be annotated … when multiple log items occur in a short

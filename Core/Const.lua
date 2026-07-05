@@ -213,6 +213,10 @@ L["moved"]                                 = "moved"
 L["repaired"]                              = "repaired"
 L["No transactions logged yet."]           = "No transactions logged yet."
 L["Open the guild bank in-game to scan it."] = "Open the guild bank in-game to scan it."
+L["Note for %s's transaction:"]            = "Note for %s's transaction:"
+L["Save"]                                  = "Save"
+L["+ note"]                                = "+ note"
+L["Show the guild-bank log to all raiders"] = "Show the guild-bank log to all raiders"
 
 -- The config window.
 L["Configuration"]                          = "Configuration"

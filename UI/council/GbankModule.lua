@@ -119,29 +119,49 @@ end
 
 -- ── Log rows (grouped transactions) ──────────────────────────────────────────
 local LOG_ICONS = 6
+-- Council click-to-annotate a group (B5): reuses ShowConfirm's input field. Non-council rows are
+-- inert. The note attaches to the group's LEAD uid (stable across scans).
+local function EditNote(panel, uid, player)
+    if not LCEX:AmCouncil() then return end
+    LCEX:ShowConfirm({
+        text = string.format(LCEX.L["Note for %s's transaction:"], tostring(player)),
+        input = (LCEX:GbankNote(uid)) or "",
+        accept = LCEX.L["Save"],
+        onAccept = function(t) LCEX:SetGbankNote(uid, t); SelectSubTab(panel, "log") end,
+    })
+end
+
 local function BuildLogRow(panel)
-    local row = CreateFrame("Frame", nil, panel)
+    local row = CreateFrame("Button", nil, panel)
     row.time = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.time, "caption", "faint")
     row.time:SetPoint("LEFT", 6, 0); row.time:SetWidth(74); row.time:SetJustifyH("LEFT")
     row.who = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.who, "body", "ink")
-    row.who:SetPoint("LEFT", row.time, "RIGHT", 4, 0); row.who:SetWidth(190)
+    row.who:SetPoint("LEFT", row.time, "RIGHT", 4, 0); row.who:SetWidth(180)
     row.who:SetJustifyH("LEFT"); row.who:SetWordWrap(false)
     row.icons = {}
     local anchor = row.who
     for i = 1, LOG_ICONS do
         local ic = LCEX:CreateItemIcon(row, 20)
-        ic:SetPoint("LEFT", anchor, i == 1 and "RIGHT" or "RIGHT", i == 1 and 6 or 2, 0)
+        ic:SetPoint("LEFT", anchor, "RIGHT", i == 1 and 6 or 2, 0)
         row.icons[i] = ic; anchor = ic
     end
     row.gold = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.gold, "body", "dim")
     row.gold:SetPoint("RIGHT", -8, 0); row.gold:SetJustifyH("RIGHT")
+    -- Annotation: shown after the icons, up to the gold. Council rows offer a "+ note" affordance.
+    row.note = row:CreateFontString(nil, "OVERLAY")
+    LCEX:ThemeText(row.note, "caption", "faint")
+    row.note:SetPoint("LEFT", row.who, "RIGHT", 6 + LOG_ICONS * 24, 0)
+    row.note:SetPoint("RIGHT", row.gold, "LEFT", -8, 0)
+    row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
+    row:SetScript("OnClick", function() EditNote(panel, row.groupUid, row.player) end)
     return row
 end
 
 local function FillLogRow(row, g)
+    row.groupUid, row.player = g.uid, g.player
     row.time:SetText(date("%m/%d %Hh", g.ts or 0))
     local cc = LCEX:ClassColor(LCEX:ClassOf(g.player) or LCEX:CachedClass(g.player))
     row.who:SetText(string.format("|cff%02x%02x%02x%s|r %s",
@@ -156,6 +176,14 @@ local function FillLogRow(row, g)
         end
     end
     row.gold:SetText((g.gold and g.gold > 0) and CoinText(g.gold) or "")
+    local note = LCEX:GbankNote(g.uid)
+    if note and note ~= "" then
+        row.note:SetText("\226\128\156" .. note .. "\226\128\157") -- “curly quotes”
+        LCEX:ThemeText(row.note, "caption", "dim")
+    else
+        row.note:SetText(LCEX:AmCouncil() and LCEX.L["+ note"] or "")
+        LCEX:ThemeText(row.note, "caption", "faint")
+    end
 end
 
 LCEX:RegisterCouncilModule({
@@ -237,6 +265,14 @@ LCEX:RegisterCouncilModule({
     show = function(panel)
         RefreshHero(panel)
         RefreshTabBar(panel)
-        SelectSubTab(panel, panel.subTab or "contents")
+        -- Log + annotations are officer-only by default (B5); hide the sub-tab for non-council unless
+        -- the guild opted in. Contents + gold stay visible to everyone.
+        local canLog = LCEX:CanSeeGbankLog()
+        for _, b in ipairs(panel.subTabs) do
+            if b.subKey == "log" then if canLog then b:Show() else b:Hide() end end
+        end
+        local sub = panel.subTab or "contents"
+        if sub == "log" and not canLog then sub = "contents" end
+        SelectSubTab(panel, sub)
     end,
 })

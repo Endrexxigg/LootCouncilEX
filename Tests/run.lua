@@ -801,6 +801,24 @@ test("Gbank accessors: gold + tabs from the cache", function()
     eq(tabs[1].name, "Tab1", "tab name")
 end)
 
+test("Gbank annotations + log visibility (Feature B, B5)", function()
+    -- Annotation round-trip keyed by a group's lead uid.
+    L:SetGbankNote("grp1", "restock for MC")
+    eq((L:GbankNote("grp1")), "restock for MC", "note stored + read back")
+    L:SetGbankNote("grp1", "")
+    eq((L:GbankNote("grp1")), "", "note cleared")
+
+    -- Log visibility: council always; a raider only under the per-guild opt-in.
+    H.inGuild, H.guildName, H.myRank = true, "Menu", 5
+    L.db.profile.council = { byRank = false, rank = 1, extra = {} } -- Tester not council
+    L.db.global.config, L._councilSet = {}, nil
+    ok(not L:AmCouncil(), "raider is not council")
+    ok(not L:CanSeeGbankLog(), "raider, opt-in off -> log hidden")
+    L:SetConfigField("visibility", { gbankLog = true })
+    ok(L:CanSeeGbankLog(), "raider, opt-in on -> log visible")
+    L.db.global.config = {}
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.

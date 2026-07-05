@@ -132,6 +132,19 @@ function LCEX:GbankLogEntries()
     return out
 end
 
+-- ── Annotations (B5): council notes attached to a transaction GROUP by its lead uid ───────────
+-- The note text for a group (its lead entry's uid), plus who last set it.
+function LCEX:GbankNote(groupUid)
+    local rec = groupUid and self.db.global.gbankNotes and self.db.global.gbankNotes[groupUid]
+    return rec and rec.text, rec and rec.by
+end
+
+-- Set (or clear, with "") a group's annotation and replicate it (LWW). Council-gated at the UI.
+function LCEX:SetGbankNote(groupUid, text)
+    if not groupUid then return end
+    self:SetRecord("gbankNotes", groupUid, { text = strtrim(text or "") })
+end
+
 -- ── Live scanner (B6) ────────────────────────────────────────────────────────
 local SLOTS_PER_TAB = _G.MAX_GUILDBANK_SLOTS_PER_TAB or 98
 

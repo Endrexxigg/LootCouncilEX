@@ -45,3 +45,11 @@ end
 function LCEX:CanSeeLootWindow()
     return self:AmCouncil() or self:LootWindowOptIn()
 end
+
+-- May the local player see the guild-bank LOG + annotations (Feature B, B5)? Council always; other
+-- raiders only when the guild opted in (config.visibility.gbankLog). Contents + gold are public.
+function LCEX:CanSeeGbankLog()
+    if self:AmCouncil() then return true end
+    local vis = self:GetConfig().visibility
+    return (vis and vis.gbankLog) == true
+end

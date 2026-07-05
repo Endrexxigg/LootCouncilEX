@@ -869,10 +869,14 @@ LCEX:RegisterSelfTest("ui", "guild bank module renders (Feature B)", function(se
         t:Ok(gp.hero ~= nil and gp.grid ~= nil and gp.logList ~= nil, "gbank controls missing")
         t:Eq(#gp.gridIcons, 98, "contents grid has 14x7 slots")
         t:Ok(gp.hero.gold:GetText() ~= nil, "hero gold rendered from the cache")
-        -- Switch to the Log sub-tab (exercises BuildGbankGroups over the live ledger) and back.
-        for _, b in ipairs(gp.subTabs) do if b.subKey == "log" then b:Click() end end
-        t:Ok(gp.logList:IsShown(), "log sub-tab shows the grouped list")
-        for _, b in ipairs(gp.subTabs) do if b.subKey == "contents" then b:Click() end end
+        t:Ok(type(self.GbankNote) == "function" and type(self.SetGbankNote) == "function",
+            "annotation accessors present")
+        -- The Log sub-tab is officer-only by default (B5); only exercise it when this player may see it.
+        if self:CanSeeGbankLog() then
+            for _, b in ipairs(gp.subTabs) do if b.subKey == "log" then b:Click() end end
+            t:Ok(gp.logList:IsShown(), "log sub-tab shows the grouped list")
+            for _, b in ipairs(gp.subTabs) do if b.subKey == "contents" then b:Click() end end
+        end
     end
 end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end

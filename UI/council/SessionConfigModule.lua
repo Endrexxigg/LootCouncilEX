@@ -228,6 +228,19 @@ LCEX:RegisterCouncilModule({
             end)
         panel.vis:SetPoint("BOTTOMLEFT", 14, 40)
 
+        -- Guild-bank log visibility (B5) — a SHARED-config toggle. Off by default (raiders see the
+        -- bank's contents + gold, but not the log or annotations); on opens the log to the whole guild.
+        panel.visGbank = LCEX:CreateCheckbox(panel, LCEX.L["Show the guild-bank log to all raiders"],
+            function() local v = LCEX:GetConfig().visibility; return v and v.gbankLog end,
+            function(v)
+                local cur = LCEX:GetConfig().visibility or {}
+                local nv = {}
+                for k, val in pairs(cur) do nv[k] = val end
+                nv.gbankLog = v
+                LCEX:SetConfigField("visibility", nv)
+            end)
+        panel.visGbank:SetPoint("LEFT", panel.vis, "RIGHT", 24, 0)
+
         -- DL-8 placeholder ----------------------------------------------------------
         panel.dl8 = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.dl8, "caption", "faint")
@@ -241,6 +254,7 @@ LCEX:RegisterCouncilModule({
         panel.byRank:Refresh()
         panel.rank:Refresh()
         panel.vis:Refresh()
+        panel.visGbank:Refresh()
         RefreshRoster(panel)
         RefreshDisenchanters(panel)
     end,
