@@ -151,6 +151,7 @@ function LCEX:EnterSession(sid, ml, items, responses, council, timeout, anon)
     else
         self:ResetSessionTimeout()
     end
+    self:UpdateMiniFrame() -- surface the session pill if the loot window is hidden (§6.13)
 end
 
 -- ── ML-liveness watchdog (DL-6) ──────────────────────────────────────────────
@@ -187,6 +188,7 @@ function LCEX:LeaveSession(sid)
         self:ClearSessionTimeout()
         self:HidePoll()
         self:HideLootWindow()
+        self:UpdateMiniFrame() -- no session ⇒ the pill hides (§6.13)
     end
 end
 

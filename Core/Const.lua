@@ -150,6 +150,9 @@ L["No disenchanter available. Send %s for disenchant to:"] =
 L["Scan bags"]                             = "Scan bags"
 L["SESSION ITEMS"]                         = "SESSION ITEMS"
 L["STAGED ITEMS"]                          = "STAGED ITEMS"
+L["Loot session: %d item(s) · %d response(s)"] = "Loot session: %d item(s) · %d response(s)"
+L["Loot session: %d item(s) · %d awarded"] = "Loot session: %d item(s) · %d awarded"
+L["Unresolved loot session — click to review"] = "Unresolved loot session — click to review"
 L["%d item(s) staged."]                    = "%d item(s) staged."
 L["Nothing staged — scan your bags or add items."] =
     "Nothing staged — scan your bags or add items."

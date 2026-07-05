@@ -242,6 +242,11 @@ function LCEX:EnsureLootWindow()
     f.deBtn:SetScript("OnClick", function() self:LootDisenchantSelected() end)
     f.deBtn:Hide()
 
+    -- The mini pill and the window are mutually exclusive: hide the pill when the window opens,
+    -- surface it when the window closes on a live session (§6.13 — closing never ends the session).
+    f:HookScript("OnShow", function() LCEX:UpdateMiniFrame() end)
+    f:HookScript("OnHide", function() LCEX:UpdateMiniFrame() end)
+
     self.lootWindow = f
     return f
 end
@@ -722,6 +727,7 @@ end
 -- this scale (a handful of pooled rows), so the index goes unused.
 function LCEX:RefreshLootItem()
     self:RefreshLootWindow()
+    self:UpdateMiniFrame() -- keep the pill's response/award counts current (§6.13)
 end
 
 -- ── Staging actions ──────────────────────────────────────────────────────────

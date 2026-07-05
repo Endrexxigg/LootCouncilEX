@@ -1246,6 +1246,16 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
         t:Eq(st1.kind, "ready", "solo single-roller item should border ready")
         t:Ok(st1.voted and st1.voted.of >= 1, "vote tally denominator should count present council")
     end
+    -- Mini pill (Phase 12, §6.13): hidden while the full window is open; hiding the window
+    -- surfaces it (closing must NOT end the session), showing the item count.
+    t:Ok(not (self.miniFrame and self.miniFrame:IsShown()), "pill visible while the loot window is open")
+    self:HideLootWindow()
+    t:Ok(self.miniFrame and self.miniFrame:IsShown(), "pill not shown after hiding the loot window")
+    t:Ok(self.session ~= nil, "hiding the loot window must not end the session")
+    t:Ok((self.miniFrame.text:GetText() or ""):find("item", 1, true) ~= nil, "pill text missing item count")
+    self:ShowLootWindow()
+    t:Ok(not self.miniFrame:IsShown(), "pill not hidden after reopening the loot window")
+
     local candRow = self.lootWindow and self.lootWindow.candList.rows[1]
     t:Ok(candRow ~= nil and candRow:IsShown(), "candidate row did not render for the response")
     -- Own row must be class-colored (live ClassOf path; solo, we are always resolvable).

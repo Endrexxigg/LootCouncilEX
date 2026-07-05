@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.46.0
+## Version: 0.47.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -49,6 +49,7 @@ UI\Theme.lua
 UI\Widgets.lua
 UI\PollWindow.lua
 UI\LootWindow.lua
+UI\MiniFrame.lua
 
 # The council dashboard: shell + module registry, then the self-registering modules.
 UI\CouncilWindow.lua

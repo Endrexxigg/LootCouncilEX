@@ -210,6 +210,7 @@ function LCEX:HidePoll() end
 function LCEX:ShowLootWindow() end
 function LCEX:HideLootWindow() end
 function LCEX:RefreshLootItem() end
+function LCEX:UpdateMiniFrame() end -- mini session pill (Phase 12) — pure UI, no headless render
 function LCEX:ShowConfirm(opts) H.confirm = opts end -- capture the inherit/D-E prompt (no frames headless)
 
 -- Reset mutable state between tests.
