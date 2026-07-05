@@ -39,10 +39,14 @@ local SCOPED = { "notes", "marks", "history", "gearCache", "profCache", "config"
 function LCEX:SyncGuildScope()
     local g = self.db and self.db.global
     if not g then return end
-    -- Guilded but the roster hasn't loaded yet (GetGuildInfo nil): wait, so we don't claim/stash the
-    -- data under "_local" and strand it. GUILD_ROSTER_UPDATE re-fires this once the name is known.
-    if IsInGuild() and not self:GuildKey() then return end
-    local key = self:GuildKey() or "_local"
+    -- NEVER re-scope unless the guild is positively known. IsInGuild() reads FALSE transiently at
+    -- login/reload before guild data loads — scoping then would stash the active guild's flat tables
+    -- and blank them (no gear/gbank/notes visible) until GUILD_ROSTER_UPDATE recovered. So: not in a
+    -- guild at all → don't touch the flat tables (a guildless user just uses them as-is); guilded but
+    -- the name hasn't loaded → wait. Either way GUILD_ROSTER_UPDATE re-runs this once it settles.
+    if not IsInGuild() then return end
+    local key = self:GuildKey()
+    if not key then return end
     if g.activeGuild == key then return end
     g.guilds = g.guilds or {}
     if g.activeGuild == nil then

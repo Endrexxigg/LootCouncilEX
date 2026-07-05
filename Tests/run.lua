@@ -939,6 +939,19 @@ test("SyncGuildScope defers while guilded but the roster has not loaded", functi
     ok(L.db.global.history["u1"], "flat data left in place (still visible) meanwhile")
 end)
 
+-- Regression: a transient IsInGuild()=false at login must NOT stash the active guild's data and
+-- blank the flat tables (the gear/gbank "caching broke on toon switch" bug).
+test("SyncGuildScope: guildless call never blanks the active guild's flat tables", function()
+    H.inGuild, H.guildName = true, "Alpha"
+    L.db.global.gearCache["amy"] = { items = {}, mod = 1 }
+    L:SyncGuildScope()
+    eq(L.db.global.activeGuild, "Alpha", "claimed for Alpha")
+    H.inGuild = false -- transient login / reload before guild data loads
+    L:SyncGuildScope()
+    eq(L.db.global.activeGuild, "Alpha", "activeGuild unchanged while guild status is unknown")
+    ok(L.db.global.gearCache["amy"], "flat cache left intact (not stashed/blanked)")
+end)
+
 test("Inherit gate: hold + prompt a peer config on first load; accept applies it (Feature C)", function()
     H.inGuild, H.guildName, H.myRank = true, "Menu", 3 -- guilded officer, not GM
     local incoming = { anonVoting = true, mod = 500, by = "Officer" }
