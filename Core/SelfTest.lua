@@ -972,6 +972,33 @@ end, { cleanup = function(self)
     end
 end })
 
+-- Phase 12 (DL-23): the shared zebra layer stripes by ABSOLUTE index parity (even rows lighten).
+LCEX:RegisterSelfTest("ui", "scroll list: zebra stripes alternate by absolute index", function(self, t)
+    local host = CreateFrame("Frame", nil, UIParent)
+    host:SetSize(200, 120)
+    host:Hide()
+    self._selfTestZebraHost = host
+    local list = self:CreateScrollList(host, {
+        rowHeight = 20, visibleRows = 4, width = 200, zebra = true,
+        buildRow = function(parent) return CreateFrame("Button", nil, parent) end,
+        fillRow  = function() end,
+    })
+    list:SetPoint("TOPLEFT", 0, 0)
+    list:SetData({ "a", "b", "c" })
+    for i = 1, 3 do
+        local row = list.rows[i]
+        if t:Ok(row and row._stripe ~= nil, "row " .. i .. " missing the stripe texture") then
+            t:Eq(row._stripe:IsShown() and true or false, i % 2 == 0, "row " .. i .. " stripe parity")
+        end
+    end
+end, { cleanup = function(self)
+    if self._selfTestZebraHost then
+        self._selfTestZebraHost:Hide()
+        self._selfTestZebraHost:SetParent(nil)
+        self._selfTestZebraHost = nil
+    end
+end })
+
 -- ── comm: the real receive path + the real wire ───────────────────────────────
 -- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
 -- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so

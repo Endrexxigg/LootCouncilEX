@@ -106,7 +106,7 @@ LCEX:RegisterCouncilModule({
         panel.deAddBox:SetPoint("TOPLEFT", 324, -74)
 
         panel.deList = LCEX:CreateScrollList(panel, {
-            rowHeight = 20, fillHeight = true,
+            rowHeight = 20, fillHeight = true, zebra = true,
             buildRow = function(parent)
                 local row = CreateFrame("Frame", nil, parent)
                 row.fs = row:CreateFontString(nil, "OVERLAY")
@@ -182,7 +182,7 @@ LCEX:RegisterCouncilModule({
 
         -- The resolved council (rank members + extras); extras carry a remove ×.
         panel.rosterList = LCEX:CreateScrollList(panel, {
-            rowHeight = 20, fillHeight = true,
+            rowHeight = 20, fillHeight = true, zebra = true,
             buildRow = function(parent)
                 local row = CreateFrame("Frame", nil, parent)
                 row.fs = row:CreateFontString(nil, "OVERLAY")

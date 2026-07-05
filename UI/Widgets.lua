@@ -103,11 +103,25 @@ function LCEX:CreateScrollList(parent, opts)
                 row:SetHeight(rowHeight)
                 row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -(i - 1) * rowHeight)
                 row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -24, -(i - 1) * rowHeight) -- scrollbar gap
+                if opts.zebra then
+                    -- Shared zebra layer (DL-23): BACKGROUND sublevel 1 sits above a row's
+                    -- Surface gradient (sublevel 0) and below ARTWORK selection bars, so the
+                    -- select/hover re-tinting the modules already do repaints underneath it.
+                    row._stripe = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+                    row._stripe:SetAllPoints(row)
+                    row._stripe:SetTexture("Interface\\Buttons\\WHITE8X8")
+                    local s = self.Theme.stripe
+                    row._stripe:SetVertexColor(s[1], s[2], s[3], s[4])
+                end
                 list.rows[i] = row
             end
             local item = list.items[offset + i]
             if item then
                 opts.fillRow(row, item, offset + i)
+                -- Stripe by ABSOLUTE index parity so stripes don't swim while scrolling.
+                if row._stripe then
+                    if (offset + i) % 2 == 0 then row._stripe:Show() else row._stripe:Hide() end
+                end
                 row:Show()
             else
                 row:Hide()

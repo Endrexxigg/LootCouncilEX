@@ -67,7 +67,7 @@ function LCEX:EnsureLootWindow()
     f.rail = rail
 
     f.railList = self:CreateScrollList(rail, {
-        rowHeight = 30, width = RAIL_W - 4, fillHeight = true,
+        rowHeight = 30, width = RAIL_W - 4, fillHeight = true, zebra = true,
         buildRow = function(parent) return self:BuildLootRailRow(parent) end,
         fillRow  = function(row, entry, index) self:FillLootRailRow(row, entry, index) end,
     })
@@ -146,7 +146,7 @@ function LCEX:EnsureLootWindow()
     f.empty:Hide()
 
     f.candList = self:CreateScrollList(pane, {
-        rowHeight = 26, width = 480, fillHeight = true,
+        rowHeight = 26, width = 480, fillHeight = true, zebra = true,
         buildRow = function(parent) return self:BuildLootCandRow(parent) end,
         fillRow  = function(row, entry) self:FillLootCandRow(row, entry) end,
     })

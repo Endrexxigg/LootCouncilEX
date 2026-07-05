@@ -26,7 +26,7 @@ LCEX:RegisterCouncilModule({
         end)
 
         panel.list = LCEX:CreateScrollList(panel, {
-            rowHeight = 24, fillHeight = true,
+            rowHeight = 24, fillHeight = true, zebra = true,
             buildRow = function(parent)
                 local row = CreateFrame("Frame", nil, parent)
                 row.icon = LCEX:CreateItemIcon(row, 18)

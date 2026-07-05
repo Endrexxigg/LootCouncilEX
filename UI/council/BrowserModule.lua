@@ -149,7 +149,7 @@ LCEX:RegisterCouncilModule({
 
         -- The browse list fills the space between phase buttons and the mark editor.
         panel.list = LCEX:CreateScrollList(panel, {
-            rowHeight = 22, fillHeight = true,
+            rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function() return BuildRow(panel) end,
             fillRow  = function(row, entry) FillRow(panel, row, entry) end,
         })

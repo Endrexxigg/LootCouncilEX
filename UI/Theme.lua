@@ -28,6 +28,7 @@ LCEX.Theme = {
     accent  = { 0.792, 0.651, 0.353 }, -- gold #caa65a — selection, focus, the addon's voice
     success = { 0.373, 0.749, 0.541 }, -- #5fbf8a
     danger  = { 0.831, 0.459, 0.420 }, -- #d4756b
+    stripe  = { 1, 1, 1, 0.035 },      -- zebra row overlay (DL-23): even list rows lighten subtly
     text = {
         ink   = { 0.914, 0.918, 0.933 }, -- #e9eaee — primary
         dim   = { 0.604, 0.627, 0.678 }, -- #9aa0ad — secondary

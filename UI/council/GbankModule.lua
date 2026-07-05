@@ -248,7 +248,7 @@ LCEX:RegisterCouncilModule({
 
         -- Log list (grouped transactions).
         panel.logList = LCEX:CreateScrollList(panel, {
-            rowHeight = 24, fillHeight = true,
+            rowHeight = 24, fillHeight = true, zebra = true,
             buildRow = function() return BuildLogRow(panel) end,
             fillRow = function(row, g) FillLogRow(row, g) end,
         })

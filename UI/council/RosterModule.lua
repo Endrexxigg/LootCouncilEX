@@ -194,7 +194,7 @@ LCEX:RegisterCouncilModule({
         end)
 
         panel.playerList = LCEX:CreateScrollList(picker, {
-            rowHeight = 22, fillHeight = true,
+            rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function(parent)
                 local row = CreateFrame("Button", nil, parent)
                 LCEX:Surface(row, "base")
@@ -271,7 +271,7 @@ LCEX:RegisterCouncilModule({
         end
 
         panel.detailList = LCEX:CreateScrollList(panel, {
-            rowHeight = 22, fillHeight = true,
+            rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function() return BuildDetailRow(panel) end,
             fillRow = function(row, entry) FillDetailRow(row, entry) end,
         })
