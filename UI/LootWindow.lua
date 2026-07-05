@@ -360,15 +360,16 @@ function LCEX:BuildLootCandRow(parent)
 
     row.award = self:CreateFlatButton(row, self.L["Award"], 56, 20, "accent")
     row.award:SetPoint("RIGHT", -2, 0)
-    row.minus = self:CreateFlatButton(row, "−", 22, 20)
-    row.minus:SetPoint("RIGHT", row.award, "LEFT", -8, 0)
+    -- Vote cluster reads [−][n][+] left→right (handoff item 2): downvote left, upvote right.
+    row.plus = self:CreateFlatButton(row, "+", 22, 20)
+    row.plus:SetPoint("RIGHT", row.award, "LEFT", -8, 0)
     row.votes = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.votes, "body", "ink")
-    row.votes:SetPoint("RIGHT", row.minus, "LEFT", -6, 0)
+    row.votes:SetPoint("RIGHT", row.plus, "LEFT", -6, 0)
     row.votes:SetWidth(22); row.votes:SetJustifyH("CENTER")
-    row.plus = self:CreateFlatButton(row, "+", 22, 20)
-    row.plus:SetPoint("RIGHT", row.votes, "LEFT", -4, 0)
-    row.note:SetPoint("RIGHT", row.plus, "LEFT", -6, 0)
+    row.minus = self:CreateFlatButton(row, "−", 22, 20)
+    row.minus:SetPoint("RIGHT", row.votes, "LEFT", -4, 0)
+    row.note:SetPoint("RIGHT", row.minus, "LEFT", -6, 0)
 
     return row
 end
