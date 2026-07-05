@@ -594,3 +594,117 @@ function LCEX:ShowConfirm(opts)
     if hasInput then f.input:SetFocus() end
     return f
 end
+
+-- ── Context menu ─────────────────────────────────────────────────────────────
+-- A small themed right-click menu (Phase 12, DL-23) — native frames, no UIDropDownMenu. One
+-- reused frame plus a fullscreen click-catcher one level beneath it, so any click-away closes;
+-- ESC closes via UISpecialFrames. Rows rebuild on every show, so dynamic item lists (per-copy
+-- un-award entries, note flows) are first-class. `opts`:
+--   anchor — "cursor" (default) or a frame to hang TOPLEFT-under
+--   title  — optional non-interactive caption row
+--   items  — { { text, disabled=bool, danger=bool, onClick=function() end }, ... }
+-- Consumers: browser leave-note flow, award correction, trade-timer rows.
+local MENU_ROW_H = 20
+function LCEX:ShowContextMenu(opts)
+    opts = opts or {}
+    local addon = self
+    local menu = self._contextMenu
+    if not menu then
+        -- Click-catcher: swallows the click that lands anywhere off the menu and closes it.
+        local catcher = CreateFrame("Frame", nil, UIParent)
+        catcher:SetAllPoints(UIParent)
+        catcher:SetFrameStrata("FULLSCREEN_DIALOG")
+        catcher:EnableMouse(true)
+        catcher:SetScript("OnMouseDown", function() addon:HideContextMenu() end)
+        catcher:Hide()
+
+        menu = CreateFrame("Frame", "LCEX_ContextMenu", UIParent,
+            BackdropTemplateMixin and "BackdropTemplate" or nil)
+        menu:SetFrameStrata("FULLSCREEN_DIALOG")
+        menu:SetFrameLevel(catcher:GetFrameLevel() + 10)
+        menu:SetClampedToScreen(true)
+        self:Surface(menu, "float")
+        self:SoftEdge(menu)
+        menu.catcher = catcher
+        menu.rows = {}
+
+        menu.title = menu:CreateFontString(nil, "OVERLAY")
+        self:ThemeText(menu.title, "caption", "faint")
+        menu.title:SetPoint("TOPLEFT", 10, -6)
+
+        menu:SetScript("OnHide", function() catcher:Hide() end)
+        tinsert(UISpecialFrames, "LCEX_ContextMenu")
+        self._contextMenu = menu
+    end
+
+    local items = opts.items or {}
+    local top = 4
+    if opts.title and opts.title ~= "" then
+        menu.title:SetText(opts.title)
+        menu.title:Show()
+        top = 22
+    else
+        menu.title:Hide()
+    end
+
+    local width = menu.title:IsShown() and (menu.title:GetStringWidth() + 20) or 0
+    for i, it in ipairs(items) do
+        local row = menu.rows[i]
+        if not row then
+            row = CreateFrame("Button", nil, menu)
+            row:SetHeight(MENU_ROW_H)
+            row.hl = row:CreateTexture(nil, "ARTWORK")
+            row.hl:SetAllPoints(row)
+            row.hl:SetTexture("Interface\\Buttons\\WHITE8X8")
+            row.hl:SetVertexColor(1, 1, 1, 0.06)
+            row.hl:Hide()
+            row.fs = row:CreateFontString(nil, "OVERLAY")
+            row.fs:SetPoint("LEFT", 10, 0)
+            row.fs:SetJustifyH("LEFT")
+            row:SetScript("OnEnter", function(r) if not r._off then r.hl:Show() end end)
+            row:SetScript("OnLeave", function(r) r.hl:Hide() end)
+            row:SetScript("OnClick", function(r)
+                if r._off then return end
+                addon:HideContextMenu()
+                if r._onClick then r._onClick() end
+            end)
+            menu.rows[i] = row
+        end
+        row:SetPoint("TOPLEFT", 2, -(top + (i - 1) * MENU_ROW_H))
+        row:SetPoint("TOPRIGHT", -2, -(top + (i - 1) * MENU_ROW_H))
+        row.fs:SetText(it.text or "")
+        if it.disabled then
+            self:ThemeText(row.fs, "body", "faint")
+        elseif it.danger then
+            self:ThemeText(row.fs, "body", "ink")
+            row.fs:SetTextColor(self.Theme.danger[1], self.Theme.danger[2], self.Theme.danger[3])
+        else
+            self:ThemeText(row.fs, "body", "ink")
+        end
+        row._off = it.disabled and true or nil
+        row._onClick = it.onClick
+        row:Show()
+        local w = row.fs:GetStringWidth() + 24
+        if w > width then width = w end
+    end
+    for i = #items + 1, #menu.rows do menu.rows[i]:Hide() end
+
+    menu:SetSize(math.max(120, width), top + #items * MENU_ROW_H + 6)
+
+    menu:ClearAllPoints()
+    if opts.anchor and opts.anchor ~= "cursor" then
+        menu:SetPoint("TOPLEFT", opts.anchor, "BOTTOMLEFT", 0, -2)
+    else
+        local x, y = GetCursorPosition()
+        local scale = UIParent:GetEffectiveScale()
+        menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x / scale + 2, y / scale + 2)
+    end
+
+    menu.catcher:Show()
+    menu:Show()
+    return menu
+end
+
+function LCEX:HideContextMenu()
+    if self._contextMenu then self._contextMenu:Hide() end
+end

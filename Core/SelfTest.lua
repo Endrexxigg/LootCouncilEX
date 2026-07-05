@@ -1020,6 +1020,36 @@ end, { cleanup = function(self)
     end
 end })
 
+-- Phase 12 (DL-23): the shared context menu — build, disabled rows, click-through, dismissal.
+LCEX:RegisterSelfTest("ui", "context menu: rows render, disabled row inert, click closes", function(self, t)
+    local clicked = false
+    local menu = self:ShowContextMenu({
+        title = "Probe",
+        items = {
+            { text = "Run",      onClick = function() clicked = true end },
+            { text = "Dimmed",   disabled = true },
+            { text = "Danger",   danger = true, onClick = function() end },
+        },
+    })
+    if not t:Ok(menu and menu:IsShown(), "menu not shown") then return end
+    t:Ok(menu.catcher:IsShown() and true or false, "click-catcher not shown")
+    for i = 1, 3 do
+        t:Ok(menu.rows[i] and menu.rows[i]:IsShown(), "row " .. i .. " not shown")
+    end
+    t:Ok(menu.rows[2]._off == true, "disabled row not marked inert")
+    menu.rows[2]:Click()
+    t:Ok(menu:IsShown() and true or false, "disabled row click must not close the menu")
+    menu.rows[1]:Click()
+    t:Ok(clicked, "item onClick did not run")
+    t:Ok(not menu:IsShown(), "menu still shown after an item click")
+    t:Ok(not menu.catcher:IsShown(), "catcher still shown after dismiss")
+    local found = false
+    for _, n in ipairs(UISpecialFrames) do
+        if n == "LCEX_ContextMenu" then found = true end
+    end
+    t:Ok(found, "context menu not registered for ESC-close")
+end, { cleanup = function(self) self:HideContextMenu() end })
+
 -- ── comm: the real receive path + the real wire ───────────────────────────────
 -- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
 -- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so
