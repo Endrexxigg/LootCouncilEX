@@ -661,6 +661,7 @@ function LCEX:ShowContextMenu(opts)
             row.hl:SetVertexColor(1, 1, 1, 0.06)
             row.hl:Hide()
             row.fs = row:CreateFontString(nil, "OVERLAY")
+            addon:ThemeText(row.fs, "body", "ink") -- set a font at BUILD time: SetText below errors otherwise
             row.fs:SetPoint("LEFT", 10, 0)
             row.fs:SetJustifyH("LEFT")
             row:SetScript("OnEnter", function(r) if not r._off then r.hl:Show() end end)
