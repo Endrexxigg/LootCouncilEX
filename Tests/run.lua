@@ -111,6 +111,13 @@ test("BrowserMarkText: user mark only, never (token) metadata", function()
     eq(L:BrowserMarkText(tokenID), "save for tanks", "marked token shows the mark text only")
     L.db.global.marks[tokenID] = nil
     eq(L:BrowserMarkText(12345), "", "unmarked item shows nothing")
+    -- HasUserMark (item 14): the note indicator fires only on a REAL non-empty mark.
+    eq(L:HasUserMark(12345), false, "no mark -> no indicator")
+    L.db.global.marks[12345] = { text = "", mod = 1, by = "X" }
+    eq(L:HasUserMark(12345), false, "empty mark text -> no indicator")
+    L.db.global.marks[12345] = { text = "note", mod = 2, by = "X" }
+    eq(L:HasUserMark(12345), true, "real mark -> indicator")
+    L.db.global.marks[12345] = nil
 end)
 
 -- ── Notes command write + read ───────────────────────────────────────────────

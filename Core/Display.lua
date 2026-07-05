@@ -43,6 +43,12 @@ function LCEX:BrowserMarkText(itemID)
     return (mark and mark.text) or ""
 end
 
+-- True iff an item carries a REAL user mark (non-empty text) — drives the browser row's note
+-- indicator (item 14): the icon must only ever reflect actual user-entered notes. Pure/testable.
+function LCEX:HasUserMark(itemID)
+    return self:BrowserMarkText(itemID) ~= ""
+end
+
 -- ── Player detail displays (gear / history / professions) ────────────────────
 function LCEX:BuildGearDisplay(player)
     local key = self:NormalizeName(player)

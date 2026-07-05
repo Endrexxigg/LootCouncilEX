@@ -49,6 +49,14 @@ local function BuildRow(panel)
     row.mark:SetJustifyH("RIGHT")
     row.mark:SetWordWrap(false)
 
+    -- Note indicator (item 14): a small note-glyph icon, shown only when a REAL user mark
+    -- exists — icon-based so it can't be confused with item-quality name colors.
+    row.noteIcon = row:CreateTexture(nil, "OVERLAY")
+    row.noteIcon:SetSize(12, 12)
+    row.noteIcon:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
+    row.noteIcon:SetPoint("RIGHT", row.mark, "LEFT", -4, 0)
+    row.noteIcon:Hide()
+
     row:SetScript("OnClick", function(r)
         if r.itemID then
             LCEX:BrowserSelectItem(r.panel, r.itemID)
@@ -68,6 +76,7 @@ local function FillRow(panel, row, entry)
     row.bg:Hide()
     row.sel:Hide()
     row.icon:Hide()
+    row.noteIcon:Hide()
     row.mark:SetText("")
     row.text:ClearAllPoints()
 
@@ -94,8 +103,9 @@ local function FillRow(panel, row, entry)
         row.icon:SetItem(nil, instantIcon)
         LCEX:ThemeText(row.text, "body", "dim")
         row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-        row.text:SetPoint("RIGHT", row.mark, "LEFT", -8, 0)
+        row.text:SetPoint("RIGHT", row.noteIcon, "LEFT", -6, 0)
         row.text:SetText("item:" .. entry.itemID)
+        if LCEX:HasUserMark(entry.itemID) then row.noteIcon:Show() end
 
         local id = entry.itemID
         row.loadingID = id
