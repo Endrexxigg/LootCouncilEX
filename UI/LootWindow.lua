@@ -20,6 +20,10 @@ local FRAME_NAME = "LCEX_LootWindow"
 local RAIL_W     = 236
 local BAR_H      = 34 -- bottom bar
 
+-- Awarded marker: an inline texture escape (the ready-check tick), NOT a "✓" glyph —
+-- FRIZQT__.TTF has no U+2713 and renders it as an error box (handoff item 9).
+local CHECK_TEX = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12:0:0|t"
+
 LCEX.stagingItems = LCEX.stagingItems or {}
 
 -- The RESPONSES entry for a response id, from this session's set (falls back to defaults).
@@ -299,7 +303,7 @@ function LCEX:FillLootRailRow(row, entry, index)
         local statusKind
         local awardedTo = a.awarded and a.awarded[index]
         if awardedTo then
-            row.badge:SetText("✓ " .. DisplayName(nil, awardedTo))
+            row.badge:SetText(CHECK_TEX .. " " .. DisplayName(nil, awardedTo))
             row.badge:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
             statusKind = "awarded"
         else
