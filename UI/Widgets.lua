@@ -333,8 +333,34 @@ function LCEX:CreateFlatButton(parent, text, width, height, variant)
     b:SetText(text or "")
     b:SetPushedTextOffset(0, -1)
 
-    b:SetScript("OnEnter", function(btn) addon:Surface(btn, "float") end)
-    b:SetScript("OnLeave", function(btn) addon:Surface(btn, "overlay") end)
+    b:SetScript("OnEnter", function(btn)
+        if not btn._flatDisabled then addon:Surface(btn, "float") end
+    end)
+    b:SetScript("OnLeave", function(btn)
+        if not btn._flatDisabled then addon:Surface(btn, "overlay") end
+    end)
+
+    -- Disabled state (Phase 12, DL-23): dim the text/border and stop hover re-tinting. Named
+    -- SetFlatEnabled so the native Button:SetEnabled stays untouched. Re-enabling restores the
+    -- variant's own edge color and text tone.
+    b._edge, b._textTone = edge, textTone
+    function b.SetFlatEnabled(btn, on)
+        if on then
+            btn._flatDisabled = nil
+            btn:Enable()
+            addon:ThemeText(fs, "body", btn._textTone)
+            if btn.SetBackdropBorderColor then
+                btn:SetBackdropBorderColor(btn._edge[1], btn._edge[2], btn._edge[3], btn._edge[4])
+            end
+            addon:Surface(btn, "overlay")
+        else
+            btn._flatDisabled = true
+            btn:Disable()
+            addon:ThemeText(fs, "body", "faint")
+            if btn.SetBackdropBorderColor then btn:SetBackdropBorderColor(0, 0, 0, 0.4) end
+            addon:Surface(btn, "base")
+        end
+    end
     return b
 end
 

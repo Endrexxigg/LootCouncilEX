@@ -999,6 +999,27 @@ end, { cleanup = function(self)
     end
 end })
 
+-- Phase 12 (DL-23): flat buttons carry a disabled state (award-button grey-out rides on it).
+LCEX:RegisterSelfTest("ui", "flat button: SetFlatEnabled disable/enable round-trip", function(self, t)
+    local host = CreateFrame("Frame", nil, UIParent)
+    host:Hide()
+    self._selfTestBtnHost = host
+    local b = self:CreateFlatButton(host, "Probe", 60, 20, "accent")
+    t:Ok(b.SetFlatEnabled ~= nil, "SetFlatEnabled missing")
+    b:SetFlatEnabled(false)
+    t:Ok(not b:IsEnabled(), "button still enabled after SetFlatEnabled(false)")
+    t:Ok(b._flatDisabled == true, "hover guard flag not set")
+    b:SetFlatEnabled(true)
+    t:Ok(b:IsEnabled() and true or false, "button not re-enabled")
+    t:Ok(b._flatDisabled == nil, "hover guard flag not cleared")
+end, { cleanup = function(self)
+    if self._selfTestBtnHost then
+        self._selfTestBtnHost:Hide()
+        self._selfTestBtnHost:SetParent(nil)
+        self._selfTestBtnHost = nil
+    end
+end })
+
 -- ── comm: the real receive path + the real wire ───────────────────────────────
 -- tEcho: the self-test's loopback cmd. Deliberately has NO IsSelf-drop (unlike every production
 -- handler) — it only ever acts when a self-test armed _selfTestEcho with a matching nonce, so
