@@ -19,6 +19,8 @@ local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemIn
 local FRAME_NAME = "LCEX_LootWindow"
 local RAIL_W     = 280 -- widened from 236 so item names truncate less (handoff item 11)
 local BAR_H      = 34 -- bottom bar
+local FULL_W     = 824          -- rail + the 536px right pane
+local COMPACT_W  = RAIL_W + 4   -- rail-only form (item 4): pre-session staging
 
 -- Awarded marker: an inline texture escape (the ready-check tick), NOT a "✓" glyph —
 -- FRIZQT__.TTF has no U+2713 and renders it as an error box (handoff item 9).
@@ -56,7 +58,7 @@ end
 function LCEX:EnsureLootWindow()
     if self.lootWindow then return self.lootWindow end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = 824, height = 470, -- 824 = the widened rail (280) + the unchanged 536px pane
+        width = FULL_W, height = 470,
         title = self.L["Loot Session"],
         savedKey = "loot",
         defaultPos = { x = 0, y = 40 },
@@ -488,6 +490,22 @@ function LCEX:FillLootCandRow(row, entry)
     end
 end
 
+-- Compact/full layout (item 4): with nothing to show on the right, the window is just the
+-- staging rail; a live session expands to the two-pane form. Resizing pins TOPLEFT (the
+-- PollWindow reflow pattern) so the rail never moves — the pane grows rightward. Hiding
+-- `f.pane` covers every right-side widget (all are pane children). Height never changes.
+function LCEX:ApplyLootLayout(f, mode)
+    if f._layoutMode == mode then return end
+    f._layoutMode = mode
+    local winTop, winLeft = f:GetTop(), f:GetLeft()
+    f:SetWidth(mode == "full" and FULL_W or COMPACT_W)
+    if mode == "full" then f.pane:Show() else f.pane:Hide() end
+    if type(winTop) == "number" and type(winLeft) == "number" then
+        f:ClearAllPoints()
+        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", winLeft, winTop)
+    end
+end
+
 -- ── Rendering ────────────────────────────────────────────────────────────────
 function LCEX:LootSelectItem(index)
     local f = self.lootWindow
@@ -502,12 +520,16 @@ function LCEX:RefreshLootWindow()
     if not f or not f:IsShown() then return end
     local items, inSession = self:LootRailItems()
 
+    self:ApplyLootLayout(f, inSession and "full" or "rail")
+
     -- Clamp/derive selection.
     if not f.selectedIndex or not items[f.selectedIndex] then
         f.selectedIndex = items[1] and 1 or nil
     end
 
     f.railHeader:SetText(inSession and self.L["SESSION ITEMS"] or self.L["STAGED ITEMS"])
+    -- In-session the staging-control band (scan/add, 58px) is reclaimed by the list.
+    f.railList:SetPoint("BOTTOMRIGHT", -2, inSession and 6 or 58)
     f.railList:SetData(items)
 
     if inSession then

@@ -690,6 +690,10 @@ LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", f
     local f = self.lootWindow
     if not t:Ok(f and f:IsShown(), "loot window not shown") then return end
     t:Ok(f.startBtn:IsShown() and not f.endBtn:IsShown(), "staging controls not in staging mode")
+    -- Compact pre-session form (Phase 12, item 4): rail-only width, right pane hidden.
+    t:Ok(math.abs(f:GetWidth() - (f.rail:GetWidth() + 4)) < 0.5,
+        "pre-session window not rail-only (width " .. math.floor(f:GetWidth() or 0) .. ")")
+    t:Ok(not f.pane:IsShown(), "right pane visible before a session")
     t:Eq(f.status:GetText(), self.L["Nothing staged — scan your bags or add items."],
         "empty-staging status line")
 
@@ -1215,6 +1219,10 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Ok(self.lootWindow and self.lootWindow:IsShown(), "loot window did not open")
     t:Ok(self.lootWindow and self.lootWindow.endBtn:IsShown()
         and not self.lootWindow.startBtn:IsShown(), "loot window not in session mode")
+    -- Full layout in-session (Phase 12, item 4): pane shown, window expanded past the rail.
+    t:Ok(self.lootWindow.pane:IsShown(), "right pane hidden during a live session")
+    t:Ok(self.lootWindow:GetWidth() > self.lootWindow.rail:GetWidth() + 100,
+        "window did not expand to the two-pane form")
     t:Ok(self.db.global.session[me] ~= nil, "session not mirrored to the DB (resume support)")
 
     -- Respond to both items through the button path (ML fast-path dispatches cResp in-process),
