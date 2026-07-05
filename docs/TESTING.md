@@ -31,6 +31,53 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.39.2–v0.51 — PHASE 12 (jul4 fix/change batch, 18 items)
+The 18-item handoff (`docs/lcex_fix_change_handoff_jul4.md`). **Heavily selftest-covered** — the
+scrollbar/zebra/flat-button/context-menu widgets, compact↔full loot layout, awarded feedback, x2
+grouping (one card / two distinct-uid awards), un-award round-trip, mini-pill show/hide, save→wipe→
+resume, the trade-timer scanner shape + GUID probe, and the timer-window render/minimize/hide all
+run under `/lcex selftest`; headless covers grouping/poll-dedup/leader-remap, history LWW +
+`dispatch.unaward`, resume overlay + `CountSavedResponses`, `sReq`/`sJoin`, and the trade-timer
+pure helpers. **Run `/lcex selftest` first** — then the genuinely-manual items below.
+
+**Solo / visual (one client):**
+- [ ] **Scrollbars (items 12/18)**: the loot rail, roster picker, and browser scrollbars sit
+  *inside* their panel, not across the divider.
+- [ ] **Zebra striping (item 8)**: alternating row shading on the loot cand list, rail, roster,
+  browser, history, and gbank log — subtle, still legible on hover/selection.
+- [ ] **Vote order (item 2)**: candidate rows read `[−] [n] [+]  [Award]`; the own-vote gold tint
+  follows the correct button.
+- [ ] **Glyph (item 9)**: an awarded rail row shows a ready-check tick + winner, no tofu box.
+- [ ] **Rail width / names (item 11)**: common item names fit the widened (280) rail; the
+  selected-item header and browser names show a tooltip on *name* hover (not the rail).
+- [ ] **Compact pre-session (item 4)**: `/lcex loot` opens rail-only; **Start** expands to two
+  panes; **End** collapses back on reopen.
+- [ ] **Browser (items 13/14/16/17)**: raids default **collapsed**, +/− toggles raids/bosses; a
+  note icon shows only on truly-marked items; no `(Token)` in the mark column; right-click an item
+  → **Leave note…** / **Clear note** (the bottom mark box is gone).
+- [ ] **Trade timers (item 7)** *(needs a real BoP drop — like the v0.14 DL-9 item)*: the window
+  auto-opens on tradeable loot, bars recolor green→gold→red over time, minimize shows the soonest
+  bar, **shift+double-click** hides a bar, it auto-closes when the last window lapses. `/lcex timers`
+  toggles it. *(The selftest confirms rendering with injected entries; only the live scan is manual.)*
+
+**2-client:**
+- [ ] **Spectator view (item 1)**: a non-council raider can `/lcex loot` into a **rail-only** view
+  (items, quantities, award state, winners) — **no** responses/votes/notes anywhere — and still
+  answers the **poll** normally. Flip "Show the full loot window…" (Session Config) → that raider
+  gets the full read-only view.
+- [ ] **Duplicates (item 10)**: put **two identical items** up → raiders see **one** poll card
+  (x2), the ML sees **one** candidate table; award to two different winners → rail badge reads
+  `✓ 1/2` then done, the per-copy hover tooltip names each, and **two separate** trade timers track.
+- [ ] **Un-award (item 3)**: right-click an awarded row → **Un-award <winner>** → the item reopens
+  on both clients and history shows it retracted; **re-award** supersedes. A **post-trade**
+  retraction (from the History module) is record-only and says so.
+- [ ] **ML reload (item 6)**: collect responses/votes + an award, then `/reload` → the **resume
+  dialog** shows age + item/response counts; **Resume** restores the votes **and** the award state.
+- [ ] **Candidate reload (item 6)**: a raider `/reload`s mid-session → they **auto-rejoin** within
+  ~30s of the next heartbeat (poll reopens, awarded state correct) — no ML action needed.
+- [ ] **Mini pill (item 5)**: close the loot window mid-session → the pill appears (session stays
+  open); its counts update as responses arrive; click restores the window.
+
 ### v0.37–v0.39 — FEATURE B COMPLETE (guild bank) — **needs a live scan**
 Headless-tested: the pure ledger (uid dedup, elapsed→absolute, 5-min/xN grouping), accessors, log
 visibility, and annotation round-trip; a selftest API contract (all guild-bank APIs exist) + a module
