@@ -135,8 +135,11 @@ Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`;
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,reason,note,gear,votes,class}}, status={kind,voted} }` |
 | `vVote` | council → ML | WHISPER | `{ item, candidate, vote=±1|0 }` |
 | `award` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, resp, boss, instance, ts }` |
+| `unaward` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, ts }` (award correction, §6.15) |
+| `sReq` | candidate → ML | WHISPER | `{}` (rejoin request after hearing an unknown-sid `sPing`, §6.16) |
+| `sJoin` | ML → candidate | WHISPER | `{ items, council, responses, timeout, anon, awarded }` (rejoin reply; followed by per-leader whispered `cUpdate`s) |
 
-Reliability: ML holds the authoritative table; drop inbound `cResp`/`vVote` with a stale `sid` or non-member/non-council sender. Debounce `cUpdate` (~0.2s). Idempotent — re-sends overwrite last value. No ACK in v1. `award` carries enough to build a complete local history record on every present client.
+Reliability: ML holds the authoritative table; drop inbound `cResp`/`vVote` with a stale `sid` or non-member/non-council sender. Debounce `cUpdate` (~0.2s). Idempotent — re-sends overwrite last value. No ACK in v1. `award` carries enough to build a complete local history record on every present client. `unaward`/`sJoin` are honored only from the bound session ML (DL-11); `sReq` is throttled per sid (60s) and only sent when no session view is active.
 
 Notes: items live in the ML's bags (no loot slot), so `sStart` items carry only `{link,quality}` — the ML resolves the live `{bag,slot}` locally at trade time. Until Phase-3 voting exists, `award.resp` carries the `STATUS.ANNOUNCED` sentinel; a disenchant award carries `award.resp = STATUS.DISENCHANT` (§6.10).
 
@@ -156,7 +159,7 @@ Sync flow: on login/load broadcast `pHello`; a peer that's behind sends `pSyncRe
 ### 6.3 Datasets (Plane B — under `global.guilds[guildKey]` per Feature C / §6.11)
 - `notes`: name → `{text, mod, by}`
 - `marks`: itemID → `{text, mod, by}`
-- `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (immutable; union merge). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts for display; union ignores both for merge. Logged locally on every present client from the `award` broadcast (§6.1).
+- `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (**LWW by `mod` per uid** — changed from union by Phase 12 / DL-20 so awards can be corrected). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts. A correction *appends in time*: a retraction re-writes the same uid with `retracted=true, retractedBy` and a fresh `mod`; a re-award re-writes it again with the new winner and a newer `mod` — the latest fact wins on merge, and records are never deleted (§6.15). Logged locally on every present client from the `award` broadcast (§6.1); replayed award logs are idempotent (equal `mod`+`by` → merge no-op).
 - `gearCache`: name → `{items={slot→link}, class, spec, mod}` (self-reported; `class`/`spec` let the BiS tab auto-resolve a cached player — talent-derived spec, §6.7)
 - `profCache`: name → `{profs={name→level}, mod}` (self-reported)
 - gbank sets (Feature B, §6.12): `gbankCache` (LWW), `gbankLog` (immutable, union), `gbankNotes` (LWW)
@@ -169,7 +172,9 @@ LootCouncilEXDB = {
     syncChannel        = "GUILD",
     minQuality         = 4,
     selfReport         = true,
-    ui                 = { lootFrame={pos}, votingFrame={pos}, sessionFrame={pos}, playerDetail={pos}, lootBrowser={pos} },
+    tradeTimersAuto    = true,          -- auto-show the trade-timer window when tradeable loot exists (§6.17)
+    ui                 = { lootFrame={pos}, votingFrame={pos}, sessionFrame={pos}, playerDetail={pos}, lootBrowser={pos},
+                           mini={pos}, tradeTimers={pos} },  -- Phase 12: mini session pill + trade-timer window
     useWhisperFallback = false,
   },
   global = {
@@ -180,7 +185,10 @@ LootCouncilEXDB = {
     },
     -- Local (NOT synced) owner-keyed recovery stores so a /reload can't lose ML state (DL-6):
     pendingTrades = { [owner] = { [shortKey] = {owed records} } },  -- owed loot still to be traded out
-    session       = { [owner] = {sid, items, council, sessionItems, startedAt} },  -- the open ML session
+    session       = { [owner] = {sid, items, council, sessionItems, startedAt,
+                                 rows, voters, awarded, anon, savedAt} },  -- the open ML session (Phase 12 / §6.16:
+                                 -- rows/voters/awarded are LIVE REFERENCES to the in-memory tables, so every
+                                 -- response/vote/award is durable at the next SavedVariables write — DL-21)
   },
 }
 ```
@@ -306,7 +314,7 @@ Builds on the shared config (§6.9). Three parts:
 
 **Gating — `Core/Access.lua`** (role + visibility predicates, headless-tested; reads `AmCouncil()` + `config.visibility`):
 - **Officer settings (C3):** the Session Config module is added to the council rail only when `AmCouncil()` (the `CouncilWindow.lua` module loop) — hidden from non-council. Personal settings (`ConfigWindow`) stay visible to everyone (Cd2).
-- **Loot/voting window (C7):** non-council can't open the loot window unless `config.visibility.lootWindow` — by default raiders see only the **poll** + the chat `award` announcements; opt-in per guild for transparency.
+- **Loot/voting window (C7 — superseded by Phase 12 / DL-18, §6.13):** every raider may now OPEN the loot window; what they see is tiered. Non-council (non-opted-in) get the **list view** — the left item rail only (items, quantities, award state, winners), never responses/votes/notes. `config.visibility.lootWindow` is repurposed: the opt-in now grants non-council the **full** (read-only) view rather than any view at all. Council always full; award/end/D-E controls stay ML-only.
 - **Greyed controls (Cd3):** a new disabled state on `CreateCheckbox`/`CreateSliderV2` (`faint` tone + `EnableMouse(false)`) — Widgets has none today.
 
 **Guild scoping + hide-on-leave (C6).** Every replicated dataset (`config` from Phase 9, plus `notes`/`marks`/`history`/`gearCache`/`profCache`/`dummy`, and Feature B's gbank sets) is guild-scoped so leaving a guild hides its data. Rather than re-home the ~25 readers, an **active-flat + stash** model is used (`Core/Guild.lua` `SyncGuildScope`): the **active guild's data always lives in the flat `db.global.<name>` tables** (every existing reader is unchanged), while **other guilds' data is stashed under `db.global.guilds[guildKey][name]`**. Switching guild (or leaving → key change) stashes the outgoing guild's flat tables and loads the incoming guild's (empty if new), so **an old guild's records are simply not present in the flat tables** — hidden without deletion; rejoining restores them. `db.global.activeGuild` tracks which guild the flat tables hold; **nil ⇒ never scoped**, which triggers a one-time *in-place claim* (existing pre-scoping data becomes the current guild's — nothing is moved or lost, so **no migration is needed**). `SyncGuildScope` runs at `OnEnable`, on `GUILD_ROSTER_UPDATE`, and defensively in `BuildDigest`, and **defers while guilded-but-roster-not-loaded** (`IsInGuild()` true, `GuildKey()` nil) so data is never stranded under `_local`. The sync/council gate is already per-`guildKey` (a peer in another guild fails `SyncSenderOk`). Local owner-keyed recovery stores (`pendingTrades`/`session`) stay account-global (live ML state, not council data).
@@ -334,6 +342,141 @@ A new council module (`UI/council/GbankModule.lua`, key `gbank`, order 50) over 
 **Visibility (B5).** `config.visibility` (§6.9) gates the sensitive views: **contents + gold visible to all guild members by default**; **logs / annotations hidden from non-council by default**, each toggle per guild.
 
 **UI (B8 / Bd1-3 / Bd6).** A **hero gold card** on top (a `Surface("raised")` card with the cached total in coin icons, built inline in the poll-card style, with "cached Nm ago" freshness — Bd2/Bd3), a **tab selector** for the bank tabs, and **Contents** (item grid) / **Log** (grouped, annotatable, money+item unified, newest-first — Bd6) sub-tabs.
+
+### 6.13 Loot-window visibility tiers, compact layout, mini pill (Phase 12, DL-18)
+The loot window is decoupled from council membership: **anyone may open it; the view is tiered.**
+
+**View levels.** `LCEX:LootViewLevel()` → `"full" | "list"`. In-session the level is snapshotted
+onto the view at `EnterSession` (`viewLevel`, replacing `canSeeLoot`): **full** = council ∪
+`config.visibility.lootWindow` opt-in; **list** = everyone else. Out of session the window is the
+compact staging rail for everyone (each client sees only its own local staging list — harmless).
+- **full** — both panes; votes still council-only, award/D-E/End still ML-only (unchanged gates).
+- **list** ("spectator") — the left rail only, at compact width: item icons/names/quality,
+  quantity (`xN`), readiness-border *kind*, award state + winner. The response-count badge is
+  suppressed. Spectator clients **never store** responses/votes/notes: `ApplyCUpdate` at list
+  level keeps only `status.kind` and never populates `voteRows` — privacy is enforced at the
+  state layer, not just the paint layer (the wire itself stays raid-wide per DL-18).
+- The bottom-bar button is contextual: ML = "End session", everyone else = "Leave session".
+- Auto-open on `sStart` remains full-level-only; spectators open on demand (minimap / mini pill /
+  `/lcex`). The poll flow is untouched at every level.
+
+**Compact/full layout (item 4).** `ApplyLootLayout(f, mode)`: `COMPACT_W = 284` (rail + insets),
+`FULL_W = 824`. Pre-session (and in-session spectators) the window is rail-only at compact width;
+a session at full level expands to `FULL_W` (pane shown). Resize pins TOPLEFT (the PollWindow
+reflow pattern) so the rail never jumps; the staging-control band (scan/add, 58px) is reclaimed by
+the list in-session. Height fixed at 470.
+
+**Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (~220×26, HIGH strata,
+position → `profile.ui.mini`, NOT in `UISpecialFrames`) shown **iff a session view is active and
+the loot window is hidden** — any view level. Text: full = "Loot session: N item(s) · R
+response(s)"; list = "Loot session: N item(s) · A awarded". Click → `ShowLootWindow()`. With no
+live session but a recoverable one (§6.16) it reads "Unresolved loot session — click to review" →
+resume prompt. One verb `UpdateMiniFrame()` is called from Enter/LeaveSession, `RefreshLootItem`,
+and the loot window's OnShow/OnHide. Window visibility never touches session state (DL-18).
+
+### 6.14 Duplicate-item grouping (Phase 12, DL-19)
+Duplicate drops (same item link) form a **group** with **shared responses** (RCLC-style):
+raiders see ONE poll card per group and respond once; the council sees ONE candidate table; each
+award still consumes a distinct **physical** item index, so `uid = sid:index`, per-copy trade
+tracking, and history all keep their existing shape.
+
+**Derivation (zero wire change).** `LCEX:BuildItemGroups(items)` — pure and deterministic over
+the broadcast `sStart` items list (same `link` ⇒ same group; leader = lowest index) → returns
+`{ leaderOf = {[i]=leader}, members = {[leader]={i,...}}, leaders = {asc} }`. Computed
+independently on the ML (`StartSession`/`ResumeSession` → `session.groups`) and every client
+(`EnterSession` → `activeSession.groups`); all agree because the input list is identical.
+
+**Aggregation.** `session.rows`/`voters` (and `voteRows`/`voteStatus`/`cUpdate`) exist **only
+under leader indices**. Inbound `cResp`/`vVote` map `msg.item` through `leaderOf` before
+validation (identity mapping for non-duplicate sessions — behavior is unchanged when no dups
+exist). `SeedSessionRows` seeds leaders only; a group's kill set = deduped union of every member
+copy's captured roster. `ComputeItemStatus(leader)`: `awarded` only when **all** members are
+awarded — a partially-awarded group keeps computing live status for the remaining copies.
+
+**Award.** UI verbs call `AwardGroup(leader, name, forcedResp)` =
+`AwardItem(NextAwardableIndex(leader), ...)` — leader first, then next unawarded member; nil ⇒
+all copies awarded. The `award` broadcast and `/lcex award <n>` keep raw physical indices.
+Un-award (§6.15) targets a specific physical copy, re-opening a mid-group hole that
+`NextAwardableIndex` naturally re-offers.
+
+**Display.** The rail shows one row per group: `xN` count overlay (hidden when N=1 — item 10),
+badge `✓ Name` (fully awarded single) or `✓ a/N` (partial), and a hover tooltip enumerating
+per-copy winners so diverged state is never hidden behind the `xN`. Selection and the right pane
+operate on leader indices. Poll cards carry the `xN` overlay too.
+
+**Trade-fill hardening.** Two same-link copies owed to one partner must both fill:
+`FillOwedTrades` counts placed-vs-needed per link (not a boolean has-item), and `FindItemInBags`
+skips locked slots so the second copy resolves to the second physical stack.
+
+### 6.15 Award correction — un-award + retractable history (Phase 12, DL-20)
+The ML can **un-award** a copy (right-click the awarded rail/candidate row → per-copy
+"Un-award <winner>" → confirm). `UnawardItem(physIdx)`: `ForgetAward(uid)` (drops the owed trade
+if still pending), clears `awarded[physIdx]` locally, writes a **retracted history record**
+(same uid, `retracted=true, retractedBy`, fresh `mod`), broadcasts `unaward` (§6.1), and
+rebroadcasts the group's `cUpdate`. Receivers (bound-ML-gated, DL-11) clear their `awarded`
+mirror and write the byte-identical record (`mod = msg.ts`) so every client converges; absent
+council members converge via the normal Plane-B delta pull (the uid's `mod` grew).
+
+The confirm wording is stateful: **pre-trade** = "return the item to the session"; **post-trade**
+(no owed record found) = "correct the record only" — LCEX never implies an in-game trade was
+reversed. Post-session record fixes: HistoryModule row right-click → "Retract record…", enabled
+only when `IsSelf(rec.by)` (the ML who logged it), which `SetRecord`s a retracted copy over
+pSet/pSync. Retracted records render faint + "(retracted)" wherever history renders and are
+never deleted. History's merge is LWW-by-`mod` per uid (§6.3) — the enabling change.
+
+### 6.16 Session persistence v2 + rejoin (Phase 12, DL-21)
+**Persist-by-reference.** `SaveSession` mirrors the ML's live `rows`, `voters`, and the view's
+`awarded` tables (plus `anon`, `savedAt`) into `db.global.session[owner]` **as references** (the
+`sessionItems` trick), so every subsequent mutation is durable at the next SavedVariables write —
+no debounced re-save plumbing. `EnterSession` pre-creates `awarded = {}` for this.
+
+**Resume.** On login with a saved session, a delayed (~3s) `ShowConfirm` reports age
+(`RelTime(startedAt)`), item count, and responses collected; Accept = `ResumeSession` (the
+explicit ML action that re-broadcasts `sStart` with the SAME sid); dismiss = chat hint
+(`/lcex resume` / `/lcex end` / `/lcex abort` remain). If the confirm frame is busy (Feature C
+inherit prompt), fall back to the chat prompt. `ResumeSession` restores `anon` from the save,
+seeds rows fresh (late joiners appear), then **overlays** saved rows (saved
+responses/notes/gear/votes win; seeded class/reason survive for non-responders; saved rows
+missing from the seed re-enter as `left`), restores `voters` + `awarded`, and pushes one
+debounced `cUpdate` per leader. **Out of group:** resume proceeds LOCALLY (no broadcast — safe
+read-only recovery); the heartbeat self-arms on the next roster update that finds a channel.
+Sessions are destroyed **only** by the explicit `EndSession` (`/lcex end`, `/lcex abort`, the
+End button) — never by reload/DC/group-drop/window-close.
+
+**Candidate rejoin (sReq/sJoin, §6.1).** A client with NO active session hearing `sPing` for an
+unknown sid whispers `sReq` to the pinger (throttled 60s per sid). The ML validates (open
+session, sid match, `InGroupWith`) and whispers back `sJoin` (items/council/responses/remaining
+timeout/anon/awarded) followed by one whispered `cUpdate` per leader (AceComm preserves
+per-target order). The candidate enters via the normal `EnterSession` (ML bound to sender,
+DL-11); a same-sid duplicate `sJoin` merges `awarded` only; a client already viewing a
+*different* live session ignores it. The reopened poll shows all items — the DL-3 re-respond
+mechanism (the reloaded client's old responses live on in the ML's aggregate).
+
+### 6.17 Trade timers (Phase 12, DL-22)
+Gargul-pattern loot trade timers, rebuilt native (no LibCandyBar, no copied code).
+
+**Scanner (`Core/TradeTimers.lua`).** `BAG_UPDATE_DELAYED` → 1s-debounced rescan; login/zone →
+5s-delayed rescan (piggybacks the existing `OnEnterWorld`); a 60s safety tick while entries
+exist. A rescan walks bags 0-4 and calls the DL-9 tooltip scanner (`ItemTradeTimeRemaining`) per
+occupied slot; items with a running BoP trade window become entries `{key, link, itemID, icon,
+bag, slot, expireAt}` — **all tradeable loot**, not just owed trades. Keying: prefer
+`C_Item.GetItemGUID` (pcall-guarded; availability on Anniversary is probed by selftest — X-item);
+fallback = `itemID:bucket(expireAt,120s)` + collision ordinal, with `_ReconcileTradeEntries`
+matching new scans to prior entries (by GUID, else itemID + |Δexpire| ≤ 180s) so keys stay stable
+across rescans despite the tooltip's minute-granular drift. `_AnnotateTradeWinners` zips
+`pendingTrades` owed records onto entries per link (both sides expiry-sorted) → "→ Winner".
+
+**Window (`UI/TradeTimerWindow.lua`).** A 280-wide `CreateWindowV2` (savedKey `tradeTimers`,
+**not** ESC-closable — new `noEscClose` opt) of pooled native `StatusBar` rows (h≈20): icon,
+"[Item] → Winner", right-aligned countdown, fill 0..7200 colored by bucket — `success` ≥60%
+remaining, `accent` ≥30%, `danger` below (Gargul's thresholds). Rows sort ascending by remaining;
+height reflows (TOPLEFT-pin); cap ~12 rows + "+N more". Title-bar **minimize** → only the
+soonest bar + "(+N)". Auto-shows when entries appear (`profile.tradeTimersAuto`, default on;
+ConfigWindow checkbox) and auto-hides when empty; a user close (×) suppresses auto-show until
+the entry set drains empty once. `/lcex timers` toggles manually. 1s repaint ticker while shown
+(display math off stored `expireAt` — no tooltip work). **Hide gesture:** shift+double-click a
+bar hides that item for the play session (in-memory hidden set; the hover tooltip carries the
+hint) — deliberate enough to never fire by accident.
 
 ---
 
@@ -379,6 +522,19 @@ Phases 8–11 extend **past** the original v1 definition of done — the four fe
 **Phase 11 — Guild Bank (Feature B).** `Core/council/Gbank.lua` (scan-on-open, append-only ledger, guild-scoped `gbankCache`/`gbankLog`/`gbankNotes`) + `UI/council/GbankModule.lua` (hero gold card, tab selector, Contents/Log sub-tabs, "xN" icon overlay). Council-only annotations; configurable visibility. Withdrawal-request flow + auto note-prompt deferred.
 *Exit:* opening the guild bank caches all tabs + gold + logs; the module shows the hero gold total, per-tab contents, and a grouped newest-first log; an officer annotates a withdrawal group and a second officer sees both the note and the withdrawal replicate; non-council see contents+gold but not logs/annotations (unless the guild opts in). `/lcex selftest` covers the ledger dedup/grouping (headless) + the guild-bank API contract (in-game).
 
+**Phase 12 — Fix/change batch (handoff jul4).** The 18-item UX/fix batch specced in
+`docs/lcex_fix_change_handoff_jul4.md` (§6.13–6.17, DL-18..23): spectator list view + compact
+layout + mini pill; vote-button order, awarded feedback, un-award + retractable history (LWW);
+duplicate grouping with shared responses; session persistence v2 (rows/votes/awarded survive
+`/reload`) + resume dialog + sReq/sJoin rejoin; Gargul-style trade-timer window; shared widget
+fixes (scrollbar-inside-list, zebra striping, flat-button disable, context menu); browser
+collapse/note-indicator/name-tooltips/right-click notes/(token) cleanup; rail widen + glyph fix.
+*Exit:* the consolidated Phase 12 checklist in `docs/TESTING.md` passes a 2-client run — a
+non-council raider sees the rail-only view while responding via the poll; two identical drops
+run as one card / two awards; an un-award converges on both clients and in history; an ML
+`/reload` mid-session resumes with responses/votes/awarded intact and a reloaded candidate
+auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-end.
+
 ---
 
 ## 8. Decision log / open questions
@@ -412,6 +568,51 @@ Phases 8–11 extend **past** the original v1 definition of done — the four fe
 - **DL-15 (accepted, 2026-07-04 — Feature V voting readiness):** `session.rows` is pre-seeded one row per present raider (`PresentRoster` + `ClassCanUse`); non-rollers dim to the bottom (RCLC); the rail sorts oldest-loot-first. The ML computes a per-item **status** (awarded/de/ready/voting/waiting) and broadcasts it on `cUpdate` so all clients draw the same **rail-row** border (header unchanged). Adds a vote tally (`status.voted={n,of}`), anonymous voting (snapshotted onto `sStart.anon`, default off), and a **D/E award type** (`STATUS.DISENCHANT=93`; target = highest-ranked present+eligible `config.disenchanters`; reason renders "D/E"). **Row-set (resolved 2026-07-04, R1–R5):** the list is the union (deduped) of the **kill set** (raid snapshotted at loot time — the proxy for the kill; manual-adds → `StartSession` roster) and the **current raid** (latecomers → `missedkill`); per-item eligible = in-kill-set ∧ `ClassCanUse`. Three display tiers **ROLLED > MIGHT ROLL (`pending`) > NOT ROLLING** (dimmed). Eligibility is a **soft, fail-open gate** — it flags/warns but the ML can always award anyone; a bad snapshot must never block a legitimate award. Accumulate/union over the session (never drop a row; re-mark leave/rejoin subtly). §6.10.
 - **DL-16 (accepted, 2026-07-04 — Feature C access control + guild scoping):** the council roster moves from local `profile.council` into the shared `config` record (§6.9), officer-authored and replicated — **resolves DL-1** (one roster, now consistent guild-wide). `Core/Access.lua` gates the Session Config module and the loot window behind `AmCouncil()` + `config.visibility` (raiders see only the poll + award chat by default; per-guild opt-in). All Plane-B datasets are namespaced under `db.global.guilds[guildKey]`, so leaving a guild hides its data with no deletion (hide-on-leave, C6); local recovery stores stay account-global. First-load inherit prompt ("inherit `<Guild>` from `<Player>`? Y/N") with a GM / no-config / solo escape hatch (C4). Unreleased ⇒ no migration. §6.11.
 - **DL-17 (accepted, 2026-07-04 — Feature B guild bank):** a new `gbank` council module over a Plane-B scanner (`Core/council/Gbank.lua`). Scan all viewable tabs on `GUILDBANKFRAME_OPENED` (throttled queries); cache contents+gold (LWW `gbankCache`) and an **append-only union ledger** (`gbankLog`) built by converting the logs' **elapsed** time to absolute + a content-hash uid (dedup is hour-granular — an API limitation, accepted). Rapid same-player+action entries **group** (5-min window, "xN" icon overlay); **council-only annotations** attach to a group (LWW `gbankNotes`). All guild-scoped (§6.11) + replicated (real-time bounded by the capturing officer's sync). `config.visibility` hides logs/annotations from non-council by default (contents+gold public). **Deferred:** withdrawal-request flow, auto close-prompt/chat reminder, sync-notification chat prints. Guild-bank APIs verify on the live client (X3). §6.12.
+- **DL-18 (accepted, 2026-07-04 — Phase 12 loot visibility tiers):** the loot window opens for
+  everyone; the VIEW is tiered — non-council default = the left-rail **list view** (items,
+  quantities, award state, winners; responses/votes/notes neither rendered **nor stored** —
+  `ApplyCUpdate` strips at list level); council ∪ `config.visibility.lootWindow` opt-in = full
+  view (opt-in REPURPOSED from "may open at all" — supersedes the C7 gate in DL-16); ML keeps the
+  only award/end controls. The wire stays raid-wide (trusted guild, §2) — privacy is state/UI-side
+  by explicit decision. Window visibility ≠ session state: close/ESC/minimize never end a session;
+  a mini pill surfaces hidden active sessions. Spectators are never auto-opened into the window.
+  §6.13.
+- **DL-19 (accepted, 2026-07-04 — Phase 12 duplicate grouping):** duplicate drops group by item
+  link with **shared responses** (one poll card, one candidate table per group) — RCLC-style.
+  Grouping is derived client-side from the `sStart` items list (leader = lowest index): **zero
+  wire change**, deterministic everywhere. Aggregation re-keys onto leader indices; awards stay
+  per-PHYSICAL-index (`uid = sid:index` inviolate; per-copy trades/history unchanged);
+  `AwardGroup` consumes the next unawarded copy. Partial groups stay visually distinguishable
+  (`✓ a/N` + per-copy tooltip). §6.14.
+- **DL-20 (accepted, 2026-07-04 — Phase 12 award correction):** history flips **union →
+  LWW-by-`mod` per uid** (records already carry `mod`/`by`; zero data migration) so awards can be
+  corrected. Correction = append-in-time: un-award writes a `retracted=true` record with fresh
+  `mod`; a re-award overwrites with a newer one; nothing is ever deleted. Live path = ML-only
+  right-click → `unaward` broadcast (DL-11-gated receivers); post-trade path = record-only
+  retraction from HistoryModule (gated `IsSelf(rec.by)`), wording never implies the trade
+  reversed. Caveat: a not-yet-upgraded client keeps union semantics and ignores retractions until
+  updated — accepted (same-version fleet). §6.15.
+- **DL-21 (accepted, 2026-07-04 — Phase 12 session persistence v2):** the saved ML session
+  mirrors the live `rows`/`voters`/`awarded` tables **by reference** (the `sessionItems` trick) —
+  responses/votes/awards survive `/reload` with no extra save plumbing. Resume is an explicit ML
+  action (dialog with age/counts, or `/lcex resume`); it seeds fresh then overlays the saved
+  aggregate; out-of-group resume is local-only (no broadcast). Candidate rejoin = `sReq`/`sJoin`
+  whisper pair triggered by an unknown-sid `sPing` — minimal, idempotent, throttled, DL-11 trust
+  unchanged. Sessions die only by explicit end/abort. §6.16.
+- **DL-22 (accepted, 2026-07-04 — Phase 12 trade timers):** Gargul's trade-timer UX rebuilt
+  native (no LibCandyBar, no copied code): bag-scan on `BAG_UPDATE_DELAYED` (debounced) through
+  the DL-9 tooltip scanner; **all** tradeable loot shows, winners annotated from `pendingTrades`;
+  ascending countdown bars, green/gold/red at ≥60%/≥30%/below of the 2h window; minimize = the
+  soonest bar; auto-show/hide with content. Keying prefers `C_Item.GetItemGUID` (probe on
+  Anniversary — X-item) with an `itemID:expiry-bucket` reconcile fallback. Manual hide =
+  shift+double-click (session-scoped). §6.17.
+- **DL-23 (accepted, 2026-07-04 — Phase 12 shared widget layer):** the batch's cross-cutting UI
+  mechanics land ONCE in `UI/Widgets.lua`/`UI/Theme.lua`, never per-module: FauxScrollFrame
+  scrollbar repositioned inside the list (fixes every list at once), an index-parity zebra stripe
+  layer under `CreateScrollList` (`opts.zebra`), a `SetFlatEnabled` disabled state on flat
+  buttons, and one reused native context-menu widget (`ShowContextMenu`) shared by the browser
+  note flow, award correction, and future consumers. Per the handoff's "do not duplicate
+  row-striping logic" rule.
 
 ---
 
