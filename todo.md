@@ -281,9 +281,16 @@ settings that depend on state, and for the configurable-visibility toggles.
 
 ## Feature B — Guild Bank module
 
-**Status:** **specced** — PROJECT.md §6.12 + Phase 11 + DL-17. Guild-scoped scanner + append-only
-ledger + 5-min grouping + council annotations + gold hero card + configurable visibility;
-withdrawal-request flow and auto-note-prompt **deferred**. Build last.
+**Status:** **in progress** (Phase 11) — building in 3 commits. **(1) Data layer — DONE (v0.37.0):**
+`Core/council/Gbank.lua` — three guild-scoped datasets (`gbankCache` lww / `gbankLog` union /
+`gbankNotes` lww); pure ledger logic (`GbankNormalizeKind`, `GbankTxnHour` elapsed→absolute hour,
+`GbankTxnUid` content-hash, `IngestTxnList` dedup, `BuildGbankGroups` 5-min/xN grouping); accessors
+(`GbankGold`/`GbankTabs`/`GbankLogEntries`); live scanner on `GUILDBANKFRAME_OPENED` (throttled
+`QueryGuildBankTab`/`QueryGuildBankLog`, debounced `CacheAllTabs`/`IngestAllLogs`, crash-safe money-txn
+bound). **All guild-bank APIs verified BCC-tagged on warcraft.wiki.gg (X3)** + a selftest API contract.
+Headless tests for the pure logic. **(2) TODO:** `UI/council/GbankModule.lua` (hero gold card + tab
+selector + Contents/Log sub-tabs + xN icon overlay). **(3) TODO:** annotations (`gbankNotes` on a
+group) + `config.visibility` gbank toggles. Withdrawal-request + auto-note-prompt **deferred**. §6.12, DL-17.
 
 **The ask (user's words):** "include a module for guild bank … cache the guild bank
 items/tabs/gold/logs. log entries can be annotated … when multiple log items occur in a short

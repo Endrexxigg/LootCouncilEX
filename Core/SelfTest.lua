@@ -804,6 +804,31 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
+LCEX:RegisterSelfTest("api", "guild bank API contract (Feature B)", function(self, t)
+    -- The net-new BCC guild-bank APIs the scanner relies on exist on the live client (X3). Existence
+    -- only — the query/read functions need an open bank, and GetGuildBankMoneyTransaction crashes on
+    -- a bad index, so the scanner (not the selftest) calls them.
+    for _, name in ipairs({ "GetNumGuildBankTabs", "GetGuildBankTabInfo", "QueryGuildBankTab",
+                            "GetGuildBankItemLink", "GetGuildBankItemInfo", "GetGuildBankMoney",
+                            "QueryGuildBankLog", "GetNumGuildBankTransactions", "GetGuildBankTransaction",
+                            "GetNumGuildBankMoneyTransactions", "GetGuildBankMoneyTransaction" }) do
+        t:Ok(type(_G[name]) == "function", "missing guild-bank API: " .. name)
+    end
+end)
+
+LCEX:RegisterSelfTest("data", "guild bank ledger: uid dedup + grouping (pure, Feature B)", function(self, t)
+    t:Eq(self:GbankNormalizeKind("withdrawal"), "withdraw", "withdrawal folds to withdraw")
+    t:Eq(self:GbankTxnUid("withdraw", "A", "i:1", 2, "1>", 5),
+         self:GbankTxnUid("withdrawal", "A", "i:1", 2, "1>", 5), "normalized kinds share a uid")
+    local groups = self:BuildGbankGroups({
+        { uid = "g1", kind = "deposit", player = "A", itemLink = "i:1", count = 2, ts = 3600000 },
+        { uid = "g2", kind = "deposit", player = "A", itemLink = "i:1", count = 1, ts = 3600000 },
+        { uid = "g3", kind = "withdraw", player = "B", itemLink = "i:9", count = 1, ts = 3600000 },
+    })
+    t:Eq(#groups, 2, "A's deposits group; B's withdraw is separate")
+    t:Eq(groups[1].items[1].count, 3, "identical items collapse to xN")
+end)
+
 LCEX:RegisterSelfTest("load", "guild scoping active (Feature C, C6)", function(self, t)
     t:Ok(type(self.SyncGuildScope) == "function", "SyncGuildScope missing")
     t:Ok(type(self.db.global.guilds) == "table", "guilds namespace present")

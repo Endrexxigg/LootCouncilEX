@@ -62,6 +62,7 @@ local DB_DEFAULTS = {
         profCache = {},
         config    = {}, -- shared officer config, keyed by guildKey (Feature V/C, §6.9)
         dummy     = {}, -- Phase-4 sync-proof dataset (council/Sync.lua); retire with Phase 5.
+        gbankCache = {}, gbankLog = {}, gbankNotes = {}, -- guild bank (Feature B, §6.12)
         -- Guild scoping (Feature C, C6): non-active guilds' replicated datasets are stashed here
         -- under db.global.guilds[guildKey][name]; the ACTIVE guild's data stays in the flat tables
         -- above. `activeGuild` (which guild the flat tables belong to) is NOT defaulted — nil means
@@ -151,6 +152,9 @@ function LCEX:OnEnable()
 
     -- Plane B — gear/profession self-report (council/SelfReport.lua): snapshot + login report.
     self:SetupSelfReport()
+
+    -- Feature B — guild bank scanner (council/Gbank.lua): cache + ledger on GUILDBANKFRAME_OPENED.
+    self:SetupGbank()
 
     -- The minimap launcher (Core/Minimap.lua): left=loot, right=council, ctrl=config.
     self:SetupMinimapButton()

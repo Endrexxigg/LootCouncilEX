@@ -33,7 +33,8 @@ end
 -- guild's — so an old guild's records are simply not present in the flat tables (hidden, not deleted;
 -- rejoining restores them). Local recovery stores (pendingTrades/session) are NOT scoped — they are
 -- live ML state, not council data (§6.11).
-local SCOPED = { "notes", "marks", "history", "gearCache", "profCache", "config", "dummy" }
+local SCOPED = { "notes", "marks", "history", "gearCache", "profCache", "config", "dummy",
+                 "gbankCache", "gbankLog", "gbankNotes" }
 
 function LCEX:SyncGuildScope()
     local g = self.db and self.db.global

@@ -183,7 +183,7 @@ local FILES = {
     "Core/session/Candidate.lua", "Core/session/Council.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua", "Core/council/Config.lua",
-    "Core/Access.lua",
+    "Core/council/Gbank.lua", "Core/Access.lua",
     "Core/Usable.lua", "Core/GearIssues.lua",
     "UI/Theme.lua", "UI/Widgets.lua", "UI/PollWindow.lua", "UI/LootWindow.lua",
     "UI/CouncilWindow.lua", "UI/council/BrowserModule.lua", "UI/council/RosterModule.lua",

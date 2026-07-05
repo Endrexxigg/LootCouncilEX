@@ -745,6 +745,62 @@ test("Inherit gate: decline keeps defaults + stops asking; GM/solo skip the gate
     ok(not L:GateConfigInherit("_local", incoming, "Officer"), "solo: nothing to inherit")
 end)
 
+-- ── Guild bank ledger (Core/council/Gbank.lua, Feature B) ────────────────────
+local HR = 3600
+test("Gbank uid + normalize: content-hash dedups; withdrawal folds to withdraw", function()
+    eq(L:GbankNormalizeKind("withdrawal"), "withdraw", "money withdrawal folds to withdraw")
+    eq(L:GbankNormalizeKind("deposit"), "deposit", "deposit passes through")
+    local u1 = L:GbankTxnUid("withdraw", "Amy", "item:1", 2, "1>", 100)
+    eq(u1, L:GbankTxnUid("withdrawal", "Amy", "item:1", 2, "1>", 100), "withdraw/withdrawal same uid")
+    ok(u1 ~= L:GbankTxnUid("withdraw", "Amy", "item:1", 3, "1>", 100), "count change -> new uid")
+end)
+
+test("GbankTxnHour: capture floored to the hour minus elapsed", function()
+    local capturedAt = 100 * HR + 1800 -- 100.5 hours; floors to hour 100
+    eq(L:GbankTxnHour(capturedAt, 0, 0, 0, 2), 98, "2h ago -> capturedHour - 2")
+    eq(L:GbankTxnHour(capturedAt, 0, 0, 1, 0), 100 - 24, "1 day ago -> -24h")
+end)
+
+test("IngestTxnList: dedups identical transactions across scans (union ledger)", function()
+    local txns = {
+        { kind = "withdraw", player = "Amy", itemLink = "item:1", count = 2, tabs = "1>",
+          years = 0, months = 0, days = 0, hours = 1 },
+        { kind = "deposit", player = "Bob", gold = 5000, tabs = "",
+          years = 0, months = 0, days = 0, hours = 1 },
+    }
+    eq(L:IngestTxnList(txns, 1000 * HR), 2, "two new entries ingested")
+    eq(L:IngestTxnList(txns, 1000 * HR), 0, "same scan re-ingested -> all dedup")
+    eq(L:IngestTxnList(txns, 1000 * HR + 600), 0, "another officer, same hour -> deduped")
+    eq(#L:GbankLogEntries(), 2, "ledger holds the two unique transactions")
+end)
+
+test("BuildGbankGroups: groups same player+action; xN items; gold sums; splits on change", function()
+    local H0 = 1000 * HR
+    local entries = {
+        { uid = "a1", kind = "deposit", player = "Amy", itemLink = "item:1", count = 2, ts = H0 },
+        { uid = "a2", kind = "deposit", player = "Amy", itemLink = "item:1", count = 3, ts = H0 },
+        { uid = "a3", kind = "deposit", player = "Amy", gold = 500, ts = H0 },
+        { uid = "b1", kind = "withdraw", player = "Bob", itemLink = "item:9", count = 1, ts = H0 },
+    }
+    local g = L:BuildGbankGroups(entries)
+    eq(#g, 2, "Amy's deposits group; Bob's withdraw is separate")
+    eq(g[1].player, "Amy", "first group is Amy")
+    eq(#g[1].items, 1, "identical items collapse to one line")
+    eq(g[1].items[1].count, 5, "counts sum to xN (2+3)")
+    eq(g[1].gold, 500, "gold in the group sums")
+    eq(g[1].uid, "a1", "group uid is the lead entry's (stable for annotations)")
+    eq(g[2].player, "Bob", "second group is Bob")
+end)
+
+test("Gbank accessors: gold + tabs from the cache", function()
+    L.db.global.gbankCache["money"] = { gold = 12345, mod = 1 }
+    L.db.global.gbankCache[1] = { index = 1, name = "Tab1", slots = {} }
+    eq((L:GbankGold()), 12345, "gold read from cache")
+    local tabs = L:GbankTabs()
+    eq(#tabs, 1, "one cached tab (money key excluded)")
+    eq(tabs[1].name, "Tab1", "tab name")
+end)
+
 -- ── Session row seeding (Core/session/Session.lua, Feature V) ────────────────
 test("SeedRows: pending / cantuse / missedkill / left", function()
     -- A plate chest (classID 4, subClass 4): WARRIOR can use, PRIEST cannot.

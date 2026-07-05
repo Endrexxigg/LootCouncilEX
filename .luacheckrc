@@ -45,6 +45,11 @@ read_globals = {
     -- Loot / master loot
     "GetMasterLootCandidate", "GiveMasterLoot", "GetNumLootItems", "GetLootMethod",
     "GetLootSlotLink", "GetLootSlotInfo", "LootSlotHasItem", "LOOT_ITEM_SELF",
+    -- Guild bank (Feature B) — net-new BCC APIs (§6.12; verified BCC-tagged on warcraft.wiki.gg)
+    "GetNumGuildBankTabs", "GetGuildBankTabInfo", "QueryGuildBankTab", "GetGuildBankItemLink",
+    "GetGuildBankItemInfo", "GetGuildBankMoney", "QueryGuildBankLog", "GetNumGuildBankTransactions",
+    "GetGuildBankTransaction", "GetNumGuildBankMoneyTransactions", "GetGuildBankMoneyTransaction",
+    "MAX_GUILDBANK_TABS", "MAX_GUILDBANK_SLOTS_PER_TAB",
     -- Bags / trade
     "C_Container",
     "GetContainerNumSlots", "GetContainerItemLink", "GetContainerItemInfo",
