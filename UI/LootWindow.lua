@@ -114,6 +114,21 @@ function LCEX:EnsureLootWindow()
     f.itemCount:SetPoint("TOPRIGHT", -12, -16)
     f.itemName:SetPoint("RIGHT", f.itemCount, "LEFT", -8, 0)
 
+    -- Tooltip on the selected item's NAME, not just its icon (item 15) — an overlay button in
+    -- the row.nameBtn pattern, reading the selection live at hover time.
+    f.itemNameBtn = CreateFrame("Button", nil, pane)
+    f.itemNameBtn:SetAllPoints(f.itemName)
+    f.itemNameBtn:SetScript("OnEnter", function(b)
+        local items = self:LootRailItems()
+        local entry = f.selectedIndex and items[f.selectedIndex]
+        if entry and entry.link then
+            GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+            GameTooltip:SetHyperlink(entry.link)
+            GameTooltip:Show()
+        end
+    end)
+    f.itemNameBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     -- Vote tally for the selected item (V6): "X / Y voted", below the item count. Session-only,
     -- and the count shows even under anonymous voting (only voter NAMES hide — V7).
     f.voteTally = pane:CreateFontString(nil, "OVERLAY")

@@ -64,6 +64,14 @@ local function BuildRow(panel)
             LCEX:BrowserToggle(r.panel, r.kind, r.toggleKey) -- raid/boss headers fold (item 13)
         end
     end)
+    -- Item tooltip on NAME hover, not just the icon (item 15). Header rows show nothing.
+    row:SetScript("OnEnter", function(r)
+        if r.kind ~= "item" or not r.itemID then return end
+        GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(r.itemLink or ("item:" .. r.itemID))
+        GameTooltip:Show()
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.panel = panel
     return row
 end
@@ -71,6 +79,7 @@ end
 local function FillRow(panel, row, entry)
     row.loadingID = nil
     row.itemID = nil
+    row.itemLink = nil
     row.kind = entry.kind
     row.toggleKey = entry.key
     row.bg:Hide()
@@ -115,6 +124,7 @@ local function FillRow(panel, row, entry)
             row.text:SetText(name or ("item:" .. id))
             row.text:SetTextColor(q[1], q[2], q[3])
             row.icon:SetItem(link, instantIcon)
+            row.itemLink = link -- the row-hover tooltip prefers the resolved link
         end)
 
         row.mark:SetText(LCEX:BrowserMarkText(id))
