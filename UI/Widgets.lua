@@ -208,6 +208,124 @@ function LCEX:CreateScrollList(parent, opts)
     return list
 end
 
+-- ── Pixel scroll list (real ScrollFrame) ─────────────────────────────────────
+-- A REAL ScrollFrame (not FauxScrollFrame): every row is a child of ONE tall scroll child that
+-- slides by PIXELS under a clipped viewport, so partial rows show at the top/bottom edges and the
+-- thumb (or wheel) scrolls smoothly instead of paging by index. Same builder contract as
+-- CreateScrollList — buildRow(parent)->row, fillRow(row,item,index), SetData(items), zebra — so an
+-- existing row factory drops in unchanged. `opts = { rowHeight, width, buildRow, fillRow, zebra,
+-- gutter }`; `gutter` reserves the flat scrollbar's strip on the right so row content never crashes
+-- into it. The compact Loot Session staging list uses this; the Faux helper still serves the rest.
+function LCEX:CreatePixelScrollList(parent, opts)
+    local addon     = self
+    local rowHeight = opts.rowHeight or self.STYLE.rowHeight
+    local width     = opts.width or 320
+    local gutter    = opts.gutter or 16
+
+    local list = CreateFrame("Frame", nil, parent)
+    list:SetSize(width, rowHeight * (opts.visibleRows or 6))
+    list.rows, list.items = {}, {}
+
+    -- Clipped viewport: the scroll child is cut to these bounds, so a row straddling an edge draws
+    -- partially. Leaves `gutter` free on the right for the scrollbar.
+    local sf = CreateFrame("ScrollFrame", nil, list)
+    sf:SetPoint("TOPLEFT", 0, 0)
+    sf:SetPoint("BOTTOMRIGHT", -gutter, 0)
+    if sf.SetClipsChildren then sf:SetClipsChildren(true) end
+    list.scroll = sf
+
+    -- Scroll child: full viewport width, as tall as the data. Holds every row stacked by pixels.
+    local child = CreateFrame("Frame", nil, sf)
+    child:SetSize(width - gutter, 1)
+    sf:SetScrollChild(child)
+    list.child = child
+
+    -- Flat scrollbar in the reserved gutter — a bare Slider (no template), so there are no stock
+    -- arrow buttons or knob texture to strip; just a faint track and a solid theme thumb.
+    local bar = CreateFrame("Slider", nil, list)
+    bar:SetOrientation("VERTICAL")
+    bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2)
+    bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 2)
+    bar:SetWidth(6)
+    local track = bar:CreateTexture(nil, "BACKGROUND")
+    track:SetAllPoints(bar)
+    track:SetTexture("Interface\\Buttons\\WHITE8X8")
+    track:SetVertexColor(1, 1, 1, 0.03)
+    bar:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+    local thumb = bar:GetThumbTexture()
+    if thumb then
+        local c = self.Theme.text.faint
+        thumb:SetVertexColor(c[1], c[2], c[3], 0.9)
+        thumb:SetSize(6, 24)
+    end
+    bar:SetMinMaxValues(0, 0)
+    bar:SetValue(0)
+    list.scrollBar = bar
+
+    local function updateRange()
+        local max = math.max(0, #list.items * rowHeight - (sf:GetHeight() or 0))
+        bar:SetMinMaxValues(0, max)
+        if bar:GetValue() > max then bar:SetValue(max) end
+        if max <= 0 then bar:Hide() else bar:Show() end
+    end
+
+    bar:SetScript("OnValueChanged", function(_, value) sf:SetVerticalScroll(value) end)
+    sf:EnableMouseWheel(true)
+    sf:SetScript("OnMouseWheel", function(_, delta)
+        bar:SetValue(bar:GetValue() - delta * rowHeight) -- one row per notch; drag for finer/partial
+    end)
+
+    -- Rebuild the stacked rows for the current data (pooled: reused across SetData, hidden past the
+    -- data length). Every row is a real child of the scroll child; clipping decides which pixels
+    -- show, so there's no index windowing to keep in sync.
+    local function layout()
+        local w = sf:GetWidth() or (width - gutter)
+        child:SetWidth(w)
+        child:SetHeight(math.max(1, #list.items * rowHeight))
+        for i, item in ipairs(list.items) do
+            local row = list.rows[i]
+            if not row then
+                row = opts.buildRow(child)
+                row:SetHeight(rowHeight)
+                row:ClearAllPoints()
+                row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -(i - 1) * rowHeight)
+                row:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -(i - 1) * rowHeight)
+                if opts.zebra then
+                    row._stripe = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+                    row._stripe:SetAllPoints(row)
+                    row._stripe:SetTexture("Interface\\Buttons\\WHITE8X8")
+                    local s = addon.Theme.stripe
+                    row._stripe:SetVertexColor(s[1], s[2], s[3], s[4])
+                end
+                list.rows[i] = row
+            end
+            opts.fillRow(row, item, i)
+            if row._stripe then
+                if i % 2 == 0 then row._stripe:Show() else row._stripe:Hide() end
+            end
+            row:Show()
+        end
+        for i = #list.items + 1, #list.rows do list.rows[i]:Hide() end
+    end
+    list.Refresh = layout
+
+    -- A resizable/reflowing parent only changes the scroll RANGE — row Y positions are child-
+    -- relative, so they don't move; just match the child width and recompute the range.
+    sf:SetScript("OnSizeChanged", function(_, w)
+        child:SetWidth(w)
+        updateRange()
+    end)
+
+    function list.SetData(l, items)
+        l.items = items or {}
+        l.scroll:SetVerticalScroll(0)
+        l.scrollBar:SetValue(0)
+        layout()
+        updateRange()
+    end
+    return list
+end
+
 -- ── Edit box ─────────────────────────────────────────────────────────────────
 -- A single-line input (generalizes LootFrame's note box). `opts = { width, onCommit(text) }`.
 -- Enter commits (then unfocuses); Escape unfocuses. Commits should route through SetRecord.

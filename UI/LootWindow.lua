@@ -22,6 +22,22 @@ local BAR_H      = 34 -- bottom bar
 local FULL_W     = 824          -- rail + the 536px right pane
 local COMPACT_W  = RAIL_W + 4   -- rail-only form (item 4): pre-session staging
 
+-- ── Compact staging layout ───────────────────────────────────────────────────
+-- One content inset shared by the header, the staged-items list, the Scan/add controls and the
+-- footer, plus a fixed scrollbar gutter and a deliberate footer band. Every compact-state control
+-- anchors from these constants (not one-off offsets), so the left/right content boundaries line
+-- up across the whole rail-only window.
+local C_INSET    = 10             -- left/right content inset inside the rail and the footer
+local C_ROW_H    = 30             -- staged-item row height
+local C_GUTTER   = 14             -- scrollbar gutter reserved on the list's right edge
+local C_GAP      = 8              -- vertical gap between stacked controls
+local C_HEADER_H = 16             -- header caption band
+local C_CTRL_H   = 22             -- Scan button height (the edit box is a fixed 20)
+local C_EDIT_H   = 20             -- InputBoxTemplate's intrinsic height
+-- Staging control band, measured up from the rail bottom: gap · addBox · gap · scanBtn · gap.
+local C_BAND_H   = C_GAP + C_EDIT_H + C_GAP + C_CTRL_H + C_GAP
+local C_CONTENT_W = RAIL_W - 2 * C_INSET
+
 -- Awarded marker: an inline texture escape (the ready-check tick), NOT a "✓" glyph —
 -- FRIZQT__.TTF has no U+2713 and renders it as an error box (handoff item 9).
 local CHECK_TEX = "|TInterface\\RaidFrame\\ReadyCheck-Ready:12:12:0:0|t"
@@ -103,28 +119,31 @@ function LCEX:EnsureLootWindow()
     self:Surface(rail, "base")
     f.rail = rail
 
-    f.railList = self:CreateScrollList(rail, {
-        rowHeight = 30, width = RAIL_W - 4, fillHeight = true, zebra = true,
+    f.railHeader = rail:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(f.railHeader, "caption", "faint")
+    f.railHeader:SetPoint("TOPLEFT", C_INSET, -C_GAP)
+
+    -- Real pixel-scrolling staged-items list: top-anchored below the header, bottom set per state
+    -- in RefreshLootWindow (above the staging band out-of-session, snug in-session). The C_GUTTER
+    -- reserve keeps the flat scrollbar clear of the row content on the right.
+    f.railList = self:CreatePixelScrollList(rail, {
+        rowHeight = C_ROW_H, width = C_CONTENT_W, gutter = C_GUTTER, zebra = true,
         buildRow = function(parent) return self:BuildLootRailRow(parent) end,
         fillRow  = function(row, entry, index) self:FillLootRailRow(row, entry, index) end,
     })
-    f.railList:SetPoint("TOPLEFT", 2, -30)
-    f.railList:SetPoint("BOTTOMRIGHT", -2, 58)
+    f.railList:SetPoint("TOPLEFT", C_INSET, -(C_GAP + C_HEADER_H + C_GAP))
+    f.railList:SetPoint("BOTTOMRIGHT", -C_INSET, C_BAND_H) -- staging default; retightened in-session
 
-    f.railHeader = rail:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(f.railHeader, "caption", "faint")
-    f.railHeader:SetPoint("TOPLEFT", 12, -10)
-
-    -- Staging controls (hidden while a session is open).
-    f.scanBtn = self:CreateFlatButton(rail, self.L["Scan bags"], RAIL_W - 16, 22)
-    f.scanBtn:SetPoint("BOTTOMLEFT", 8, 30)
+    -- Staging controls (hidden while a session is open), sharing the content inset with the list.
+    f.scanBtn = self:CreateFlatButton(rail, self.L["Scan bags"], C_CONTENT_W, C_CTRL_H)
+    f.scanBtn:SetPoint("BOTTOMLEFT", C_INSET, C_GAP + C_EDIT_H + C_GAP) -- sits above the add box
     f.scanBtn:SetScript("OnClick", function() self:LootStageScan() end)
 
     f.addBox = self:CreateEditBox(rail, {
-        width = RAIL_W - 20,
+        width = C_CONTENT_W,
         onCommit = function(text) self:LootStageAdd(text) end,
     })
-    f.addBox:SetPoint("BOTTOMLEFT", 12, 6)
+    f.addBox:SetPoint("BOTTOMLEFT", C_INSET, C_GAP)
 
     -- Right pane ---------------------------------------------------------------
     local pane = CreateFrame("Frame", nil, f)
@@ -215,7 +234,7 @@ function LCEX:EnsureLootWindow()
 
     f.status = bar:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.status, "body", "dim")
-    f.status:SetPoint("LEFT", 12, 0)
+    f.status:SetPoint("LEFT", C_INSET, 0)
     f.status:SetJustifyH("LEFT")
     f.status:SetWordWrap(false) -- single-line: a right bound (set per-state in RefreshLootWindow) truncates, never wraps
 
@@ -640,8 +659,9 @@ function LCEX:RefreshLootWindow()
     end
 
     f.railHeader:SetText(inSession and self.L["SESSION ITEMS"] or self.L["STAGED ITEMS"])
-    -- In-session the staging-control band (scan/add, 58px) is reclaimed by the list.
-    f.railList:SetPoint("BOTTOMRIGHT", -2, inSession and 6 or 58)
+    -- In-session the staging-control band (scan/add) is reclaimed by the list; out-of-session the
+    -- list stops above it. Both use the shared content inset so the list right edge never moves.
+    f.railList:SetPoint("BOTTOMRIGHT", -C_INSET, inSession and C_GAP or C_BAND_H)
     f.railList:SetData(railEntries)
 
     if inSession then
@@ -660,23 +680,22 @@ function LCEX:RefreshLootWindow()
         -- Right-bound the status to the leftmost VISIBLE right-side button so it truncates instead
         -- of sliding under the buttons. deBtn (when shown) sits left of endBtn; never anchor to a
         -- hidden frame (LAYOUT/DANGLING_ANCHOR), so re-pick the target with the visibility swaps.
-        f.status:SetPoint("RIGHT", f.deBtn:IsShown() and f.deBtn or f.endBtn, "LEFT", -8, 0)
+        f.status:SetPoint("RIGHT", f.deBtn:IsShown() and f.deBtn or f.endBtn, "LEFT", -C_GAP, 0)
     else
         f.scanBtn:Show(); f.addBox:Show()
         f.startBtn:Show(); f.endBtn:Hide()
         f.deBtn:Hide()
-        -- End/deBtn are hidden, so pin the lone Start button to the bar's far right — it can't
-        -- ride the hidden End button's slot (that squeezed the status to ~36px in the compact
-        -- staging window and truncated the label). This reclaims ~142px for the status.
+        -- Footer: Start right-aligned at the content inset (End/deBtn hidden, so it can't ride the
+        -- hidden End button's slot — that squeezed the status to ~36px and truncated the label).
         f.startBtn:ClearAllPoints()
-        f.startBtn:SetPoint("RIGHT", f.bottomBar, "RIGHT", -8, 0)
+        f.startBtn:SetPoint("RIGHT", f.bottomBar, "RIGHT", -C_INSET, 0)
         if #items == 0 then
             f.status:SetText(self.L["Nothing staged — scan your bags or add items."])
         else
             f.status:SetText(string.format(self.L["%d item(s) staged."], #items))
         end
-        -- Out of session only startBtn holds the right side (endBtn/deBtn hidden) — bound to it.
-        f.status:SetPoint("RIGHT", f.startBtn, "LEFT", -8, 0)
+        -- Status left-aligned at the inset, right-bounded to Start so it truncates before overlap.
+        f.status:SetPoint("RIGHT", f.startBtn, "LEFT", -C_GAP, 0)
     end
 
     -- Right pane: selected item header + candidate table.

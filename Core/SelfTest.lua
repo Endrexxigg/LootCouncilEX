@@ -303,7 +303,7 @@ LCEX:RegisterSelfTest("load", "core functions present", function(self, t)
         "GetItemsForBoss", "GetBiSSpecs", "GetBiSForSpecPhase", "GetTierToken",
         "GetTierPieceForClass", "FindTokenForItem", "SpecsForClass", "IsKnownClass",
         -- UI
-        "CreateItemIcon", "CreateScrollList", "CreateEditBox",
+        "CreateItemIcon", "CreateScrollList", "CreatePixelScrollList", "CreateEditBox",
         -- UI v2 (Theme + themed primitives)
         "ApplyGradient", "Surface", "SoftEdge", "ThemeText", "QualityColor", "ClassColor",
         "CreateWindowV2", "CreateFlatButton", "CreateNavRail", "CreateCheckbox", "CreateSliderV2",
@@ -711,7 +711,7 @@ LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", f
     t:Eq(#f.railList.items, 2, "staged items in the rail")
     t:Ok(f.railList.rows[1] and f.railList.rows[1]:IsShown(), "rail row not rendered")
     t:Ok(f.railList.rows[1].remove:IsShown(), "staging rows must carry the remove ×")
-    t:Eq(f.railList.scroll.offset, 0, "rail scroll offset after SetData")
+    t:Eq(f.railList.scroll:GetVerticalScroll(), 0, "rail pixel-scroll reset to top after SetData")
     self:LootStageRemove(1)
     t:Eq(#self.stagingItems, 1, "remove did not edit the staging list")
     t:Eq(#f.railList.items, 1, "rail did not follow the edit")
@@ -995,6 +995,40 @@ end, { cleanup = function(self)
         self._selfTestScrollHost:Hide()
         self._selfTestScrollHost:SetParent(nil)
         self._selfTestScrollHost = nil
+    end
+end })
+
+-- Compact staging list uses a REAL ScrollFrame (pixel scrolling): rows are children of one scroll
+-- child sliding under a clipped viewport, the flat scrollbar is a bare Slider (no stock arrows),
+-- and SetData resets the scroll to the top. Partial rows show because the viewport clips.
+LCEX:RegisterSelfTest("ui", "pixel scroll list: real ScrollFrame, flat bar, reset on SetData", function(self, t)
+    local host = CreateFrame("Frame", nil, UIParent)
+    host:SetSize(200, 120)
+    host:Hide()
+    self._selfTestPixelHost = host
+    local list = self:CreatePixelScrollList(host, {
+        rowHeight = 30, width = 200, gutter = 14, zebra = true,
+        buildRow = function(parent) return CreateFrame("Button", nil, parent) end,
+        fillRow  = function() end,
+    })
+    list:SetPoint("TOPLEFT", 0, 0)
+    t:Ok(list.scroll and list.scroll:IsObjectType("ScrollFrame"), "viewport is a real ScrollFrame")
+    t:Ok(list.child and list.scroll:GetScrollChild() == list.child, "scroll child wired to the viewport")
+    t:Ok(list.scrollBar and list.scrollBar:IsObjectType("Slider"), "flat scrollbar is a Slider")
+    -- A bare Slider carries no stock arrow-button children (the STYLE/SCROLLBAR_DEFAULT trap).
+    t:Ok(list.scrollBar.ScrollUpButton == nil and list.scrollBar.ScrollDownButton == nil,
+        "flat scrollbar must not carry stock arrow buttons")
+    -- Overfill (6×30 = 180 > 120 viewport), scroll down, then SetData must snap back to the top.
+    list:SetData({ 1, 2, 3, 4, 5, 6 })
+    list.scroll:SetVerticalScroll(40)
+    list:SetData({ 1, 2, 3, 4, 5, 6 })
+    t:Eq(list.scroll:GetVerticalScroll(), 0, "SetData resets pixel scroll to the top")
+    t:Ok(list.rows[1] and list.rows[1]:GetParent() == list.child, "rows parent to the scroll child")
+end, { cleanup = function(self)
+    if self._selfTestPixelHost then
+        self._selfTestPixelHost:Hide()
+        self._selfTestPixelHost:SetParent(nil)
+        self._selfTestPixelHost = nil
     end
 end })
 
