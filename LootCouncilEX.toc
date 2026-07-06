@@ -2,9 +2,13 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.51.7
+## Version: 0.51.8
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
+
+#@do-not-package@
+## OptionalDeps: AddonUIAudit
+#@end-do-not-package@
 
 # Embedded libraries (LibStub + Ace3), loaded in dependency order.
 embeds.xml
@@ -91,3 +95,12 @@ Core\Access.lua
 
 # In-game validation harness (/lcex selftest). Loads LAST — it exercises every module above.
 Core\SelfTest.lua
+
+#@do-not-package@
+# ── AddonUIAudit dev adapter — STRIPPED from release builds ────────────────────
+# Registers LCEX with the AddonUIAudit engine for in-game UI audits. The packager
+# removes these wrapped lines and the DevAudit/ folder is excluded via .pkgmeta, so
+# nothing here ever ships. Fixtures loads first (Adapter reads its table).
+DevAudit\Fixtures.lua
+DevAudit\Adapter.lua
+#@end-do-not-package@
