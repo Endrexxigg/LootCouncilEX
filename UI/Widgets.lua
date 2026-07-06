@@ -240,13 +240,16 @@ function LCEX:CreatePixelScrollList(parent, opts)
     sf:SetScrollChild(child)
     list.child = child
 
-    -- Flat scrollbar in the reserved gutter — a bare Slider (no template), so there are no stock
-    -- arrow buttons or knob texture to strip; just a faint track and a solid theme thumb.
+    -- Flat scrollbar CENTERED in the reserved gutter — a bare Slider (no template), so there are no
+    -- stock arrow buttons or knob texture to strip; just a faint track and a solid theme thumb.
+    -- Centering (equal pad each side) keeps the gutter from reading as a random extra right margin.
+    local barW = math.min(6, math.max(2, gutter - 6))
+    local barPad = (gutter - barW) / 2
     local bar = CreateFrame("Slider", nil, list)
     bar:SetOrientation("VERTICAL")
-    bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2)
-    bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 2)
-    bar:SetWidth(6)
+    bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -barPad, -2)
+    bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -barPad, 2)
+    bar:SetWidth(barW)
     local track = bar:CreateTexture(nil, "BACKGROUND")
     track:SetAllPoints(bar)
     track:SetTexture("Interface\\Buttons\\WHITE8X8")
@@ -256,7 +259,7 @@ function LCEX:CreatePixelScrollList(parent, opts)
     if thumb then
         local c = self.Theme.text.faint
         thumb:SetVertexColor(c[1], c[2], c[3], 0.9)
-        thumb:SetSize(6, 24)
+        thumb:SetSize(barW, 24)
     end
     bar:SetMinMaxValues(0, 0)
     bar:SetValue(0)
@@ -316,12 +319,20 @@ function LCEX:CreatePixelScrollList(parent, opts)
         updateRange()
     end)
 
+    -- Repaint the SAME logical list (selection change, per-row edit, aggregate update) WITHOUT
+    -- yanking the view: keep the current pixel offset and clamp it to the new range. A shorter list
+    -- (items removed) pulls the offset up only as far as needed; an unchanged/taller list holds it.
     function list.SetData(l, items)
         l.items = items or {}
-        l.scroll:SetVerticalScroll(0)
-        l.scrollBar:SetValue(0)
         layout()
-        updateRange()
+        updateRange() -- clamps bar (and thus the ScrollFrame, via OnValueChanged) into [0, max]
+    end
+
+    -- Deliberate reset to the top — for a fresh/empty window or an explicit "scroll to top". Not
+    -- called on ordinary repaints, so selection never snaps the view back.
+    function list.ScrollToTop(l)
+        l.scrollBar:SetValue(0)
+        l.scroll:SetVerticalScroll(0)
     end
     return list
 end

@@ -131,8 +131,19 @@ function LCEX:EnsureLootWindow()
         buildRow = function(parent) return self:BuildLootRailRow(parent) end,
         fillRow  = function(row, entry, index) self:FillLootRailRow(row, entry, index) end,
     })
-    f.railList:SetPoint("TOPLEFT", C_INSET, -(C_GAP + C_HEADER_H + C_GAP))
+    f.railList:SetPoint("TOPLEFT", C_INSET, -C_GAP) -- staging default; re-topped for the in-session header
     f.railList:SetPoint("BOTTOMRIGHT", -C_INSET, C_BAND_H) -- staging default; retightened in-session
+
+    -- Empty-state helper in the BODY (replaces the old header band): shown only when nothing is
+    -- staged, so the footer can stay a short, stable count. Sits inside the list viewport, clear of
+    -- the scrollbar gutter; wraps because the body has room the footer doesn't.
+    f.railEmpty = rail:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(f.railEmpty, "body", "faint")
+    f.railEmpty:SetPoint("TOPLEFT", f.railList, "TOPLEFT", 2, -6)
+    f.railEmpty:SetPoint("TOPRIGHT", f.railList, "TOPRIGHT", -C_GUTTER, -6)
+    f.railEmpty:SetJustifyH("LEFT")
+    f.railEmpty:SetText(self.L["Scan bags or paste item links to stage loot."])
+    f.railEmpty:Hide()
 
     -- Staging controls (hidden while a session is open), sharing the content inset with the list.
     f.scanBtn = self:CreateFlatButton(rail, self.L["Scan bags"], C_CONTENT_W, C_CTRL_H)
@@ -658,7 +669,19 @@ function LCEX:RefreshLootWindow()
         f.selectedIndex = railEntries[1] and railEntries[1].leaderIndex or nil
     end
 
-    f.railHeader:SetText(inSession and self.L["SESSION ITEMS"] or self.L["STAGED ITEMS"])
+    -- Header only in-session (the list starts below it). Staging drops the header entirely so the
+    -- list starts near the top of the body; the empty-state helper takes the header's old job.
+    if inSession then
+        f.railHeader:SetText(self.L["SESSION ITEMS"])
+        f.railHeader:Show()
+        f.railList:SetPoint("TOPLEFT", C_INSET, -(C_GAP + C_HEADER_H + C_GAP))
+    else
+        f.railHeader:Hide()
+        f.railList:SetPoint("TOPLEFT", C_INSET, -C_GAP)
+    end
+    -- Empty-state helper (staging only, when nothing is staged). Lives in the body so the footer
+    -- stays a short count; hidden the moment a row exists so the list owns the space.
+    if not inSession and #items == 0 then f.railEmpty:Show() else f.railEmpty:Hide() end
     -- In-session the staging-control band (scan/add) is reclaimed by the list; out-of-session the
     -- list stops above it. Both use the shared content inset so the list right edge never moves.
     f.railList:SetPoint("BOTTOMRIGHT", -C_INSET, inSession and C_GAP or C_BAND_H)
@@ -689,11 +712,11 @@ function LCEX:RefreshLootWindow()
         -- hidden End button's slot — that squeezed the status to ~36px and truncated the label).
         f.startBtn:ClearAllPoints()
         f.startBtn:SetPoint("RIGHT", f.bottomBar, "RIGHT", -C_INSET, 0)
-        if #items == 0 then
-            f.status:SetText(self.L["Nothing staged — scan your bags or add items."])
-        else
-            f.status:SetText(string.format(self.L["%d item(s) staged."], #items))
-        end
+        -- Start needs at least one staged item; disable it in the empty state (the long "what to do"
+        -- copy lives in the body helper, not here). LootStartStaged still guards defensively.
+        f.startBtn:SetFlatEnabled(#items > 0)
+        -- Short, stable footer count — "0 item(s) staged." when empty (no truncating sentence).
+        f.status:SetText(string.format(self.L["%d item(s) staged."], #items))
         -- Status left-aligned at the inset, right-bounded to Start so it truncates before overlap.
         f.status:SetPoint("RIGHT", f.startBtn, "LEFT", -C_GAP, 0)
     end
@@ -912,6 +935,7 @@ function LCEX:ShowLootWindow()
     f.selectedIndex = nil -- re-derive from the current item list
     f:Show()
     self:RefreshLootWindow()
+    f.railList:ScrollToTop() -- opening the window is a deliberate fresh view → start at the top
 end
 
 function LCEX:HideLootWindow()

@@ -698,8 +698,12 @@ LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", f
     t:Ok(math.abs(f:GetWidth() - (f.rail:GetWidth() + 4)) < 0.5,
         "pre-session window not rail-only (width " .. math.floor(f:GetWidth() or 0) .. ")")
     t:Ok(not f.pane:IsShown(), "right pane visible before a session")
-    t:Eq(f.status:GetText(), self.L["Nothing staged — scan your bags or add items."],
-        "empty-staging status line")
+    -- Empty state: short stable footer count, the body helper visible, and Start disabled (nothing
+    -- to start). The long "what to do" copy lives in the body, not the footer.
+    t:Eq(f.status:GetText(), string.format(self.L["%d item(s) staged."], 0), "empty-staging footer count")
+    t:Ok(f.railEmpty:IsShown(), "empty-state body helper not shown with nothing staged")
+    t:Ok(not f.startBtn:IsEnabled(), "Start must be disabled with zero staged items")
+    t:Ok(f.railList.scroll:GetVerticalScroll() == 0, "fresh staging window starts scrolled to top")
 
     -- Real bag scan populates the staging list (exercises the container APIs end-to-end).
     self:LootStageScan()
@@ -711,7 +715,8 @@ LCEX:RegisterSelfTest("ui", "loot window: staging list edits + live bag scan", f
     t:Eq(#f.railList.items, 2, "staged items in the rail")
     t:Ok(f.railList.rows[1] and f.railList.rows[1]:IsShown(), "rail row not rendered")
     t:Ok(f.railList.rows[1].remove:IsShown(), "staging rows must carry the remove ×")
-    t:Eq(f.railList.scroll:GetVerticalScroll(), 0, "rail pixel-scroll reset to top after SetData")
+    t:Ok(not f.railEmpty:IsShown(), "empty-state helper must hide once items are staged")
+    t:Ok(f.startBtn:IsEnabled(), "Start must enable once items are staged")
     self:LootStageRemove(1)
     t:Eq(#self.stagingItems, 1, "remove did not edit the staging list")
     t:Eq(#f.railList.items, 1, "rail did not follow the edit")
@@ -999,9 +1004,10 @@ end, { cleanup = function(self)
 end })
 
 -- Compact staging list uses a REAL ScrollFrame (pixel scrolling): rows are children of one scroll
--- child sliding under a clipped viewport, the flat scrollbar is a bare Slider (no stock arrows),
--- and SetData resets the scroll to the top. Partial rows show because the viewport clips.
-LCEX:RegisterSelfTest("ui", "pixel scroll list: real ScrollFrame, flat bar, reset on SetData", function(self, t)
+-- child sliding under a clipped viewport, the flat scrollbar is a bare Slider (no stock arrows).
+-- SetData PRESERVES the pixel offset (clamped to the new range) so selection never snaps the view;
+-- only ScrollToTop resets. Partial rows show because the viewport clips.
+LCEX:RegisterSelfTest("ui", "pixel scroll list: preserve/clamp offset, flat bar, ScrollToTop", function(self, t)
     local host = CreateFrame("Frame", nil, UIParent)
     host:SetSize(200, 120)
     host:Hide()
@@ -1012,18 +1018,28 @@ LCEX:RegisterSelfTest("ui", "pixel scroll list: real ScrollFrame, flat bar, rese
         fillRow  = function() end,
     })
     list:SetPoint("TOPLEFT", 0, 0)
+    list:SetPoint("BOTTOMRIGHT", 0, 0) -- fill the 200×120 host so 6×30=180 content overflows
     t:Ok(list.scroll and list.scroll:IsObjectType("ScrollFrame"), "viewport is a real ScrollFrame")
     t:Ok(list.child and list.scroll:GetScrollChild() == list.child, "scroll child wired to the viewport")
     t:Ok(list.scrollBar and list.scrollBar:IsObjectType("Slider"), "flat scrollbar is a Slider")
     -- A bare Slider carries no stock arrow-button children (the STYLE/SCROLLBAR_DEFAULT trap).
     t:Ok(list.scrollBar.ScrollUpButton == nil and list.scrollBar.ScrollDownButton == nil,
         "flat scrollbar must not carry stock arrow buttons")
-    -- Overfill (6×30 = 180 > 120 viewport), scroll down, then SetData must snap back to the top.
+
+    -- Scroll down, then repaint the SAME list → offset holds (selection must not snap to top).
     list:SetData({ 1, 2, 3, 4, 5, 6 })
-    list.scroll:SetVerticalScroll(40)
+    list.scrollBar:SetValue(40)
     list:SetData({ 1, 2, 3, 4, 5, 6 })
-    t:Eq(list.scroll:GetVerticalScroll(), 0, "SetData resets pixel scroll to the top")
+    t:Eq(list.scroll:GetVerticalScroll(), 40, "SetData preserves the pixel scroll offset")
     t:Ok(list.rows[1] and list.rows[1]:GetParent() == list.child, "rows parent to the scroll child")
+    -- A shorter list clamps the stranded offset into the new (smaller) range instead of leaving a gap.
+    list:SetData({ 1, 2 })
+    t:Eq(list.scroll:GetVerticalScroll(), 0, "SetData clamps offset to the shrunken range")
+    -- Explicit reset is the only path back to the top.
+    list:SetData({ 1, 2, 3, 4, 5, 6 })
+    list.scrollBar:SetValue(40)
+    list:ScrollToTop()
+    t:Eq(list.scroll:GetVerticalScroll(), 0, "ScrollToTop resets to the top")
 end, { cleanup = function(self)
     if self._selfTestPixelHost then
         self._selfTestPixelHost:Hide()

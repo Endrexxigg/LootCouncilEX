@@ -164,6 +164,8 @@ L["Auto-show trade timers"]                = "Auto-show trade timers"
 L["%d item(s) staged."]                    = "%d item(s) staged."
 L["Nothing staged — scan your bags or add items."] =
     "Nothing staged — scan your bags or add items."
+L["Scan bags or paste item links to stage loot."] =
+    "Scan bags or paste item links to stage loot."
 L["Couldn't read that item — shift-click a link or type an itemID."] =
     "Couldn't read that item — shift-click a link or type an itemID."
 
