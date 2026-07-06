@@ -647,6 +647,10 @@ function LCEX:RefreshLootWindow()
     if inSession then
         f.scanBtn:Hide(); f.addBox:Hide()
         f.startBtn:Hide(); f.endBtn:Show()
+        -- End is shown here, so restore startBtn to its shared slot left of End (it's hidden in
+        -- this state, but keep the anchor coherent for the next staging→session toggle).
+        f.startBtn:ClearAllPoints()
+        f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
         -- Contextual label (DL-18): only the ML ends the session for everyone; anyone else
         -- (council or spectator) merely leaves their own view of it.
         f.endBtn:SetText(self.session and self.L["End session"] or self.L["Leave session"])
@@ -661,6 +665,11 @@ function LCEX:RefreshLootWindow()
         f.scanBtn:Show(); f.addBox:Show()
         f.startBtn:Show(); f.endBtn:Hide()
         f.deBtn:Hide()
+        -- End/deBtn are hidden, so pin the lone Start button to the bar's far right — it can't
+        -- ride the hidden End button's slot (that squeezed the status to ~36px in the compact
+        -- staging window and truncated the label). This reclaims ~142px for the status.
+        f.startBtn:ClearAllPoints()
+        f.startBtn:SetPoint("RIGHT", f.bottomBar, "RIGHT", -8, 0)
         if #items == 0 then
             f.status:SetText(self.L["Nothing staged — scan your bags or add items."])
         else

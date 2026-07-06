@@ -60,10 +60,11 @@ end
 -- quiet theme fill. Shared by every CreateScrollList, so this de-Blizzards every scroll list in
 -- the addon (council browser, roster, history, gbank, session config) in one place.
 function LCEX:FlatScrollBar(bar)
-    -- Arrow buttons: parentKeys on the template; fall back to scanning Button children for a
-    -- client that only differs by name. Hidden AND alpha-0/mouse-off so a FauxScrollFrame_Update
-    -- that re-Shows the bar can't bring a live arrow back.
-    local up, down = bar.ScrollUpButton, bar.ScrollDownButton
+    -- Arrow buttons: parentKeys on the template, else the named globals, else a Button-child scan
+    -- (an unnamed FauxScrollFrame has no $parent name, so the parentKey/scan paths carry it here).
+    local name = bar.GetName and bar:GetName()
+    local up   = bar.ScrollUpButton   or (name and _G[name .. "ScrollUpButton"])
+    local down = bar.ScrollDownButton or (name and _G[name .. "ScrollDownButton"])
     if not (up and down) then
         for _, child in ipairs({ bar:GetChildren() }) do
             if child:IsObjectType("Button") then
@@ -71,7 +72,11 @@ function LCEX:FlatScrollBar(bar)
             end
         end
     end
-    for _, b in ipairs({ up, down }) do
+    -- Stash the arrows so the list's Refresh() can re-hide them: FauxScrollFrame_Update toggles
+    -- their ENABLED state (not shown), so a one-time Hide() should stick — but re-hiding after
+    -- every Update is the belt-and-suspenders that guarantees the flat look.
+    bar._flatArrows = { up, down }
+    for _, b in ipairs(bar._flatArrows) do
         if b then b:Hide(); b:SetAlpha(0); b:EnableMouse(false) end
     end
 
@@ -136,6 +141,11 @@ function LCEX:CreateScrollList(parent, opts)
 
     local function Refresh()
         FauxScrollFrame_Update(sf, #list.items, list.visibleRows, rowHeight)
+        -- Re-hide the stock arrows: FauxScrollFrame_Update may re-show the bar (and, on some
+        -- clients, its arrow buttons) whenever the row count crosses the visible window.
+        if bar and bar._flatArrows then
+            for _, b in ipairs(bar._flatArrows) do if b then b:Hide() end end
+        end
         local offset = FauxScrollFrame_GetOffset(sf)
         for i = 1, list.visibleRows do
             local row = list.rows[i]
