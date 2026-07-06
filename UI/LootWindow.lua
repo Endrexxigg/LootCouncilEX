@@ -216,6 +216,8 @@ function LCEX:EnsureLootWindow()
     f.status = bar:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.status, "body", "dim")
     f.status:SetPoint("LEFT", 12, 0)
+    f.status:SetJustifyH("LEFT")
+    f.status:SetWordWrap(false) -- single-line: a right bound (set per-state in RefreshLootWindow) truncates, never wraps
 
     f.endBtn = self:CreateFlatButton(bar, self.L["End session"], 100, 22, "danger")
     f.endBtn:SetPoint("RIGHT", -8, 0)
@@ -651,6 +653,10 @@ function LCEX:RefreshLootWindow()
         -- D/E is the ML's action only (it awards on the ML-authoritative session).
         if self.activeSession and self:IsSelf(self.activeSession.ml) then f.deBtn:Show() else f.deBtn:Hide() end
         f.status:SetText(string.format(self.L["Session active — %d item(s)."], #items))
+        -- Right-bound the status to the leftmost VISIBLE right-side button so it truncates instead
+        -- of sliding under the buttons. deBtn (when shown) sits left of endBtn; never anchor to a
+        -- hidden frame (LAYOUT/DANGLING_ANCHOR), so re-pick the target with the visibility swaps.
+        f.status:SetPoint("RIGHT", f.deBtn:IsShown() and f.deBtn or f.endBtn, "LEFT", -8, 0)
     else
         f.scanBtn:Show(); f.addBox:Show()
         f.startBtn:Show(); f.endBtn:Hide()
@@ -660,6 +666,8 @@ function LCEX:RefreshLootWindow()
         else
             f.status:SetText(string.format(self.L["%d item(s) staged."], #items))
         end
+        -- Out of session only startBtn holds the right side (endBtn/deBtn hidden) — bound to it.
+        f.status:SetPoint("RIGHT", f.startBtn, "LEFT", -8, 0)
     end
 
     -- Right pane: selected item header + candidate table.

@@ -54,6 +54,39 @@ function LCEX:_TabSelect(state, key)
     return state.active
 end
 
+-- ── Flat scrollbar ───────────────────────────────────────────────────────────
+-- Strip a FauxScrollFrame's stock Blizzard slider down to the addon's flat look (STYLE): hide
+-- the beveled up/down arrow buttons and swap the default knob texture (130849) for a solid,
+-- quiet theme fill. Shared by every CreateScrollList, so this de-Blizzards every scroll list in
+-- the addon (council browser, roster, history, gbank, session config) in one place.
+function LCEX:FlatScrollBar(bar)
+    -- Arrow buttons: parentKeys on the template; fall back to scanning Button children for a
+    -- client that only differs by name. Hidden AND alpha-0/mouse-off so a FauxScrollFrame_Update
+    -- that re-Shows the bar can't bring a live arrow back.
+    local up, down = bar.ScrollUpButton, bar.ScrollDownButton
+    if not (up and down) then
+        for _, child in ipairs({ bar:GetChildren() }) do
+            if child:IsObjectType("Button") then
+                if not up then up = child else down = down or child end
+            end
+        end
+    end
+    for _, b in ipairs({ up, down }) do
+        if b then b:Hide(); b:SetAlpha(0); b:EnableMouse(false) end
+    end
+
+    -- Solid thumb in place of the default knob (matches CreateSliderV2's flat thumb pattern).
+    bar:SetWidth(6)
+    bar:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
+    local thumb = bar:GetThumbTexture()
+    if thumb then
+        local c = self.Theme.text.faint
+        thumb:SetVertexColor(c[1], c[2], c[3], 0.9)
+        thumb:SetSize(4, 24)
+    end
+    return bar
+end
+
 -- ── Scroll list (FauxScrollFrame) ────────────────────────────────────────────
 -- A virtualized list: a fixed pool of `visibleRows` rows re-filled from a windowed slice of the
 -- backing data as the user scrolls. `opts = { rowHeight, visibleRows, width, buildRow(list)->row,
@@ -87,9 +120,17 @@ function LCEX:CreateScrollList(parent, opts)
     end
     if bar then
         bar:ClearAllPoints()
-        -- ±16 leaves room for the template's up/down arrows, which hang off the slider's ends.
-        bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -16)
-        bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 16)
+        -- Flat-styled (arrows hidden below), so no ±16 arrow gap — run the thumb the full height.
+        bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2)
+        bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 2)
+        self:FlatScrollBar(bar)
+        -- The flat bar hides the stock up/down arrows, so the wheel + thumb-drag are the scroll
+        -- affordances. Driving the slider value routes through the template's OnValueChanged →
+        -- sf:SetVerticalScroll → our OnVerticalScroll → Refresh, exactly as an arrow click did.
+        sf:EnableMouseWheel(true)
+        sf:SetScript("OnMouseWheel", function(_, delta)
+            bar:SetValue(bar:GetValue() - delta * rowHeight)
+        end)
     end
     list.scrollBar = bar
 
