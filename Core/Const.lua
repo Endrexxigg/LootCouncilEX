@@ -164,8 +164,10 @@ L["Auto-show trade timers"]                = "Auto-show trade timers"
 L["%d item(s) staged."]                    = "%d item(s) staged."
 L["Nothing staged — scan your bags or add items."] =
     "Nothing staged — scan your bags or add items."
+-- Balanced two-line break (roughly equal halves) so the centered body helper never reads as one
+-- long line over one stub. The KEY stays the plain sentence; only the displayed value wraps.
 L["Scan bags or paste item links to stage loot."] =
-    "Scan bags or paste item links to stage loot."
+    "Scan bags or paste item\nlinks to stage loot."
 L["Couldn't read that item — shift-click a link or type an itemID."] =
     "Couldn't read that item — shift-click a link or type an itemID."
 

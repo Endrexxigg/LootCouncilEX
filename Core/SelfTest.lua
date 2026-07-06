@@ -1005,12 +1005,14 @@ end })
 
 -- Compact staging list uses a REAL ScrollFrame (pixel scrolling): rows are children of one scroll
 -- child sliding under a clipped viewport, the flat scrollbar is a bare Slider (no stock arrows).
--- SetData PRESERVES the pixel offset (clamped to the new range) so selection never snaps the view;
--- only ScrollToTop resets. Partial rows show because the viewport clips.
-LCEX:RegisterSelfTest("ui", "pixel scroll list: preserve/clamp offset, flat bar, ScrollToTop", function(self, t)
+-- SetData PRESERVES the pixel offset (clamped into the new range) so selection never snaps the view;
+-- only ScrollToTop resets. The bar (and its gutter) only appear when content overflows.
+-- The host is SHOWN offscreen with EXPLICIT sizes so the frame chain actually lays out — a hidden,
+-- anchor-derived host reports a 0 viewport height, which breaks every scroll-math assertion.
+LCEX:RegisterSelfTest("ui", "pixel scroll list: preserve/clamp offset, flat bar, gutter, ScrollToTop", function(self, t)
     local host = CreateFrame("Frame", nil, UIParent)
+    host:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT", 0, 0) -- fully offscreen, but a resolved anchor
     host:SetSize(200, 120)
-    host:Hide()
     self._selfTestPixelHost = host
     local list = self:CreatePixelScrollList(host, {
         rowHeight = 30, width = 200, gutter = 14, zebra = true,
@@ -1018,7 +1020,7 @@ LCEX:RegisterSelfTest("ui", "pixel scroll list: preserve/clamp offset, flat bar,
         fillRow  = function() end,
     })
     list:SetPoint("TOPLEFT", 0, 0)
-    list:SetPoint("BOTTOMRIGHT", 0, 0) -- fill the 200×120 host so 6×30=180 content overflows
+    list:SetSize(200, 120) -- explicit viewport: 6×30=180 content overflows, 2×30=60 fits
     t:Ok(list.scroll and list.scroll:IsObjectType("ScrollFrame"), "viewport is a real ScrollFrame")
     t:Ok(list.child and list.scroll:GetScrollChild() == list.child, "scroll child wired to the viewport")
     t:Ok(list.scrollBar and list.scrollBar:IsObjectType("Slider"), "flat scrollbar is a Slider")
@@ -1026,15 +1028,18 @@ LCEX:RegisterSelfTest("ui", "pixel scroll list: preserve/clamp offset, flat bar,
     t:Ok(list.scrollBar.ScrollUpButton == nil and list.scrollBar.ScrollDownButton == nil,
         "flat scrollbar must not carry stock arrow buttons")
 
-    -- Scroll down, then repaint the SAME list → offset holds (selection must not snap to top).
+    -- Overflow → the bar (and its gutter) appear.
     list:SetData({ 1, 2, 3, 4, 5, 6 })
+    t:Ok(list.scrollBar:IsShown(), "scrollbar must show when content overflows")
+    t:Ok(list.rows[1] and list.rows[1]:GetParent() == list.child, "rows parent to the scroll child")
+    -- Scroll down, then repaint the SAME list → offset holds (selection must not snap to top).
     list.scrollBar:SetValue(40)
     list:SetData({ 1, 2, 3, 4, 5, 6 })
     t:Eq(list.scroll:GetVerticalScroll(), 40, "SetData preserves the pixel scroll offset")
-    t:Ok(list.rows[1] and list.rows[1]:GetParent() == list.child, "rows parent to the scroll child")
-    -- A shorter list clamps the stranded offset into the new (smaller) range instead of leaving a gap.
+    -- Shrink below the viewport: offset clamps to 0 AND the bar/gutter go away so rows fill the width.
     list:SetData({ 1, 2 })
     t:Eq(list.scroll:GetVerticalScroll(), 0, "SetData clamps offset to the shrunken range")
+    t:Ok(not list.scrollBar:IsShown(), "scrollbar (and its gutter) must hide when content fits")
     -- Explicit reset is the only path back to the top.
     list:SetData({ 1, 2, 3, 4, 5, 6 })
     list.scrollBar:SetValue(40)

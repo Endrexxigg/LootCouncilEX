@@ -265,12 +265,29 @@ function LCEX:CreatePixelScrollList(parent, opts)
     bar:SetValue(0)
     list.scrollBar = bar
 
-    local function updateRange()
-        local max = math.max(0, #list.items * rowHeight - (sf:GetHeight() or 0))
+    -- Apply a known max scroll: clamp the thumb into [0, max], and — the padding half — reserve the
+    -- gutter ONLY when a bar is actually needed. With no bar the viewport (and its rows) reclaim the
+    -- gutter, so a short list isn't left with a lopsided empty strip down the right edge.
+    local function applyRange(max)
+        max = math.max(0, max or 0)
         bar:SetMinMaxValues(0, max)
-        if bar:GetValue() > max then bar:SetValue(max) end
-        if max <= 0 then bar:Hide() else bar:Show() end
+        if bar:GetValue() > max then bar:SetValue(max) end -- clamps the ScrollFrame via OnValueChanged
+        local show = max > 0
+        if show ~= list._barShown then
+            list._barShown = show
+            sf:SetPoint("BOTTOMRIGHT", show and -gutter or 0, 0) -- replaces only the BR anchor
+            if show then bar:Show() else bar:Hide() end
+        end
     end
+
+    -- Best-effort synchronous recompute from the viewport height we can measure now...
+    local function updateRange()
+        applyRange(#list.items * rowHeight - (list:GetHeight() or 0))
+    end
+    -- ...backed by the authoritative post-layout signal: the ScrollFrame reports its true vertical
+    -- range once WoW has laid the child out, so the clamp lands correctly even when a synchronous
+    -- height read was stale (e.g. the list hadn't been sized yet at SetData time).
+    sf:SetScript("OnScrollRangeChanged", function(_, _, yrange) applyRange(yrange) end)
 
     bar:SetScript("OnValueChanged", function(_, value) sf:SetVerticalScroll(value) end)
     sf:EnableMouseWheel(true)

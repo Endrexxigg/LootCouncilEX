@@ -135,13 +135,14 @@ function LCEX:EnsureLootWindow()
     f.railList:SetPoint("BOTTOMRIGHT", -C_INSET, C_BAND_H) -- staging default; retightened in-session
 
     -- Empty-state helper in the BODY (replaces the old header band): shown only when nothing is
-    -- staged, so the footer can stay a short, stable count. Sits inside the list viewport, clear of
-    -- the scrollbar gutter; wraps because the body has room the footer doesn't.
+    -- staged, so the footer can stay a short, stable count. Centered — vertically in the list area
+    -- and center-justified — with a balanced two-line break (see the locale value) so it never reads
+    -- as one long line over a stub.
     f.railEmpty = rail:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.railEmpty, "body", "faint")
-    f.railEmpty:SetPoint("TOPLEFT", f.railList, "TOPLEFT", 2, -6)
-    f.railEmpty:SetPoint("TOPRIGHT", f.railList, "TOPRIGHT", -C_GUTTER, -6)
-    f.railEmpty:SetJustifyH("LEFT")
+    f.railEmpty:SetPoint("CENTER", f.railList, "CENTER", 0, 0)
+    f.railEmpty:SetWidth(C_CONTENT_W)
+    f.railEmpty:SetJustifyH("CENTER")
     f.railEmpty:SetText(self.L["Scan bags or paste item links to stage loot."])
     f.railEmpty:Hide()
 
