@@ -172,7 +172,8 @@ LootCouncilEXDB = {
     syncChannel        = "GUILD",
     minQuality         = 4,
     selfReport         = true,
-    tradeTimersAuto    = true,          -- auto-show the trade-timer window when tradeable loot exists (§6.17)
+    tradeTimersAuto    = false,         -- opt-in trade-timer window when tradeable loot exists (§6.17)
+    tradeTimersMaxRows = 10,            -- expanded trade-timer rows; 0 = all (§6.17)
     ui                 = { lootFrame={pos}, votingFrame={pos}, sessionFrame={pos}, playerDetail={pos}, lootBrowser={pos},
                            mini={pos}, tradeTimers={pos} },  -- Phase 12: mini session pill + trade-timer window
     useWhisperFallback = false,
@@ -458,7 +459,7 @@ Gargul-pattern loot trade timers, rebuilt native (no LibCandyBar, no copied code
 **Scanner (`Core/TradeTimers.lua`).** `BAG_UPDATE_DELAYED` → 1s-debounced rescan; login/zone →
 5s-delayed rescan (piggybacks the existing `OnEnterWorld`); a 60s safety tick while entries
 exist. A rescan walks bags 0-4 and calls the DL-9 tooltip scanner (`ItemTradeTimeRemaining`) per
-occupied slot; items with a running BoP trade window become entries `{key, link, itemID, icon,
+occupied slot; items with a running BoP trade window become entries `{key, link, itemID, quality, icon,
 bag, slot, expireAt}` — **all tradeable loot**, not just owed trades. Keying: prefer
 `C_Item.GetItemGUID` (pcall-guarded; availability on Anniversary is probed by selftest — X-item);
 fallback = `itemID:bucket(expireAt,120s)` + collision ordinal, with `_ReconcileTradeEntries`
@@ -466,17 +467,22 @@ matching new scans to prior entries (by GUID, else itemID + |Δexpire| ≤ 180s)
 across rescans despite the tooltip's minute-granular drift. `_AnnotateTradeWinners` zips
 `pendingTrades` owed records onto entries per link (both sides expiry-sorted) → "→ Winner".
 
-**Window (`UI/TradeTimerWindow.lua`).** A 280-wide `CreateWindowV2` (savedKey `tradeTimers`,
-**not** ESC-closable — new `noEscClose` opt) of pooled native `StatusBar` rows (h≈20): icon,
-"[Item] → Winner", right-aligned countdown, fill 0..7200 colored by bucket — `success` ≥60%
-remaining, `accent` ≥30%, `danger` below (Gargul's thresholds). Rows sort ascending by remaining;
-height reflows (TOPLEFT-pin); cap ~12 rows + "+N more". Title-bar **minimize** → only the
-soonest bar + "(+N)". Auto-shows when entries appear (`profile.tradeTimersAuto`, default on;
-ConfigWindow checkbox) and auto-hides when empty; a user close (×) suppresses auto-show until
-the entry set drains empty once. `/lcex timers` toggles manually. 1s repaint ticker while shown
-(display math off stored `expireAt` — no tooltip work). **Hide gesture:** shift+double-click a
-bar hides that item for the play session (in-memory hidden set; the hover tooltip carries the
-hint) — deliberate enough to never fire by accident.
+**Window (`UI/TradeTimerWindow.lua`).** A compact 260-wide `CreateWindowV2` (savedKey
+`tradeTimers`, scaled slightly smaller, semi-transparent, **width-resizable only**, **not**
+ESC-closable, and **not closeable**) with a 25%-opacity shell/header/empty-track,
+a subtle centered "Loot" title, 14px header/rows, and a smaller resize grip. Pooled native
+`StatusBar` rows use a full-height icon,
+rarity-colored bracketed item name (`[Item]`), optional "-> Winner", right-aligned countdown,
+fill 0..7200 beginning at the icon's right edge and colored by absolute warning bucket —
+`success` ≥60m remaining, `accent` ≥30m, `danger` below. Rows sort ascending by remaining;
+height reflows from content only (TOPLEFT-pin). Expanded row count is configurable
+(`profile.tradeTimersMaxRows`, default 10, 0 = all) with "+N more" when capped. Compact
+title-bar **minimize** → exactly the soonest bar + "(+N)". `profile.tradeTimersAuto` is the
+opt-in feature toggle (default off; ConfigWindow checkbox). When enabled and entries exist the
+frame stays on-screen; when disabled or empty it hides. `/lcex timers` toggles the feature. 1s
+repaint ticker while shown (display math off stored `expireAt` — no tooltip work). `/lcex
+timertest` toggles one synthetic, in-memory Leggings of the Festering Swarm row so the frame can
+be visually checked without a live BoP drop.
 
 ---
 
@@ -602,10 +608,12 @@ auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-en
 - **DL-22 (accepted, 2026-07-04 — Phase 12 trade timers):** Gargul's trade-timer UX rebuilt
   native (no LibCandyBar, no copied code): bag-scan on `BAG_UPDATE_DELAYED` (debounced) through
   the DL-9 tooltip scanner; **all** tradeable loot shows, winners annotated from `pendingTrades`;
-  ascending countdown bars, green/gold/red at ≥60%/≥30%/below of the 2h window; minimize = the
-  soonest bar; auto-show/hide with content. Keying prefers `C_Item.GetItemGUID` (probe on
-  Anniversary — X-item) with an `itemID:expiry-bucket` reconcile fallback. Manual hide =
-  shift+double-click (session-scoped). §6.17.
+  ascending countdown bars, green/gold/red at ≥60m/≥30m/below; minimize = the
+  soonest bar; opt-in default off, no close button, rarity-colored bracketed item text,
+  semi-transparent compact frame with width-only resize grip and configurable expanded row cap.
+  Keying prefers `C_Item.GetItemGUID` (probe on Anniversary — X-item) with an
+  `itemID:expiry-bucket` reconcile fallback. `/lcex timertest` shows a synthetic test row for
+  visual QA without raid loot. §6.17.
 - **DL-23 (accepted, 2026-07-04 — Phase 12 shared widget layer):** the batch's cross-cutting UI
   mechanics land ONCE in `UI/Widgets.lua`/`UI/Theme.lua`, never per-module: FauxScrollFrame
   scrollbar repositioned inside the list (fixes every list at once), an index-parity zebra stripe

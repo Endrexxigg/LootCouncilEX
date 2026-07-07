@@ -51,8 +51,8 @@ L["  %s — v%s"]                       = "  %s — v%s"
 L["Not in a group — nothing to broadcast."] = "Not in a group — nothing to broadcast."
 L["Version check sent (v%s) — watch for replies."] =
     "Version check sent (v%s) — watch for replies."
-L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"] =
-    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"
+L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, timers, timertest, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"] =
+    "Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, timers, timertest, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"
 
 -- Phase 2 — bags + trade loot engine.
 L["Tracking %s for council (from %s)."]     = "Tracking %s for council (from %s)."
@@ -159,8 +159,12 @@ L["Loot session: %d item(s) · %d response(s)"] = "Loot session: %d item(s) · %
 L["Loot session: %d item(s) · %d awarded"] = "Loot session: %d item(s) · %d awarded"
 L["Unresolved loot session — click to review"] = "Unresolved loot session — click to review"
 L["Trade timers"]                          = "Trade timers"
-L["Shift+double-click to hide"]            = "Shift+double-click to hide"
-L["Auto-show trade timers"]                = "Auto-show trade timers"
+L["Show trade timers"]                     = "Show trade timers"
+L["Trade timer rows"]                      = "Trade timer rows"
+L["All"]                                   = "All"
+L["Trade timer test item shown. Run /lcex timertest again to clear it."] =
+    "Trade timer test item shown. Run /lcex timertest again to clear it."
+L["Trade timer test cleared."]             = "Trade timer test cleared."
 L["%d item(s) staged."]                    = "%d item(s) staged."
 L["Nothing staged — scan your bags or add items."] =
     "Nothing staged — scan your bags or add items."

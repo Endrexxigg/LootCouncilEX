@@ -126,7 +126,7 @@ indents (14/30) derive from the 14px fold glyph.
 The 18-item handoff (`docs/lcex_fix_change_handoff_jul4.md`). **Heavily selftest-covered** — the
 scrollbar/zebra/flat-button/context-menu widgets, compact↔full loot layout, awarded feedback, x2
 grouping (one card / two distinct-uid awards), un-award round-trip, mini-pill show/hide, save→wipe→
-resume, the trade-timer scanner shape + GUID probe, and the timer-window render/minimize/hide all
+resume, the trade-timer scanner shape + GUID probe, and the timer-window render/minimize/no-close all
 run under `/lcex selftest`; headless covers grouping/poll-dedup/leader-remap, history LWW +
 `dispatch.unaward`, resume overlay + `CountSavedResponses`, `sReq`/`sJoin`, and the trade-timer
 pure helpers. **Run `/lcex selftest` first** — then the genuinely-manual items below.
@@ -146,10 +146,18 @@ pure helpers. **Run `/lcex selftest` first** — then the genuinely-manual items
 - [ ] **Browser (items 13/14/16/17)**: raids default **collapsed**, +/− toggles raids/bosses; a
   note icon shows only on truly-marked items; no `(Token)` in the mark column; right-click an item
   → **Leave note…** / **Clear note** (the bottom mark box is gone).
-- [ ] **Trade timers (item 7)** *(needs a real BoP drop — like the v0.14 DL-9 item)*: the window
-  auto-opens on tradeable loot, bars recolor green→gold→red over time, minimize shows the soonest
-  bar, **shift+double-click** hides a bar, it auto-closes when the last window lapses. `/lcex timers`
-  toggles it. *(The selftest confirms rendering with injected entries; only the live scan is manual.)*
+- [ ] **Trade timers (item 7)** *(needs a real BoP drop — like the v0.14 DL-9 item)*: default is
+  OFF; enabling **Show trade timers** or `/lcex timers` makes the compact, semi-transparent,
+  non-closeable window appear when tradeable loot exists. The header/content shell and empty timer
+  track sit at 25% opacity, the title is the subtle centered `Loot`, and header and rows match height. Item names are
+  bracketed and rarity-colored; the icon is full bar-height; bars start at the icon's right edge
+  and recolor green→gold→red over time. The
+  smaller resize grip changes width only; height is determined by the
+  visible row count. Minimize shows exactly the soonest bar; expanded honors **Trade timer rows**
+  (`0 = All`) and shows "+N more" when capped. It hides when the last trade window lapses or the
+  feature is turned off. *(The
+  selftest confirms rendering with injected entries; `/lcex timertest` pops a synthetic item for
+  fast visual QA; only the live scan is manual.)*
 
 **2-client:**
 - [ ] **Spectator view (item 1)**: a non-council raider can `/lcex loot` into a **rail-only** view

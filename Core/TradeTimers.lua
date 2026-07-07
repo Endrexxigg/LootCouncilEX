@@ -16,18 +16,39 @@ local LCEX = LootCouncilEX
 local Container = C_Container or {}
 local GetContainerNumSlots = Container.GetContainerNumSlots or _G.GetContainerNumSlots
 local GetContainerItemLink = Container.GetContainerItemLink or _G.GetContainerItemLink
+local GetContainerItemInfo = Container.GetContainerItemInfo or _G.GetContainerItemInfo
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
+local GetItemInfo = _G.GetItemInfo
 
-local TRADE_WINDOW = 7200 -- the 2h BoP window (mirrors Award.lua)
+local function LinkQuality(link)
+    local hex = link and link:match("|cff(%x%x%x%x%x%x)")
+    if not hex then return nil end
+    local q = {
+        ff9d9d9d = 0, ffffffff = 1, ff1eff00 = 2,
+        ff0070dd = 3, ffa335ee = 4, ffff8000 = 5,
+    }
+    return q[hex:lower()]
+end
+
+local function SlotQuality(bag, slot, link)
+    if GetContainerItemInfo then
+        local info = GetContainerItemInfo(bag, slot)
+        if type(info) == "table" and info.quality then return info.quality end
+        if info ~= nil then
+            local _, _, _, quality = GetContainerItemInfo(bag, slot)
+            if quality then return quality end
+        end
+    end
+    return LinkQuality(link) or (GetItemInfo and select(3, GetItemInfo(link))) or nil
+end
 
 -- ── Pure helpers (headless-tested) ───────────────────────────────────────────
--- Bar color by fraction remaining (§6.17): green ≥60%, gold ≥30%, red below — Gargul's buckets.
-function LCEX:TradeBarColor(remaining, total)
-    total = (total and total > 0) and total or TRADE_WINDOW
-    local frac = remaining and (remaining / total) or 0
-    if frac >= 0.6 then return self.Theme.success end
-    if frac >= 0.3 then return self.Theme.accent end
+-- Bar color by absolute remaining time (§6.17): green ≥60m, gold ≥30m, red below.
+function LCEX:TradeBarColor(remaining)
+    if not remaining then return self.Theme.danger end
+    if remaining >= 3600 then return self.Theme.success end
+    if remaining >= 1800 then return self.Theme.accent end
     return self.Theme.danger
 end
 
@@ -129,6 +150,7 @@ function LCEX:ScanTradeTimers()
                     key      = self:_TradeKeyFor(itemID, expireAt, guid, ord),
                     link     = link,
                     itemID   = itemID,
+                    quality  = SlotQuality(bag, slot, link),
                     icon     = GetItemInfoInstant and select(5, GetItemInfoInstant(link)) or nil,
                     bag      = bag, slot = slot,
                     expireAt = expireAt,

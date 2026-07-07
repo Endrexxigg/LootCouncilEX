@@ -17,7 +17,7 @@ local WIN_W      = 360
 -- Push profile.appearance to every created v2 window (each carries RefreshAppearance).
 -- Iterate by FIELD NAME: an array literal of window references gets nil holes for windows
 -- that don't exist yet, and ipairs stops at the first hole.
-local WINDOW_FIELDS = { "pollFrame", "lootWindow", "councilWindow", "configWindow" }
+local WINDOW_FIELDS = { "pollFrame", "lootWindow", "councilWindow", "configWindow", "tradeTimerWindow" }
 function LCEX:ApplyAppearance()
     for _, field in ipairs(WINDOW_FIELDS) do
         local win = self[field]
@@ -54,10 +54,21 @@ local function BuildSchema(self)
         { type = "checkbox", label = self.L["Broadcast my gear/professions (self-report)"],
           get = function() return p.selfReport end,
           set = function(v) p.selfReport = v end },
-        { type = "checkbox", label = self.L["Auto-show trade timers"],
+        { type = "checkbox", label = self.L["Show trade timers"],
           get = function() return p.tradeTimersAuto end,
           set = function(v)
               p.tradeTimersAuto = v
+              if self.UpdateTradeTimerWindow then self:UpdateTradeTimerWindow() end
+          end },
+        { type = "slider", label = self.L["Trade timer rows"], min = 0, max = 20, step = 1,
+          fmt = function(v)
+              v = math.floor(v)
+              if v <= 0 then return self.L["All"] end
+              return tostring(v)
+          end,
+          get = function() return p.tradeTimersMaxRows or 10 end,
+          set = function(v)
+              p.tradeTimersMaxRows = math.floor(v)
               if self.UpdateTradeTimerWindow then self:UpdateTradeTimerWindow() end
           end },
     }

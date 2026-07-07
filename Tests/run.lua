@@ -207,11 +207,11 @@ test("ParseTradeDuration + TradeExpiry + missing-API fallback", function()
 end)
 
 -- ── Trade timers (§6.17, DL-22 — pure helpers) ───────────────────────────────
-test("TradeBarColor: green ≥60%, gold ≥30%, red below", function()
+test("TradeBarColor: green ≥60m, gold ≥30m, red below", function()
     eq(L:TradeBarColor(7200, 7200), L.Theme.success, "full window -> green")
-    eq(L:TradeBarColor(4400, 7200), L.Theme.success, "≥60% -> green")
-    eq(L:TradeBarColor(3000, 7200), L.Theme.accent, "≥30% -> gold")
-    eq(L:TradeBarColor(600, 7200), L.Theme.danger, "<30% -> red")
+    eq(L:TradeBarColor(3600, 7200), L.Theme.success, "≥60m -> green")
+    eq(L:TradeBarColor(1800, 7200), L.Theme.accent, "≥30m -> gold")
+    eq(L:TradeBarColor(600, 7200), L.Theme.danger, "<30m -> red")
     eq(L:TradeBarColor(nil, 7200), L.Theme.danger, "nil remaining -> red")
 end)
 

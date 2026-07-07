@@ -1,9 +1,9 @@
 -- ── LootCouncil EX — UI/TradeTimerWindow.lua ─────────────────────────────────
 -- Gargul-style loot trade-timer window (Phase 12, §6.17, DL-22) — native rebuild, no LibCandyBar.
--- A compact draggable window of countdown bars, one per tradeable bag item, sorted soonest-first,
--- colored green/gold/red by fraction remaining. Winners (owed items) are annotated "→ Name".
--- Minimize collapses to just the soonest bar; auto-shows when loot is tradeable and auto-hides
--- when the list drains; shift+double-click a bar hides that item for the session.
+-- A compact draggable/resizable window of countdown bars, one per tradeable bag item, sorted
+-- soonest-first, colored green/gold/red by remaining time. Winners (owed items) are
+-- annotated "-> Name". Minimize collapses to just the soonest bar. The frame is not closeable:
+-- when the feature is enabled and loot is tradeable, the information stays on-screen.
 --
 -- Data comes from Core/TradeTimers.lua (self.tradeTimerEntries); this module only renders + repaints.
 -- Loads after UI/Widgets.lua and Core/TradeTimers.lua.
@@ -12,25 +12,105 @@ local LCEX = LootCouncilEX
 local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_TradeTimerWindow"
-local TIMER_W    = 280
-local ROW_H      = 22
-local TOP        = LAY.contentTop -- first bar below the title bar
-local SIDE       = LAY.edge + LAY.bleed -- bars are full-bleed bands on a bare window
-local MAX_ROWS   = 12
+local TIMER_W    = 260
+local TIMER_TITLE_H = 14
+local ROW_H      = TIMER_TITLE_H
+local TIMER_SCALE = 0.9
+local TIMER_ALPHA = 1
+local ROW_FONT   = "Fonts\\ARIALN.TTF"
+local ROW_FONT_SIZE = 9
+local TITLE_FONT_SIZE = 8
+local TITLE_SLATE = { 0.45, 0.50, 0.57 }
+local SHELL_ALPHA  = 0.25
+local TEXT_GAP    = 3
+local TOP        = TIMER_TITLE_H -- first bar below the title bar
+local SIDE       = 0
 local TRADE_WINDOW = 7200
+local TIMER_TEST_ITEM_ID = 30092
+local TIMER_TEST_LINK = "|cffa335ee|Hitem:30092::::::::70:::::|h[Leggings of the Festering Swarm]|h|r"
+local TIMER_TEST_DURATION = 74 * 60
+local WHITE = "Interface\\Buttons\\WHITE8X8"
 
-local function LinkName(link) return tostring(link):match("%[(.-)%]") or tostring(link) end
+local function PaintSurfaceAlpha(tex, tone, alpha)
+    tex:Show()
+    tex:SetTexture(WHITE)
+    tex:SetAlpha(1)
+    local ok = false
+    if tex.SetGradient and CreateColor then
+        ok = pcall(tex.SetGradient, tex, "VERTICAL",
+            CreateColor(tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha),
+            CreateColor(tone.top[1], tone.top[2], tone.top[3], alpha))
+    end
+    if not ok and tex.SetGradientAlpha then
+        tex:SetGradientAlpha("VERTICAL",
+            tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha,
+            tone.top[1], tone.top[2], tone.top[3], alpha)
+        ok = true
+    end
+    if not ok then
+        tex:SetVertexColor((tone.top[1] + tone.bottom[1]) / 2,
+            (tone.top[2] + tone.bottom[2]) / 2,
+            (tone.top[3] + tone.bottom[3]) / 2, alpha)
+    end
+    tex._lcexAlpha = alpha
+end
 
--- The entries to show: not user-hidden, still running, soonest expiry first.
+local function SetSurfaceAlpha(frame, toneName, alpha)
+    local tone = LCEX.Theme.tone[toneName] or LCEX.Theme.tone.base
+    if frame and frame._surface then
+        PaintSurfaceAlpha(frame._surface, tone, alpha)
+    end
+    if frame and frame._topLight then
+        frame._topLight:Show()
+        frame._topLight:SetAlpha(1)
+        frame._topLight:SetVertexColor(1, 1, 1, 0.04 * alpha)
+    end
+end
+
+local function LinkText(link) return tostring(link):match("(%[.-%])") or ("[" .. tostring(link) .. "]") end
+
+local function ColorText(text, color)
+    color = color or { 1, 1, 1 }
+    return string.format("|cff%02x%02x%02x%s|r",
+        math.floor((color[1] or 1) * 255 + 0.5),
+        math.floor((color[2] or 1) * 255 + 0.5),
+        math.floor((color[3] or 1) * 255 + 0.5),
+        tostring(text or ""))
+end
+
+local function AddVisibleEntries(out, entries, now)
+    for _, e in ipairs(entries or {}) do
+        if (e.expireAt or 0) > now then out[#out + 1] = e end
+    end
+end
+
+function LCEX:_TradeTimerTestActive()
+    local now = time()
+    for _, e in ipairs(self.tradeTimerTestEntries or {}) do
+        if (e.expireAt or 0) > now then return true end
+    end
+    return false
+end
+
+-- The entries to show: still running, soonest expiry first. Real bag timers obey the feature
+-- toggle; /lcex timertest entries are explicit and display even when the feature is off.
 function LCEX:_VisibleTradeEntries()
-    local hidden = self.tradeTimerHidden or {}
     local now = time()
     local out = {}
-    for _, e in ipairs(self.tradeTimerEntries or {}) do
-        if not hidden[e.key] and (e.expireAt or 0) > now then out[#out + 1] = e end
+    if self.db and self.db.profile and self.db.profile.tradeTimersAuto then
+        AddVisibleEntries(out, self.tradeTimerEntries, now)
     end
+    AddVisibleEntries(out, self.tradeTimerTestEntries, now)
     table.sort(out, function(a, b) return (a.expireAt or 0) < (b.expireAt or 0) end)
     return out
+end
+
+function LCEX:TradeTimerMaxRows()
+    local n = self.db and self.db.profile and tonumber(self.db.profile.tradeTimersMaxRows)
+    if not n then return 10 end
+    n = math.floor(n)
+    if n <= 0 then return nil end
+    return n
 end
 
 local function BuildTimerRow(f)
@@ -40,53 +120,53 @@ local function BuildTimerRow(f)
     row:RegisterForClicks("LeftButtonUp")
 
     row.bar = CreateFrame("StatusBar", nil, row)
-    row.bar:SetAllPoints(row)
+    row.bar:SetPoint("TOPLEFT", ROW_H, 0)
+    row.bar:SetPoint("BOTTOMRIGHT", 0, 0)
     row.bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
     row.bar:SetMinMaxValues(0, TRADE_WINDOW)
     row.bar.bg = row.bar:CreateTexture(nil, "BACKGROUND")
     row.bar.bg:SetAllPoints(row.bar)
     row.bar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
-    row.bar.bg:SetVertexColor(0, 0, 0, 0.4)
+    row.bar.bg:SetVertexColor(0, 0, 0, SHELL_ALPHA)
 
-    row.icon = addon:CreateItemIcon(row, ROW_H - 4)
-    row.icon:SetPoint("LEFT", 2, 0) -- (ROW_H - icon) / 2: vertically-derived, keeps the icon square-centered
+    row.textLayer = CreateFrame("Frame", nil, row)
+    row.textLayer:SetAllPoints(row)
+    row.textLayer:SetFrameLevel(row.bar:GetFrameLevel() + 2)
 
-    row.label = row:CreateFontString(nil, "OVERLAY")
-    addon:ThemeText(row.label, "caption", "ink")
-    local lf, lsz = row.label:GetFont()
-    if lf then row.label:SetFont(lf, lsz, "OUTLINE") end -- readable over the fill
-    row.label:SetPoint("LEFT", row.icon, "RIGHT", LAY.inlineGap, 0)
+    row.icon = addon:CreateItemIcon(row.textLayer, ROW_H)
+    row.icon:SetPoint("LEFT", 0, 0)
+
+    row.label = row.textLayer:CreateFontString(nil, "OVERLAY")
+    row.label:SetFont(ROW_FONT, ROW_FONT_SIZE, "OUTLINE")
+    row.label:SetTextColor(1, 1, 1)
+    row.label:SetShadowColor(0, 0, 0, 1)
+    row.label:SetShadowOffset(1, -1)
+    row.label:SetPoint("LEFT", row.icon, "RIGHT", TEXT_GAP, 0)
     row.label:SetJustifyH("LEFT"); row.label:SetWordWrap(false)
 
-    row.time = row:CreateFontString(nil, "OVERLAY")
-    addon:ThemeText(row.time, "caption", "ink")
-    local tf, tsz = row.time:GetFont()
-    if tf then row.time:SetFont(tf, tsz, "OUTLINE") end
-    row.time:SetPoint("RIGHT", -LAY.inlineGap, 0)
-    row.label:SetPoint("RIGHT", row.time, "LEFT", -LAY.inlineGap, 0)
+    row.time = row.textLayer:CreateFontString(nil, "OVERLAY")
+    row.time:SetFont(ROW_FONT, ROW_FONT_SIZE, "OUTLINE")
+    local ink = addon.Theme.text.ink
+    row.time:SetTextColor(ink[1], ink[2], ink[3])
+    row.time:SetShadowColor(0, 0, 0, 1)
+    row.time:SetShadowOffset(1, -1)
+    row.time:SetPoint("RIGHT", -TEXT_GAP, 0)
+    row.label:SetPoint("RIGHT", row.time, "LEFT", -TEXT_GAP, 0)
 
-    -- Hover: the item tooltip + who owes it + the hide hint. The bar label truncates the "→ Name",
-    -- so the winner (who the item must be traded to) stays readable here. Shift+double-click hides.
+    -- Hover: the item tooltip + who owes it. The bar label can truncate the "-> Name", so the
+    -- winner (who the item must be traded to) stays readable here.
     row:SetScript("OnEnter", function(r)
         if r.link then
             GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
             GameTooltip:SetHyperlink(r.link)
             if r._winner and r._winner ~= "" and r.label:IsTruncated() then
-                local ink = addon.Theme.text.ink
-                GameTooltip:AddLine("→ " .. r._winner, ink[1], ink[2], ink[3])
+                local tip = addon.Theme.text.ink
+                GameTooltip:AddLine("-> " .. r._winner, tip[1], tip[2], tip[3])
             end
-            GameTooltip:AddLine(addon.L["Shift+double-click to hide"], 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    row:SetScript("OnDoubleClick", function(r)
-        if IsShiftKeyDown() and r.key then
-            addon.tradeTimerHidden = addon.tradeTimerHidden or {}
-            addon.tradeTimerHidden[r.key] = true
-            addon:UpdateTradeTimerWindow()
-        end
-    end)
     return row
 end
 
@@ -94,32 +174,62 @@ function LCEX:EnsureTradeTimerWindow()
     if self.tradeTimerWindow then return self.tradeTimerWindow end
     local addon = self
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = TIMER_W, height = 120,
-        title = self.L["Trade timers"],
+        width = TIMER_W, height = TOP + ROW_H + SIDE,
+        title = self.L["Loot"],
+        titleH = TIMER_TITLE_H,
+        titleSizeKey = "caption",
+        titleTickH = 7,
+        chromeInset = 0,
         savedKey = "tradeTimers",
         defaultPos = { x = 300, y = 0 },
+        resizable = true,
+        resizeWOnly = true,
+        minW = 200, minH = TOP + ROW_H + SIDE,
+        noClose = true,
         noEscClose = true, -- a passive HUD shouldn't eat ESC
+        scale = TIMER_SCALE,
+        alpha = TIMER_ALPHA,
+        resizeGripSize = 11,
     })
 
-    -- A user close (×) suppresses auto-show until the list next drains to empty (Gargul-like).
-    f.closeButton:HookScript("OnClick", function() addon._tradeUserClosed = true end)
+    if f._surface then
+        f._surface:ClearAllPoints()
+        f._surface:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -TOP)
+        f._surface:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    end
+    if f._topLight then f._topLight:Hide() end
+    SetSurfaceAlpha(f, "page", SHELL_ALPHA)
+    SetSurfaceAlpha(f.bar, "raised", SHELL_ALPHA)
+    f.title:ClearAllPoints()
+    f.title:SetPoint("CENTER", f.bar, "CENTER", 0, 0)
+    f.title:SetFont(ROW_FONT, TITLE_FONT_SIZE, "")
+    f.title:SetTextColor(TITLE_SLATE[1], TITLE_SLATE[2], TITLE_SLATE[3])
+    f.title:SetText(self.L["Loot"])
 
-    -- Minimize: collapse to just the soonest bar (+N). Sits left of the close × (paired glyphs).
+    -- Minimize: collapse to just the soonest bar (+N).
     local mini = CreateFrame("Button", nil, f.bar)
-    mini:SetSize(LAY.btnH, LAY.btnH)
-    mini:SetPoint("RIGHT", f.closeButton, "LEFT", -2, 0)
+    mini:SetSize(TIMER_TITLE_H - 3, TIMER_TITLE_H - 3)
+    mini:SetPoint("RIGHT", -LAY.gapTight, 0)
     mini.fs = mini:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(mini.fs, "section", "dim")
+    mini.fs:SetFont(ROW_FONT, TITLE_FONT_SIZE, "")
+    local dim = self.Theme.text.dim
+    mini.fs:SetTextColor(dim[1], dim[2], dim[3])
     mini.fs:SetPoint("CENTER", 0, 0)
-    mini.fs:SetText("_")
+    mini.fs:SetText("-")
     mini:SetScript("OnClick", function()
         addon._tradeMinimized = not addon._tradeMinimized
         addon:UpdateTradeTimerWindow()
     end)
     f.miniButton = mini
+    if f.resizeGrip then
+        f.resizeGrip:ClearAllPoints()
+        f.resizeGrip:SetPoint("BOTTOMRIGHT", 0, 0)
+    end
 
     f.more = f:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(f.more, "caption", "faint")
+    f.more:SetFont(ROW_FONT, TITLE_FONT_SIZE, "")
+    local faint = self.Theme.text.faint
+    f.more:SetTextColor(faint[1], faint[2], faint[3])
     f.more:Hide()
 
     f.rows = {}
@@ -133,9 +243,11 @@ local function FillTimerRow(self, row, entry)
     local remaining = (entry.expireAt or 0) - time()
     if remaining < 0 then remaining = 0 end
     row.icon:SetItem(entry.link, entry.icon)
-    local name = LinkName(entry.link)
+    local name = LinkText(entry.link)
     row._winner = entry.winner and (entry.winner:match("^[^%-]+") or entry.winner) or nil -- for the hover tooltip
-    row.label:SetText(entry.winner and (name .. "  → " .. row._winner) or name)
+    local itemText = ColorText(name, self:QualityColor(entry.quality))
+    local winnerText = row._winner and ColorText("  -> " .. row._winner, self.Theme.text.dim) or ""
+    row.label:SetText(itemText .. winnerText)
     row.time:SetText(self:FormatDuration(remaining))
     row.bar:SetValue(remaining)
     local c = self:TradeBarColor(remaining, TRADE_WINDOW)
@@ -143,30 +255,32 @@ local function FillTimerRow(self, row, entry)
 end
 
 -- The single render/refresh verb (called by RescanTradeTimers and the 1s tick). Rebuilds the
--- visible bars, reflows the height, and drives auto-show / auto-hide.
+-- visible bars, reflows the height, and drives opt-in show / empty hide.
 function LCEX:UpdateTradeTimerWindow()
-    local visible = self:_VisibleTradeEntries()
+    local enabled = self.db and self.db.profile and self.db.profile.tradeTimersAuto
+    local testActive = self:_TradeTimerTestActive()
 
-    -- Auto-hide + reset the user-closed latch when the list drains (next batch auto-shows again).
-    if #visible == 0 then
-        self._tradeUserClosed = false
+    if not (enabled or testActive) then
         if self.tradeTimerWindow then self.tradeTimerWindow:Hide() end
         self:_StopTradeTimerTick()
         return
     end
-    -- Auto-show only when enabled and not dismissed this batch; an already-open window stays open.
-    local f = self.tradeTimerWindow
-    local wantShow = self.db.profile.tradeTimersAuto and not self._tradeUserClosed
-    if not f then
-        if not wantShow then return end -- nothing to show and not asked to
-        f = self:EnsureTradeTimerWindow()
-    end
-    if not f:IsShown() then
-        if not wantShow then return end
-        f:Show()
+
+    local visible = self:_VisibleTradeEntries()
+    if #visible == 0 then
+        if self.tradeTimerWindow then self.tradeTimerWindow:Hide() end
+        self:_StopTradeTimerTick()
+        return
     end
 
-    local shown = self._tradeMinimized and 1 or math.min(#visible, MAX_ROWS)
+    local f = self.tradeTimerWindow
+    if not f then
+        f = self:EnsureTradeTimerWindow()
+    end
+    if not f:IsShown() then f:Show() end
+
+    local rowLimit = self:TradeTimerMaxRows()
+    local shown = self._tradeMinimized and 1 or (rowLimit and math.min(#visible, rowLimit) or #visible)
     for i = 1, shown do
         local row = f.rows[i]
         if not row then
@@ -184,12 +298,12 @@ function LCEX:UpdateTradeTimerWindow()
     local bottom = TOP + shown * ROW_H
     local extra = self._tradeMinimized and (#visible - 1) or (#visible - shown)
     if extra > 0 then
-        -- "+N more" on the bars' left edge, in a 16px band 2px under the last bar.
+        -- "+N more" on the bars' left edge, in the same compact rhythm as the timer rows.
         f.more:ClearAllPoints()
         f.more:SetPoint("TOPLEFT", SIDE, -(bottom + 2))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
-        bottom = bottom + 16
+        bottom = bottom + ROW_H
     else
         f.more:Hide()
     end
@@ -229,19 +343,58 @@ function LCEX:TickTradeTimerWindow()
         if (e.expireAt or 0) > now then kept[#kept + 1] = e end
     end
     self.tradeTimerEntries = kept
+    kept = {}
+    for _, e in ipairs(self.tradeTimerTestEntries or {}) do
+        if (e.expireAt or 0) > now then kept[#kept + 1] = e end
+    end
+    self.tradeTimerTestEntries = (#kept > 0) and kept or nil
     self:UpdateTradeTimerWindow()
 end
 
--- /lcex timers — toggle the window manually (clears the auto-show suppression when opening).
-function LCEX:ToggleTradeTimerWindow()
-    local f = self.tradeTimerWindow
-    if f and f:IsShown() then
-        self._tradeUserClosed = true
-        f:Hide()
-    else
-        self._tradeUserClosed = false
-        self:RescanTradeTimers() -- refresh then render
-        self:EnsureTradeTimerWindow():Show()
+-- /lcex timertest — toggles a synthetic in-memory row so the frame can be visually checked
+-- without a real BoP drop. It deliberately bypasses the feature toggle but never persists.
+function LCEX:CmdTimerTest()
+    if self:_TradeTimerTestActive() then
+        self.tradeTimerTestEntries = nil
         self:UpdateTradeTimerWindow()
+        self:Msg(self.L["Trade timer test cleared."])
+        return
+    end
+
+    local _, link, quality, _, _, _, _, _, _, icon = GetItemInfo(TIMER_TEST_ITEM_ID)
+    if not icon and GetItemInfoInstant then icon = select(5, GetItemInfoInstant(TIMER_TEST_ITEM_ID)) end
+    self.tradeTimerTestEntries = {
+        {
+            key      = "test:" .. tostring(time()),
+            link     = link or TIMER_TEST_LINK,
+            itemID   = TIMER_TEST_ITEM_ID,
+            quality  = quality or 4,
+            icon     = icon,
+            expireAt = time() + TIMER_TEST_DURATION,
+            winner   = UnitName("player") or "Test",
+        },
+    }
+    self._tradeMinimized = false
+    self:EnsureTradeTimerWindow()
+    self:UpdateTradeTimerWindow()
+    self:Msg(self.L["Trade timer test item shown. Run /lcex timertest again to clear it."])
+end
+
+-- /lcex timers — toggle the trade-timer feature. When enabled, the window is shown whenever
+-- tradeable loot exists; when disabled, it is hidden.
+function LCEX:ToggleTradeTimerWindow()
+    if not (self.db and self.db.profile) then return end
+    self.db.profile.tradeTimersAuto = not self.db.profile.tradeTimersAuto
+    if not self.db.profile.tradeTimersAuto then
+        if self.tradeTimerWindow then self.tradeTimerWindow:Hide() end
+        self:_StopTradeTimerTick()
+    else
+        self:RescanTradeTimers() -- refresh then render
+        self:UpdateTradeTimerWindow()
+    end
+    if self.configWindow and self.configWindow.controls then
+        for _, c in ipairs(self.configWindow.controls) do
+            if c.Refresh then c:Refresh() end
+        end
     end
 end

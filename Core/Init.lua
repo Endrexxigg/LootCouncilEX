@@ -37,7 +37,8 @@ local DB_DEFAULTS = {
         minQuality         = 4,
         selfReport         = true,
         showGearIssues     = false, -- Feature G: show the gear-issue callouts on the Roster tab
-        tradeTimersAuto    = true,  -- Phase 12: auto-show the trade-timer window when loot is tradeable
+        tradeTimersAuto    = false, -- Phase 12: opt-in trade-timer window when loot is tradeable
+        tradeTimersMaxRows = 10,    -- 0 = all; minimized still always shows exactly one row
 
         ui                 = {
             poll        = {},
@@ -246,6 +247,8 @@ function LCEX:HandleSlash(input)
         self:CmdResume()
     elseif cmd == "timers" then
         self:ToggleTradeTimerWindow() -- Phase 12: Gargul-style trade-timer window (§6.17)
+    elseif cmd == "timertest" then
+        self:CmdTimerTest()
     elseif cmd == "session" then
         self:CmdSession()
     elseif cmd == "config" or cmd == "options" then
@@ -255,6 +258,6 @@ function LCEX:HandleSlash(input)
     elseif cmd == "selftest" then
         self:CmdSelfTest()
     else
-        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"])
+        self:Msg(self.L["Commands: ping, version, scan, start, respond, award <n> <name>, end, resume, session, timers, timertest, test [n], selftest, note <player> [text], mark <id|link> [text], history [player], report, gear [player], loot, player [name], council [add|remove <name>], config, sync"])
     end
 end

@@ -130,7 +130,7 @@ LCEX.__auiaFixtures = {
         states = {
             {
                 name = "responded",
-                enter = function(fctx)
+                enter = function()
                     -- Plausible raider notes that mildly exceed the narrow note column (they
                     -- surface real truncation, not a synthetic 120-char worst case).
                     LCEX:OnResponseChosen(1, LCEX.RESPONSES[1], "Off-spec set, low priority please")

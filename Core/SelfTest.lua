@@ -1574,23 +1574,68 @@ LCEX:RegisterSelfTest("api", "trade timers: scanner shape + item-GUID probe", fu
         .. "; tradeable bag items scanned: " .. #entries
 end)
 
--- Trade-timer window (Phase 12, §6.17): injected entries render as bars, sorted soonest-first;
--- minimize collapses to one bar + a "+N"; shift+double-click (simulated) hides an item.
-LCEX:RegisterSelfTest("ui", "trade-timer window: render / sort / minimize / hide", function(self, t)
+-- Trade-timer window (Phase 12, §6.17): injected entries respect the opt-in toggle, render as
+-- bars, sort soonest-first, have no close button, color the item name, and minimize to one bar.
+LCEX:RegisterSelfTest("ui", "trade-timer window: render / sort / minimize / no-close", function(self, t)
     local now = time()
     self._selfTestTradeSaved = self.tradeTimerEntries
+    self._selfTestTradeTestSaved = self.tradeTimerTestEntries
     local prevAuto = self.db.profile.tradeTimersAuto
-    self.db.profile.tradeTimersAuto = true
-    self._tradeUserClosed, self._tradeMinimized, self.tradeTimerHidden = false, false, {}
+    self._selfTestTradeMaxRows = self.db.profile.tradeTimersMaxRows
+    self._tradeMinimized = false
+    self.db.profile.tradeTimersMaxRows = 10
     self.tradeTimerEntries = {
-        { key = "e1", link = select(2, GetItemInfo(30056)) or "item:30056", itemID = 30056, expireAt = now + 3600 },
-        { key = "e2", link = select(2, GetItemInfo(28830)) or "item:28830", itemID = 28830, expireAt = now + 600 },
+        { key = "e1", link = select(2, GetItemInfo(30056)) or "item:30056", itemID = 30056,
+          quality = 4, expireAt = now + 3600 },
+        { key = "e2", link = select(2, GetItemInfo(28830)) or "item:28830", itemID = 28830,
+          quality = 4, expireAt = now + 600 },
     }
+
+    self.db.profile.tradeTimersAuto = false
+    self:UpdateTradeTimerWindow()
+    t:Ok(not (self.tradeTimerWindow and self.tradeTimerWindow:IsShown()),
+        "trade-timer window showed while disabled")
+
+    self:CmdTimerTest()
+    t:Ok(self:_TradeTimerTestActive(), "timertest did not create an active synthetic row")
+    t:Ok(self.tradeTimerWindow and self.tradeTimerWindow:IsShown(),
+        "timertest did not show the trade-timer window while disabled")
+    self:CmdTimerTest()
+    t:Ok(not self:_TradeTimerTestActive(), "timertest did not clear its synthetic row")
+
+    self.db.profile.tradeTimersAuto = true
     self:UpdateTradeTimerWindow()
     local f = self.tradeTimerWindow
-    if not t:Ok(f and f:IsShown(), "trade-timer window did not auto-open") then return end
+    if not t:Ok(f and f:IsShown(), "trade-timer window did not open when enabled") then return end
+    t:Ok(not f.closeButton, "trade-timer window must not have a close button")
+    t:Ok(f.resizeGrip and f.resizeGrip:IsShown(), "trade-timer window missing resize grip")
+    t:Eq(f.title and f.title:GetText(), self.L["Loot"], "trade-timer title should be the compact Loot label")
+    if f._surface and f.bar and f.bar._surface then
+        t:Ok(f._surface:IsShown(), "trade-timer content surface should be visible at low alpha")
+        t:Ok(f.bar._surface:IsShown(), "trade-timer header surface should be visible at low alpha")
+        t:Eq(math.floor(((f._surface._lcexAlpha or 0) * 100) + 0.5), 25,
+            "trade-timer content surface alpha")
+        t:Eq(math.floor(((f.bar._surface._lcexAlpha or 0) * 100) + 0.5), 25,
+            "trade-timer header surface alpha")
+    end
+    t:Eq(math.floor((f.bar:GetHeight() or 0) + 0.5), 14, "trade-timer header height")
+    t:Eq(math.floor((f.resizeGrip:GetWidth() or 0) + 0.5), 11, "trade-timer resize grip width")
     t:Ok(f.rows[1] and f.rows[1]:IsShown() and f.rows[2] and f.rows[2]:IsShown(), "two bars not rendered")
+    t:Eq(math.floor((f.rows[1]:GetHeight() or 0) + 0.5), 14, "trade-timer row height should match header")
     t:Eq(f.rows[1].key, "e2", "bars not sorted soonest-first (600s item on top)")
+    t:Ok((f.rows[1].label:GetText() or ""):find("|cff") and true or false,
+        "item label is not colorized")
+    t:Ok((f.rows[1].label:GetText() or ""):find("%[") and true or false,
+        "item label should display bracketed item-link text")
+
+    self.db.profile.tradeTimersMaxRows = 1
+    self:UpdateTradeTimerWindow()
+    t:Ok(f.rows[1]:IsShown() and not (f.rows[2] and f.rows[2]:IsShown()),
+        "expanded row cap did not limit visible timers")
+    t:Ok(f.more:IsShown(), "expanded row cap missing the +N indicator")
+    self.db.profile.tradeTimersMaxRows = 0
+    self:UpdateTradeTimerWindow()
+    t:Ok(f.rows[2] and f.rows[2]:IsShown(), "All row setting did not show every timer")
 
     self._tradeMinimized = true
     self:UpdateTradeTimerWindow()
@@ -1598,16 +1643,22 @@ LCEX:RegisterSelfTest("ui", "trade-timer window: render / sort / minimize / hide
     t:Ok(f.more:IsShown(), "minimize missing the +N indicator")
     self._tradeMinimized = false
 
-    self.tradeTimerHidden["e2"] = true -- shift+double-click, simulated
+    self.db.profile.tradeTimersAuto = false
     self:UpdateTradeTimerWindow()
-    t:Eq(#self:_VisibleTradeEntries(), 1, "hidden item still counted visible")
-    t:Eq(f.rows[1].key, "e1", "wrong item on top after hiding the soonest")
+    t:Ok(not f:IsShown(), "disabled trade timers should hide the window")
     self.db.profile.tradeTimersAuto = prevAuto
+    self.db.profile.tradeTimersMaxRows = self._selfTestTradeMaxRows
+    self._selfTestTradeMaxRows = nil
 end, { cleanup = function(self)
     self.tradeTimerEntries = self._selfTestTradeSaved or {}
     self._selfTestTradeSaved = nil
-    self.tradeTimerHidden = nil
-    self._tradeMinimized, self._tradeUserClosed = false, false
+    self.tradeTimerTestEntries = self._selfTestTradeTestSaved
+    self._selfTestTradeTestSaved = nil
+    if self._selfTestTradeMaxRows ~= nil then
+        self.db.profile.tradeTimersMaxRows = self._selfTestTradeMaxRows
+        self._selfTestTradeMaxRows = nil
+    end
+    self._tradeMinimized = false
     self:_StopTradeTimerTick()
     if self.tradeTimerWindow then self.tradeTimerWindow:Hide() end
 end })

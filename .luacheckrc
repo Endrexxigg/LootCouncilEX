@@ -24,6 +24,7 @@ globals = {
     "LootCouncilEX",
     "LootCouncilEXDB",
     "SlashCmdList",
+    "AddonUIAudit",
 }
 
 read_globals = {

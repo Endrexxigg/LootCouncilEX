@@ -383,20 +383,25 @@ end
 -- ═════════════════════════════════════════════════════════════════════════════
 
 -- Persist a v2 window's placement into db.profile.ui[savedKey] (creates the subtable — new
--- keys need no DB_DEFAULTS entry). Size is saved only for resizable windows.
-local function SavePlacement(addon, f, savedKey, resizable)
+-- keys need no DB_DEFAULTS entry). Size is saved only for resizable windows; width-only
+-- resize windows let content determine their height.
+local function SavePlacement(addon, f, savedKey, resizable, widthOnly)
     if not (savedKey and addon.db) then return end
     local p = addon.db.profile.ui[savedKey]
     if not p then p = {}; addon.db.profile.ui[savedKey] = p end
     local point, _, relPoint, x, y = f:GetPoint()
     p.point, p.relPoint, p.x, p.y = point, relPoint, x, y
-    if resizable then p.w, p.h = f:GetWidth(), f:GetHeight() end
+    if resizable then
+        p.w = f:GetWidth()
+        if not widthOnly then p.h = f:GetHeight() end
+    end
 end
 
 -- ── Window v2 ────────────────────────────────────────────────────────────────
 -- Themed, movable, ESC-closable window. `name` is the GLOBAL frame name (UISpecialFrames).
--- opts = { width, height, title, savedKey, defaultPos={x,y}, resizable, minW, minH,
---          useOpacity } — savedKey persists position (and size when resizable); useOpacity
+-- opts = { width, height, title, titleH, titleSizeKey, chromeInset, savedKey, defaultPos={x,y},
+--          resizable, resizeWOnly, minW, minH, noClose, scale, alpha, useOpacity } — savedKey persists position
+-- (and size when resizable); useOpacity
 -- windows honor profile.appearance.opacity. Returns the frame; content anchors below f.bar.
 function LCEX:CreateWindowV2(name, opts)
     opts = opts or {}
@@ -431,23 +436,26 @@ function LCEX:CreateWindowV2(name, opts)
     self:Surface(f, "page")
     self:SoftEdge(f)
 
-    -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right. The tick
+    -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right unless
+    -- noClose is set for passive HUD frames. The tick
     -- sits on the window's absolute content line (LAYOUT.grid): bar at edge + tick at pad = grid.
+    local titleH = opts.titleH or LAY.titleH
+    local chromeInset = (opts.chromeInset ~= nil) and opts.chromeInset or LAY.edge
     local bar = CreateFrame("Frame", nil, f)
-    bar:SetPoint("TOPLEFT", LAY.edge, -LAY.edge)
-    bar:SetPoint("TOPRIGHT", -LAY.edge, -LAY.edge)
-    bar:SetHeight(LAY.titleH)
+    bar:SetPoint("TOPLEFT", chromeInset, -chromeInset)
+    bar:SetPoint("TOPRIGHT", -chromeInset, -chromeInset)
+    bar:SetHeight(titleH)
     self:Surface(bar, "raised")
     f.bar = bar
 
     local tick = bar:CreateTexture(nil, "ARTWORK")
     tick:SetTexture("Interface\\Buttons\\WHITE8X8")
-    tick:SetSize(3, 14)
+    tick:SetSize(3, opts.titleTickH or math.min(14, math.max(8, titleH - 6)))
     tick:SetPoint("LEFT", LAY.pad, 0)
     tick:SetVertexColor(self.Theme.accent[1], self.Theme.accent[2], self.Theme.accent[3], 1)
 
     local title = bar:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(title, "section", "ink")
+    self:ThemeText(title, opts.titleSizeKey or "section", "ink")
     title:SetPoint("LEFT", tick, "RIGHT", LAY.gap, 0)
     title:SetText(opts.title or "")
     f.title = title
@@ -459,33 +467,39 @@ function LCEX:CreateWindowV2(name, opts)
     bar:SetScript("OnDragStart", function() f:Raise(); f:StartMoving() end)
     bar:SetScript("OnDragStop", function()
         f:StopMovingOrSizing()
-        SavePlacement(addon, f, opts.savedKey, opts.resizable)
+        SavePlacement(addon, f, opts.savedKey, opts.resizable, opts.resizeWOnly)
     end)
 
-    local close = CreateFrame("Button", nil, bar)
-    close:SetSize(LAY.btnH, LAY.btnH)
-    close:SetPoint("RIGHT", -LAY.gapTight, 0)
-    close.fs = close:CreateFontString(nil, "OVERLAY")
-    addon:ThemeText(close.fs, "section", "dim")
-    close.fs:SetPoint("CENTER", 0, 0)
-    close.fs:SetText("×")
-    close:SetScript("OnEnter", function(b)
-        b.fs:SetTextColor(addon.Theme.danger[1], addon.Theme.danger[2], addon.Theme.danger[3])
-    end)
-    close:SetScript("OnLeave", function(b) addon:ThemeText(b.fs, "section", "dim") end)
-    close:SetScript("OnClick", function() f:Hide() end)
-    f.closeButton = close
+    if not opts.noClose then
+        local close = CreateFrame("Button", nil, bar)
+        local closeSize = math.min(LAY.btnH, math.max(12, titleH - 2))
+        close:SetSize(closeSize, closeSize)
+        close:SetPoint("RIGHT", -LAY.gapTight, 0)
+        close.fs = close:CreateFontString(nil, "OVERLAY")
+        addon:ThemeText(close.fs, "section", "dim")
+        close.fs:SetPoint("CENTER", 0, 0)
+        close.fs:SetText("×")
+        close:SetScript("OnEnter", function(b)
+            b.fs:SetTextColor(addon.Theme.danger[1], addon.Theme.danger[2], addon.Theme.danger[3])
+        end)
+        close:SetScript("OnLeave", function(b) addon:ThemeText(b.fs, "section", "dim") end)
+        close:SetScript("OnClick", function() f:Hide() end)
+        f.closeButton = close
+    end
 
     -- Resizable: bottom-right grip with the stuck-sizing guard (grip mouse-up alone can miss
     -- when the cursor leaves the grip — also stop on the frame's own mouse-up and on hide).
     if opts.resizable then
-        f:SetResizable(true)
         local minW, minH = opts.minW or 480, opts.minH or 320
-        if f.SetResizeBounds then f:SetResizeBounds(minW, minH)
-        elseif f.SetMinResize then f:SetMinResize(minW, minH) end
+        if not opts.resizeWOnly then
+            f:SetResizable(true)
+            if f.SetResizeBounds then f:SetResizeBounds(minW, minH)
+            elseif f.SetMinResize then f:SetMinResize(minW, minH) end
+        end
 
         local grip = CreateFrame("Button", nil, f)
-        grip:SetSize(16, 16)
+        local gripSize = opts.resizeGripSize or 16
+        grip:SetSize(gripSize, gripSize)
         grip:SetPoint("BOTTOMRIGHT", -3, 3)
         grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
         grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
@@ -493,11 +507,29 @@ function LCEX:CreateWindowV2(name, opts)
         local function stopSizing()
             if f._sizing then
                 f._sizing = false
+                grip:SetScript("OnUpdate", nil)
                 f:StopMovingOrSizing()
-                SavePlacement(addon, f, opts.savedKey, true)
+                SavePlacement(addon, f, opts.savedKey, true, opts.resizeWOnly)
             end
         end
-        grip:SetScript("OnMouseDown", function() f._sizing = true; f:StartSizing("BOTTOMRIGHT") end)
+        grip:SetScript("OnMouseDown", function()
+            f._sizing = true
+            f:Raise()
+            if opts.resizeWOnly then
+                local x = GetCursorPosition()
+                local scale = UIParent:GetEffectiveScale()
+                f._resizeStartX = x / scale
+                f._resizeStartW = f:GetWidth()
+                grip:SetScript("OnUpdate", function()
+                    if not f._sizing then return end
+                    local cx = GetCursorPosition()
+                    local cs = UIParent:GetEffectiveScale()
+                    f:SetWidth(math.max(minW, f._resizeStartW + (cx / cs - f._resizeStartX)))
+                end)
+            else
+                f:StartSizing("BOTTOMRIGHT")
+            end
+        end)
         grip:SetScript("OnMouseUp", stopSizing)
         f:HookScript("OnMouseUp", stopSizing)
         f:HookScript("OnHide", stopSizing)
@@ -511,7 +543,9 @@ function LCEX:CreateWindowV2(name, opts)
             f:ClearAllPoints()
             f:SetPoint(p.point, UIParent, p.relPoint, p.x, p.y)
         end
-        if opts.resizable and p and p.w and p.h then
+        if opts.resizable and opts.resizeWOnly and p and p.w then
+            f:SetWidth(p.w)
+        elseif opts.resizable and p and p.w and p.h then
             f:SetSize(p.w, p.h)
         end
     end
@@ -519,8 +553,9 @@ function LCEX:CreateWindowV2(name, opts)
     -- Appearance plumbing (Config window writes profile.appearance; nil-safe before then).
     function f.RefreshAppearance(win)
         local a = addon.db and addon.db.profile.appearance
-        win:SetScale((a and a.scale) or 1)
-        if opts.useOpacity then win:SetAlpha((a and a.opacity) or 1) end
+        win:SetScale(((a and a.scale) or 1) * (opts.scale or 1))
+        if opts.useOpacity then win:SetAlpha((a and a.opacity) or 1)
+        elseif opts.alpha then win:SetAlpha(opts.alpha) end
     end
     f:RefreshAppearance()
 
