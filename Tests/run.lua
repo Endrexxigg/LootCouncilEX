@@ -409,6 +409,39 @@ test("pReport caches gear from a group member (group-gated)", function()
     ok(not L.db.global.gearCache["stranger"], "non-group sender dropped")
 end)
 
+-- ── Self-report loopback: own report cached locally (own-alt visibility) ─────
+-- dispatch.pReport drops our own echo, so the SENDER must loopback-write its report; the
+-- account-wide db.global cache is what a same-account alt reads. Solo user = no remote peer to
+-- rebroadcast, so without the loopback an alt's detail panes stay "(no cached report)".
+test("SendSelfReport loopback: own cache written; account alts read it", function()
+    H.playerName = "CharA"
+    L.lastGearSnapshot = { [1] = "headlink", [5] = "chestlink" }
+    ok(L:SendSelfReport(), "guilded -> broadcast sent")
+    eq(#H.sent, 1, "one pReport on the wire")
+    local rec = L.db.global.gearCache["chara"]
+    ok(rec, "own gear cached without a remote rebroadcast")
+    eq(rec.items[1], "headlink", "cached items = the frozen snapshot")
+    eq(rec.by, "CharA", "stamped by us")
+    eq(rec.class, "MAGE", "class rides the gear record")
+    ok(L.db.global.profCache["chara"], "own profs cached")
+
+    -- A different character on the same account (same db.global) sees CharA's cache.
+    H.playerName = "CharB"
+    local g = L:BuildGearDisplay("CharA")
+    eq(g[1].kind, "gearitem", "alt sees cached gear rows, not the info row")
+    eq(#g, 2, "both cached slots")
+
+    -- Guildless with a GUILD channel: the broadcast is skipped but the loopback still writes.
+    H.sent = {}
+    H.inGuild = false
+    L.lastGearSnapshot = { [1] = "newhead" }
+    ok(not L:SendSelfReport(), "guildless -> not sent")
+    eq(#H.sent, 0, "nothing on the wire")
+    eq(L.db.global.gearCache["charb"].items[1], "newhead", "loopback cache written anyway")
+
+    L.lastGearSnapshot = nil
+end)
+
 -- ── pHello directional pull (regression guard for the merge-direction bug) ───
 test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     L.db.profile.council = { byRank = false, extra = { "Tester", "Peer" } }

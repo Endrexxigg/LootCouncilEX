@@ -622,6 +622,34 @@ LCEX:RegisterSelfTest("council", "dataset merge hits the live store (no broadcas
     t:Eq(store[MERGE_KEY] and store[MERGE_KEY].text, "c", "stored text after LWW")
 end, { cleanup = function(self) self.db.global.dummy[MERGE_KEY] = nil end })
 
+-- Loopback (own-alt visibility): the sender must cache its OWN pReport — dispatch.pReport drops
+-- the self-echo, so without the loopback a solo user's alts never see this character's gear.
+local prevOwnGear, prevOwnProf
+LCEX:RegisterSelfTest("council", "self-report loopback caches own gear (own-alt visibility)", function(self, t)
+    if not self.db.profile.selfReport then return t:Skip("selfReport is disabled") end
+    local key = self:NormalizeName(UnitName("player"))
+    if not key then return t:Skip("player name unavailable") end
+    local gearStore, profStore = self.db.global.gearCache, self.db.global.profCache
+    prevOwnGear, prevOwnProf = gearStore[key], profStore[key]
+    gearStore[key], profStore[key] = nil, nil
+    -- End-to-end on purpose: also emits a routine pReport broadcast, same as /lcex report
+    -- (idempotent — peers just re-cache the same data).
+    self:SendSelfReport()
+    local rec = gearStore[key]
+    if t:Ok(rec ~= nil, "own gearCache record missing after SendSelfReport") then
+        t:Ok(type(rec.items) == "table", "own record carries an items table")
+        t:Eq(rec.by, UnitName("player"), "own record stamped by us")
+    end
+    t:Ok(profStore[key] ~= nil, "own profCache record missing after SendSelfReport")
+end, { cleanup = function(self)
+    local key = self:NormalizeName(UnitName("player"))
+    if key then
+        self.db.global.gearCache[key] = prevOwnGear
+        self.db.global.profCache[key] = prevOwnProf
+    end
+    prevOwnGear, prevOwnProf = nil, nil
+end })
+
 LCEX:RegisterSelfTest("council", "digest covers every dataset", function(self, t)
     local digest = self:BuildDigest()
     for _, name in ipairs(ALL_DATASETS) do

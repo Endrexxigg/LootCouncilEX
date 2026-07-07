@@ -3,7 +3,8 @@
 -- inspection is range/faction/throttle-limited and useless here (§2 / DL-4). We broadcast a
 -- `pReport` (gear + profs) on login and on equipment change; everyone in the group caches it
 -- into gearCache/profCache, which then reconcile among council via the sync engine so an
--- out-of-raid council member still gets the last-cached gear.
+-- out-of-raid council member still gets the last-cached gear. The sender loopback-caches its
+-- own report too (SendSelfReport), so a solo user's alts share data account-wide.
 --
 -- CRITICAL gating asymmetry (§6.2): `pReport` is accepted from ANY GROUP MEMBER (so the
 -- council can view any candidate), NOT council-only — so its inbound handler uses InGroupWith,
@@ -80,21 +81,34 @@ end
 -- ── Broadcast ────────────────────────────────────────────────────────────────
 -- Send our gear (the frozen anti-swap snapshot) + professions. Honors the selfReport opt-out
 -- and the GUILD-requires-guild guard. Returns true if actually sent.
+--
+-- Loopback: the same report is ALSO merged into our own gearCache/profCache before the channel
+-- guard. The inbound handler deliberately drops our echo (IsSelf), so without this a solo addon
+-- user never populates the account-wide cache and their same-guild alts show "(no cached
+-- report)" — own data must not depend on a second addon user rebroadcasting it.
 function LCEX:SendSelfReport()
     if not self.db.profile.selfReport then return false end
-    local channel = self.db.profile.syncChannel or "GUILD"
-    if channel == "GUILD" and not IsInGuild() then
-        self:Debug("pReport NOT sent: syncChannel is GUILD but you're not in a guild")
-        return false
-    end
+    local me = UnitName("player")
     local class, spec = self:SnapshotSpec()
-    self:Send("pReport", nil, {
+    local report = {
         gear  = self.lastGearSnapshot or self:SnapshotGear(),
         profs = self:SnapshotProfs(),
         class = class,
         spec  = spec,
         mod   = time(),
-    }, channel)
+    }
+    local key = self:NormalizeName(me)
+    if key then
+        self:MergeRecord("gearCache", key,
+            { items = report.gear, class = class, spec = spec, mod = report.mod, by = me })
+        self:MergeRecord("profCache", key, { profs = report.profs, mod = report.mod, by = me })
+    end
+    local channel = self.db.profile.syncChannel or "GUILD"
+    if channel == "GUILD" and not IsInGuild() then
+        self:Debug("pReport NOT sent: syncChannel is GUILD but you're not in a guild")
+        return false
+    end
+    self:Send("pReport", nil, report, channel)
     self:Debug("sent pReport via %s", channel)
     return true
 end
