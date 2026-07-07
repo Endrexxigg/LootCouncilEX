@@ -11,10 +11,16 @@
 -- Loads after UI/CouncilWindow.lua; self-registers.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
 local LIST_W = 170
+-- The detail column hangs off the picker's right edge like a pane off a rail: lists/bands at
+-- divider, text (and bordered controls) at divider + rowPad — one shared content line.
+local DETAIL_X = LAY.divider + LAY.rowPad
+-- Detail stack, from the panel top: gap · header(16) · gap · sub-tabs · gap.
+local DETAIL_TOP = LAY.gap + 16 + LAY.gap + LAY.btnHSlim + LAY.gap
 local SUBTABS = {
     { key = "gear",    text = "Gear" },
     { key = "history", text = "History" },
@@ -28,11 +34,11 @@ local SUBTABS = {
 local function BuildDetailRow(panel)
     local row = CreateFrame("Frame", nil, panel)
     row.icon = LCEX:CreateItemIcon(row, 18)
-    row.icon:SetPoint("LEFT", 4, 0)
+    row.icon:SetPoint("LEFT", LAY.rowPad, 0)
     row.text = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.text, "body", "ink")
-    row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-    row.text:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+    row.text:SetPoint("LEFT", row.icon, "RIGHT", LAY.iconGap, 0)
+    row.text:SetPoint("RIGHT", row, "RIGHT", -LAY.rowPad, 0)
     row.text:SetJustifyH("LEFT"); row.text:SetWordWrap(false)
     return row
 end
@@ -143,12 +149,13 @@ local function SelectSubTab(panel, key)
     panel.detailList:ClearAllPoints()
     if key == "bis" then
         panel.bisBar:Show()
-        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT", 8, -88)
+        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT",
+            LAY.divider, -(DETAIL_TOP + LAY.btnHSlim + LAY.gap)) -- below the BiS cycle bar
     else
         panel.bisBar:Hide()
-        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT", 8, -60)
+        panel.detailList:SetPoint("TOPLEFT", panel.picker, "TOPRIGHT", LAY.divider, -DETAIL_TOP)
     end
-    panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 24)
+    panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -LAY.bleed, 24)
 
     local data
     if key == "gear" then data = LCEX:BuildGearDisplay(player)
@@ -186,11 +193,12 @@ LCEX:RegisterCouncilModule({
         LCEX:Surface(picker, "base")
         panel.picker = picker
 
+        -- Filter box art on the picker's grid line, symmetric right margin.
         panel.filterBox = LCEX:CreateEditBox(picker, {
-            width = LIST_W - 20,
+            width = LIST_W - 2 * LAY.grid - LAY.editPad,
             onCommit = function() panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText())) end,
         })
-        panel.filterBox:SetPoint("TOPLEFT", 12, -8)
+        panel.filterBox:SetPoint("TOPLEFT", LAY.grid + LAY.editPad, -LAY.gap)
         panel.filterBox:SetScript("OnTextChanged", function()
             panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText()))
         end)
@@ -208,11 +216,12 @@ LCEX:RegisterCouncilModule({
                 row.sel:SetVertexColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3], 1)
                 row.fs = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.fs, "body", "dim")
-                row.fs:SetPoint("LEFT", 10, 0)
-                row.fs:SetPoint("RIGHT", -22, 0); row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
+                row.fs:SetPoint("LEFT", LAY.rowPad, 0)
+                -- Right bound clears the badge's ~14px slot at the rowPad inset.
+                row.fs:SetPoint("RIGHT", -(LAY.rowPad + 14), 0); row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
                 row.badge = row:CreateFontString(nil, "OVERLAY") -- Feature G: gear-issue count
                 LCEX:ThemeText(row.badge, "caption", "dim")
-                row.badge:SetPoint("RIGHT", -6, 0)
+                row.badge:SetPoint("RIGHT", -LAY.rowPad, 0)
                 row:SetScript("OnClick", function(r) SelectPlayer(panel, r.playerName) end)
                 return row
             end,
@@ -241,13 +250,14 @@ LCEX:RegisterCouncilModule({
                 end
             end,
         })
-        panel.playerList:SetPoint("TOPLEFT", 2, -34)
-        panel.playerList:SetPoint("BOTTOMRIGHT", -2, 2)
+        panel.playerList:SetPoint("TOPLEFT", LAY.bleed, -(LAY.gap + LAY.editH + LAY.gap))
+        panel.playerList:SetPoint("BOTTOMRIGHT", -LAY.bleed, LAY.bleed)
 
-        -- Detail area: header row, then the sub-tab row, then list/notes below.
+        -- Detail area: header row, then the sub-tab row, then list/notes below — all on the
+        -- DETAIL_X content line off the picker's edge.
         panel.header = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.header, "section", "ink")
-        panel.header:SetPoint("TOPLEFT", picker, "TOPRIGHT", 12, -8)
+        panel.header:SetPoint("TOPLEFT", picker, "TOPRIGHT", DETAIL_X, -LAY.gap)
 
         -- Feature G: toggle the gear-issue callouts (per-item tags + picker badges). Off by default;
         -- the Gear Check sub-tab is unaffected — it stays as the explicit "show me problems" view.
@@ -258,47 +268,49 @@ LCEX:RegisterCouncilModule({
                 panel.playerList:SetData(LCEX:BuildPlayerIndex(panel.filterBox:GetText())) -- badges
                 SelectSubTab(panel, panel.subTab or "gear")                                -- tags
             end)
-        panel.gearToggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -8)
+        panel.gearToggle:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -LAY.grid, -LAY.gap)
 
         panel.subTabs = {}
         local x = 0
         for _, tabDef in ipairs(SUBTABS) do
             local w = math.max(52, #tabDef.text * 8)
-            local b = LCEX:CreateFlatButton(panel, tabDef.text, w, 20)
-            b:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8 + x, -32)
+            local b = LCEX:CreateFlatButton(panel, tabDef.text, w, LAY.btnHSlim)
+            b:SetPoint("TOPLEFT", picker, "TOPRIGHT", DETAIL_X + x, -(LAY.gap + 16 + LAY.gap))
             b.subKey = tabDef.key
             b:SetScript("OnClick", function() SelectSubTab(panel, tabDef.key) end)
             panel.subTabs[#panel.subTabs + 1] = b
-            x = x + w + 4
+            x = x + w + LAY.tabGap
         end
 
+        -- Full-bleed band off the picker seam: rows pad by rowPad, landing text on DETAIL_X.
+        -- The 24px bottom inset hosts the cacheMeta caption line.
         panel.detailList = LCEX:CreateScrollList(panel, {
             rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function() return BuildDetailRow(panel) end,
             fillRow = function(row, entry) FillDetailRow(row, entry) end,
         })
-        panel.detailList:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8, -60)
-        panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 24)
+        panel.detailList:SetPoint("TOPLEFT", picker, "TOPRIGHT", LAY.divider, -DETAIL_TOP)
+        panel.detailList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -LAY.bleed, 24)
 
-        -- BiS cycle bar (shown only on the BiS sub-tab).
+        -- BiS cycle bar (shown only on the BiS sub-tab): three buttons on the content line.
         local bisBar = CreateFrame("Frame", nil, panel)
-        bisBar:SetPoint("TOPLEFT", picker, "TOPRIGHT", 8, -60)
-        bisBar:SetSize(400, 22)
-        bisBar.classBtn = LCEX:CreateFlatButton(bisBar, "", 120, 20)
+        bisBar:SetPoint("TOPLEFT", picker, "TOPRIGHT", DETAIL_X, -DETAIL_TOP)
+        bisBar:SetSize(120 + LAY.tabGap + 150 + LAY.tabGap + 50, LAY.btnHSlim)
+        bisBar.classBtn = LCEX:CreateFlatButton(bisBar, "", 120, LAY.btnHSlim)
         bisBar.classBtn:SetPoint("LEFT", 0, 0)
         bisBar.classBtn:SetScript("OnClick", function()
             LCEX.bisClass = LCEX:_CycleNext(LCEX.CLASSES, LCEX.bisClass)
             LCEX.bisSpec = nil -- re-resolve to the new class's first spec
             SelectSubTab(panel, "bis")
         end)
-        bisBar.specBtn = LCEX:CreateFlatButton(bisBar, "", 150, 20)
-        bisBar.specBtn:SetPoint("LEFT", bisBar.classBtn, "RIGHT", 4, 0)
+        bisBar.specBtn = LCEX:CreateFlatButton(bisBar, "", 150, LAY.btnHSlim)
+        bisBar.specBtn:SetPoint("LEFT", bisBar.classBtn, "RIGHT", LAY.tabGap, 0)
         bisBar.specBtn:SetScript("OnClick", function()
             LCEX.bisSpec = LCEX:_CycleNext(LCEX:SpecsForClass(LCEX.bisClass), LCEX.bisSpec)
             SelectSubTab(panel, "bis")
         end)
-        bisBar.phaseBtn = LCEX:CreateFlatButton(bisBar, "", 50, 20)
-        bisBar.phaseBtn:SetPoint("LEFT", bisBar.specBtn, "RIGHT", 4, 0)
+        bisBar.phaseBtn = LCEX:CreateFlatButton(bisBar, "", 50, LAY.btnHSlim)
+        bisBar.phaseBtn:SetPoint("LEFT", bisBar.specBtn, "RIGHT", LAY.tabGap, 0)
         bisBar.phaseBtn:SetScript("OnClick", function()
             LCEX.bisPhase = LCEX:_CycleNext(LCEX.PHASES, LCEX.bisPhase)
             SelectSubTab(panel, "bis")
@@ -306,17 +318,17 @@ LCEX:RegisterCouncilModule({
         bisBar:Hide()
         panel.bisBar = bisBar
 
-        -- Notes editor (replaces the list on the Notes sub-tab).
+        -- Notes editor (replaces the list on the Notes sub-tab), on the shared content line;
+        -- the box art indents by editPad under its label and stretches to the notes frame.
         local notes = CreateFrame("Frame", nil, panel)
-        notes:SetPoint("TOPLEFT", picker, "TOPRIGHT", 12, -64)
-        notes:SetPoint("TOPRIGHT", -12, -64)
+        notes:SetPoint("TOPLEFT", picker, "TOPRIGHT", DETAIL_X, -DETAIL_TOP)
+        notes:SetPoint("TOPRIGHT", -LAY.grid, -DETAIL_TOP)
         notes:SetHeight(80)
         notes.label = notes:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(notes.label, "caption", "dim")
         notes.label:SetPoint("TOPLEFT", 0, 0)
         notes.label:SetText(LCEX.L["Note:"])
         notes.edit = LCEX:CreateEditBox(notes, {
-            width = 380,
             onCommit = function(text)
                 if panel.player then
                     LCEX:SetNote(panel.player, text)
@@ -324,17 +336,18 @@ LCEX:RegisterCouncilModule({
                 end
             end,
         })
-        notes.edit:SetPoint("TOPLEFT", notes.label, "BOTTOMLEFT", 4, -6)
+        notes.edit:SetPoint("TOPLEFT", notes.label, "BOTTOMLEFT", LAY.editPad, -LAY.inlineGap)
+        notes.edit:SetPoint("RIGHT", notes, "RIGHT", 0, 0)
         notes.meta = notes:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(notes.meta, "caption", "faint")
-        notes.meta:SetPoint("TOPLEFT", notes.edit, "BOTTOMLEFT", -4, -10)
+        notes.meta:SetPoint("TOPLEFT", notes.edit, "BOTTOMLEFT", -LAY.editPad, -LAY.gap)
         notes:Hide()
         panel.notes = notes
 
-        -- Data-freshness line (gear/profs sub-tabs only).
+        -- Data-freshness line (gear/profs sub-tabs only), under the detail list's 24px reserve.
         panel.cacheMeta = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.cacheMeta, "caption", "faint")
-        panel.cacheMeta:SetPoint("BOTTOMLEFT", picker, "BOTTOMRIGHT", 12, 8)
+        panel.cacheMeta:SetPoint("BOTTOMLEFT", picker, "BOTTOMRIGHT", DETAIL_X, LAY.gap)
     end,
 
     show = function(panel, ctx)

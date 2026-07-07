@@ -31,6 +31,37 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.52.3 — Global layout/alignment pass (LCEX.LAYOUT contract)
+Every frame now anchors from the shared spacing grid in `UI/Theme.lua` (one 12px content line
+per container; unified 14px scrollbar gutter in BOTH list helpers; one edit-box art compensation).
+Headless asserts the contract identities; geometry was verified arithmetically — what's left is
+how it *looks* on the real client.
+
+- [ ] **`/auiaudit run LootCouncilEX`** — must report **no new ERROR/WARN** vs the baseline
+  (fingerprints are geometry-independent, so pure offset changes should not churn them).
+- [ ] **Edit-box art alignment (`editPad = 4`)**: the staging add-box art lines up with the Scan
+  button above it; the roster filter box, history Winner box, session-config add boxes, and the
+  confirm popup's input all sit flush with their labels/columns. If the art reads ~1px off
+  everywhere, `LAYOUT.editPad` in `UI/Theme.lua` is the single knob.
+- [ ] **Faux-list gutters**: candidate list / roster / browser / history / gbank-log scrollbars
+  now sit centered in a 14px gutter (rows got ~10px wider) — bar clear of row content, no
+  overlap with badges/glyph clusters at the row's right edge.
+- [ ] **Loot footer**: End/Start/D-E buttons end on the same line in both states (staging ↔
+  session toggle no longer shifts the right edge by 2px); status text truncates before buttons.
+- [ ] **Poll window**: margin grew 10→12 (window 404 wide); "+N more" aligns with the card edge;
+  with a deadline armed and nothing usable, the empty text sits *below* the timer bar.
+- [ ] **Council modules**: browser phase buttons / roster sub-tabs / gbank tabs+grid+log all
+  share their panel's left line with headers and list text; session-config left column at one
+  x, right column (Anonymous voting / D/E) at one x; gbank log note column starts right after
+  the icon strip (was 14px adrift).
+- [ ] **Config window**: controls symmetric (sliders now span the window evenly), uniform
+  vertical rhythm.
+
+*Known/intentional*: nav-rail text moved 14→10 (aligns with the title tick's 12px absolute
+line); trade-timer icon inset 2 is vertical centering, not a margin; session-config roster-row
+remove-× still trails a long name unbounded (pre-existing, follow-up); the browser boss/item
+indents (14/30) derive from the 14px fold glyph.
+
 ### v0.39.2–v0.51 — PHASE 12 (jul4 fix/change batch, 18 items)
 The 18-item handoff (`docs/lcex_fix_change_handoff_jul4.md`). **Heavily selftest-covered** — the
 scrollbar/zebra/flat-button/context-menu widgets, compact↔full loot layout, awarded feedback, x2

@@ -10,7 +10,8 @@
 -- expiry the poll closes silently (no response sent — the ML's table simply shows no response).
 -- When the usable queue is longer than the visible cards, a "+N more" footer shows the overflow.
 --
--- Layout uses one uniform PAD everywhere (window edge ↔ content, and the gap between cards).
+-- Layout uses one uniform PAD everywhere (window edge ↔ content, and the gap between cards):
+-- LAYOUT.grid, the bare-window content line. Card INTERIORS pad by LAYOUT.pad (cards are panels).
 --
 -- Data flow: Candidate.lua EnterSession → ShowPoll(items, responses, secondsLeft); a button
 -- click → OnResponseChosen(itemIndex, resp, note) → cResp to the ML. LeaveSession → HidePoll.
@@ -18,16 +19,17 @@
 -- Loads after UI/Theme.lua + UI/Widgets.lua.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 LCEX.pollNotes = LCEX.pollNotes or {}
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
 local FRAME_NAME = "LCEX_PollWindow"
 local MAX_CARDS  = 3
-local PAD        = 10   -- the ONE margin: window edge ↔ content, and the gap between cards
+local PAD        = LAY.grid -- the ONE margin: window edge ↔ content, and the gap between cards
 local CARD_W     = 380
 local CARD_H     = 78
-local TITLE_H    = 30   -- CreateWindowV2's title bar (28px) + its 2px top inset — content below
+local TITLE_H    = LAY.edge + LAY.titleH -- the title bar's bottom edge — content stacks below
 local TIMER_H    = 12   -- deadline depleting bar (present only when a deadline is armed)
 local MORE_H     = 16   -- "+N more" footer (present only when the queue exceeds MAX_CARDS)
 
@@ -79,9 +81,11 @@ function LCEX:EnsurePoll()
     bar:Hide()
     f.timerBar = bar
 
+    -- Re-anchored each render to the middle of the reserved card band (so it can never sit
+    -- under an armed deadline bar); built here, positioned in RenderPollCards.
     f.empty = f:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.empty, "body", "faint")
-    f.empty:SetPoint("TOP", 0, -(TITLE_H + 20))
+    f.empty:SetPoint("TOP", 0, -(TITLE_H + PAD))
     f.empty:SetText(self.L["Nothing for you this round."])
     f.empty:Hide()
 
@@ -103,23 +107,25 @@ function LCEX:BuildPollCard(parent)
     self:Surface(card, "raised")
     self:SoftEdge(card, 0.1)
 
+    -- Card interior: a panel surface, so content pads by LAYOUT.pad from the card's own edges.
     card.icon = self:CreateItemIcon(card, 32)
-    card.icon:SetPoint("TOPLEFT", PAD, -PAD)
+    card.icon:SetPoint("TOPLEFT", LAY.pad, -LAY.pad)
 
     card.name = card:CreateFontString(nil, "OVERLAY")
     self:ThemeText(card.name, "body", "ink")
-    card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10, -1)
-    card.name:SetPoint("RIGHT", card, "RIGHT", -PAD, 0)
+    card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", LAY.iconGap, -1)
+    card.name:SetPoint("RIGHT", card, "RIGHT", -LAY.pad, 0)
     card.name:SetJustifyH("LEFT")
     card.name:SetWordWrap(false)
 
     card.buttons = {}
 
     -- Full-width note under the icon/buttons: TOPLEFT + RIGHT anchors override CreateEditBox's
-    -- default width so it fills the card.
+    -- default width so it fills the card; editPad lands the box ART on the card's pad line.
+    -- Its top rides the interior stack: pad + button row at -20 + 20px buttons + gapTight = 54.
     card.note = self:CreateEditBox(card, {})
-    card.note:SetPoint("TOPLEFT", card, "TOPLEFT", PAD + 4, -54)
-    card.note:SetPoint("RIGHT", card, "RIGHT", -PAD, 0)
+    card.note:SetPoint("TOPLEFT", card, "TOPLEFT", LAY.pad + LAY.editPad, -54)
+    card.note:SetPoint("RIGHT", card, "RIGHT", -LAY.pad, 0)
     card.note:SetScript("OnTextChanged", function(eb)
         -- Notes are keyed by ITEM index so they follow the item when cards shift slots.
         if card.itemIndex then LCEX.pollNotes[card.itemIndex] = eb:GetText() end
@@ -146,7 +152,7 @@ function LCEX:FillPollCard(card, itemIndex, item, responses)
     for ri, resp in ipairs(responses) do
         local b = card.buttons[ri]
         if not b then
-            b = self:CreateFlatButton(card, "", 58, 20)
+            b = self:CreateFlatButton(card, "", 58, LAY.btnHSlim)
             card.buttons[ri] = b
         end
         b:SetText(resp.text)
@@ -154,13 +160,13 @@ function LCEX:FillPollCard(card, itemIndex, item, responses)
         local fs = b:GetFontString()
         if c and fs then fs:SetTextColor(c[1], c[2], c[3]) end
         b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10 + x, -20)
+        b:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", LAY.iconGap + x, -20)
         b:SetScript("OnClick", function()
             self:OnResponseChosen(card.itemIndex, resp, self.pollNotes[card.itemIndex] or "")
             self:PollCardAnswered(card.itemIndex)
         end)
         b:Show()
-        x = x + 62
+        x = x + 58 + LAY.tabGap -- button width + the tab-strip gap
     end
 
     card.note:SetText(self.pollNotes[itemIndex] or "")
@@ -212,10 +218,10 @@ function LCEX:RenderPollCards()
 
     local extra = #queue - shown
     if extra > 0 then
-        -- Left-justified, vertically centered in a MORE_H band a PAD below the last card. The
-        -- "LEFT" anchor point puts the text's vertical centre on the y, so it reads as centered.
+        -- Left-justified on the card edge line, vertically centered in a MORE_H band a PAD below
+        -- the last card ("LEFT" puts the text's vertical centre on the y, so it reads centered).
         f.more:ClearAllPoints()
-        f.more:SetPoint("LEFT", f, "TOPLEFT", PAD + 4, -(bottom + PAD + MORE_H / 2))
+        f.more:SetPoint("LEFT", f, "TOPLEFT", PAD, -(bottom + PAD + MORE_H / 2))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
         bottom = bottom + PAD + MORE_H
@@ -223,7 +229,14 @@ function LCEX:RenderPollCards()
         f.more:Hide()
     end
 
-    if shown == 0 then f.empty:Show() else f.empty:Hide() end
+    -- Empty state: centered in the CARD_H band reserved above (never under the timer bar).
+    if shown == 0 then
+        f.empty:ClearAllPoints()
+        f.empty:SetPoint("TOP", 0, -(top + CARD_H / 2 - 6)) -- half a body line above true centre
+        f.empty:Show()
+    else
+        f.empty:Hide()
+    end
     -- Grow/shrink DOWNWARD: pin the current top-left, then resize. The window default is a CENTER
     -- anchor, which resizes around the middle — so shrinking as you answer would slide the cards
     -- (and their buttons) up, out from under the cursor. Re-anchoring TOPLEFT keeps the top fixed.

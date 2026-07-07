@@ -1467,6 +1467,20 @@ test("SelfTest suite: real registrations loaded and solo session E2E skips safel
     ok(type(L.dispatch.tEcho) == "function", "tEcho loopback handler registered")
 end)
 
+-- ── Layout contract (UI/Theme.lua) ───────────────────────────────────────────
+-- The spacing grid's load-bearing identities: every frame derives its content lines from
+-- these, so a constant edit that breaks the algebra must fail here, not in-game.
+test("LAYOUT contract identities", function()
+    local LAY = L.LAYOUT
+    ok(type(LAY) == "table", "LCEX.LAYOUT exists")
+    eq(LAY.contentTop, LAY.edge + LAY.titleH + LAY.edge, "contentTop = edge + titleH + edge")
+    eq(LAY.grid, LAY.edge + LAY.pad, "grid = edge + pad (panel line == bare-window line)")
+    eq(LAY.bleed, LAY.grid - LAY.rowPad, "bleed = grid - rowPad (bleed-list text lands on the line)")
+    ok(LAY.iconGap <= 14, "iconGap within the audit's tooltip-adjacency reach (14px)")
+    ok(LAY.gutter >= 6 + 2, "gutter fits the 6px flat scrollbar with padding")
+    eq((LAY.gutter - 6) % 2, 0, "gutter centers the 6px bar on whole pixels")
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

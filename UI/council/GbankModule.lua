@@ -8,6 +8,7 @@
 -- Loads after UI/CouncilWindow.lua; self-registers (order 50).
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
@@ -140,26 +141,28 @@ local function BuildLogRow(panel, listFrame)
     local row = CreateFrame("Button", nil, listFrame or panel)
     row.time = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.time, "caption", "faint")
-    row.time:SetPoint("LEFT", 6, 0); row.time:SetWidth(74); row.time:SetJustifyH("LEFT")
+    row.time:SetPoint("LEFT", LAY.rowPad, 0); row.time:SetWidth(74); row.time:SetJustifyH("LEFT")
     row.who = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.who, "body", "ink")
-    row.who:SetPoint("LEFT", row.time, "RIGHT", 4, 0); row.who:SetWidth(180)
+    row.who:SetPoint("LEFT", row.time, "RIGHT", LAY.inlineGap, 0); row.who:SetWidth(180)
     row.who:SetJustifyH("LEFT"); row.who:SetWordWrap(false)
     row.icons = {}
     local anchor = row.who
     for i = 1, LOG_ICONS do
         local ic = LCEX:CreateItemIcon(row, 20)
-        ic:SetPoint("LEFT", anchor, "RIGHT", i == 1 and 6 or 2, 0)
+        ic:SetPoint("LEFT", anchor, "RIGHT", i == 1 and LAY.inlineGap or 2, 0) -- paired icons: 2
         row.icons[i] = ic; anchor = ic
     end
     row.gold = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.gold, "body", "dim")
-    row.gold:SetPoint("RIGHT", -8, 0); row.gold:SetJustifyH("RIGHT")
+    row.gold:SetPoint("RIGHT", -LAY.rowPad, 0); row.gold:SetJustifyH("RIGHT")
     -- Annotation: shown after the icons, up to the gold. Council rows offer a "+ note" affordance.
+    -- Offset = the icon strip's true span (first gap + icons + inner gaps) + an inlineGap.
+    local iconSpan = LAY.inlineGap + LOG_ICONS * 20 + (LOG_ICONS - 1) * 2
     row.note = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.note, "caption", "faint")
-    row.note:SetPoint("LEFT", row.who, "RIGHT", 6 + LOG_ICONS * 24, 0)
-    row.note:SetPoint("RIGHT", row.gold, "LEFT", -8, 0)
+    row.note:SetPoint("LEFT", row.who, "RIGHT", iconSpan + LAY.inlineGap, 0)
+    row.note:SetPoint("RIGHT", row.gold, "LEFT", -LAY.rowPad, 0)
     row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
     row:SetScript("OnClick", function() EditNote(panel, row.groupUid, row.player) end)
     return row
@@ -195,51 +198,60 @@ LCEX:RegisterCouncilModule({
     key = "gbank", title = LCEX.L["Guild Bank"], order = 50,
 
     build = function(panel)
-        -- Hero gold card (Bd1-3).
+        -- Hero gold card (Bd1-3): a full-bleed band; its interior pads like a card (LAYOUT.pad),
+        -- so hero text sits on the same absolute line as the tab buttons below (bleed + pad).
         local hero = CreateFrame("Frame", nil, panel)
-        hero:SetPoint("TOPLEFT", 4, -4); hero:SetPoint("TOPRIGHT", -4, -4); hero:SetHeight(52)
+        hero:SetPoint("TOPLEFT", LAY.bleed, -LAY.bleed)
+        hero:SetPoint("TOPRIGHT", -LAY.bleed, -LAY.bleed)
+        hero:SetHeight(52)
         LCEX:Surface(hero, "raised")
         hero.label = hero:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(hero.label, "caption", "dim")
-        hero.label:SetPoint("TOPLEFT", 14, -8); hero.label:SetText(LCEX.L["Guild Bank"])
+        hero.label:SetPoint("TOPLEFT", LAY.pad, -LAY.gap); hero.label:SetText(LCEX.L["Guild Bank"])
         hero.gold = hero:CreateFontString(nil, "OVERLAY")
         hero.gold:SetFont(LCEX.Theme.font, 22, "")
         hero.gold:SetTextColor(LCEX.Theme.text.ink[1], LCEX.Theme.text.ink[2], LCEX.Theme.text.ink[3])
-        hero.gold:SetPoint("LEFT", 14, -4)
+        hero.gold:SetPoint("LEFT", LAY.pad, -4)
         hero.fresh = hero:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(hero.fresh, "caption", "faint")
-        hero.fresh:SetPoint("BOTTOMRIGHT", -14, 8)
+        hero.fresh:SetPoint("BOTTOMRIGHT", -LAY.pad, LAY.gap)
         panel.hero = hero
+
+        -- Band stack below the hero: tab bar · sub-tabs · grid/log, a gap apart. Buttons and
+        -- grid icons start on the panel's grid line (hero at bleed + pad inside = the same line).
+        local bandX = LAY.grid - LAY.bleed -- hero-relative x for the panel's grid line
+        local tabTop, subTop = LAY.gap, LAY.gap + LAY.btnHSlim + LAY.gap
+        local contentTop = subTop + LAY.btnHSlim + LAY.gap
 
         -- Tab selector (pooled buttons).
         panel.tabBtns = {}
-        local x = 0
+        local x = bandX
         for i = 1, MAX_TABS do
-            local b = LCEX:CreateFlatButton(panel, "", 84, 20)
-            b:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", x, -6)
+            local b = LCEX:CreateFlatButton(panel, "", 84, LAY.btnHSlim)
+            b:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", x, -tabTop)
             b:SetScript("OnClick", function()
                 if b.tabIndex then panel.selTab = b.tabIndex; RefreshTabBar(panel); SelectSubTab(panel, "contents") end
             end)
             b:Hide()
             panel.tabBtns[i] = b
-            x = x + 88
+            x = x + 84 + LAY.tabGap
         end
 
         -- Contents / Log sub-tabs.
         panel.subTabs = {}
-        local sx = 0
+        local sx = bandX
         for _, def in ipairs(SUBTABS) do
-            local b = LCEX:CreateFlatButton(panel, def.text, 74, 20)
-            b:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", sx, -32)
+            local b = LCEX:CreateFlatButton(panel, def.text, 74, LAY.btnHSlim)
+            b:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", sx, -subTop)
             b.subKey = def.key
             b:SetScript("OnClick", function() SelectSubTab(panel, def.key) end)
             panel.subTabs[#panel.subTabs + 1] = b
-            sx = sx + 78
+            sx = sx + 74 + LAY.tabGap
         end
 
         -- Contents grid (14×7 pooled icons).
         local grid = CreateFrame("Frame", nil, panel)
-        grid:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", 4, -58)
+        grid:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", bandX, -contentTop)
         grid:SetSize(GRID_COLS * (ICON + 2), GRID_ROWS * (ICON + 2))
         panel.grid = grid
         panel.gridIcons = {}
@@ -258,13 +270,16 @@ LCEX:RegisterCouncilModule({
             buildRow = function(list) return BuildLogRow(panel, list) end,
             fillRow = function(row, g) FillLogRow(row, g) end,
         })
-        panel.logList:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", 4, -58)
-        panel.logList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 8)
+        -- Full-bleed band (rows pad by rowPad, landing text on the grid line with the icons).
+        panel.logList:SetPoint("TOPLEFT", hero, "BOTTOMLEFT", 0, -contentTop)
+        panel.logList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -LAY.bleed, LAY.bleed)
         panel.logList:Hide()
 
+        -- Centered in the content region below the hero band (bleed + hero + tab bands ≈ 64px:
+        -- shift down by half so it reads centered in the space the grid/log actually occupy).
         panel.empty = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.empty, "body", "faint")
-        panel.empty:SetPoint("CENTER", 0, -20)
+        panel.empty:SetPoint("CENTER", 0, -32)
         panel.empty:Hide()
     end,
 

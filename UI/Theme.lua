@@ -2,7 +2,7 @@
 -- The design language for the four-frame UI: flat-dark gradient surfaces, gold accent, quiet
 -- text tones (patterned on iddqd/Cell, verified TBC-safe against Gargul). One source of truth
 -- for every color/font/metric so all windows read as one addon. Widgets.lua builds on this;
--- frame modules never hardcode colors.
+-- frame modules never hardcode colors — and anchor from LCEX.LAYOUT, never one-off offsets.
 --
 -- Classic-safety notes baked in here:
 --   • Gradients: newer clients take Texture:SetGradient(orient, ColorMixin, ColorMixin); the
@@ -49,6 +49,54 @@ LCEX.Theme = {
         de      = { 0.45, 0.64, 0.88 }, -- blue          — nobody wants it → disenchant waiting
         awarded = { 0.28, 0.55, 0.38 }, -- dark green    — awarded
     },
+}
+
+-- ── Layout contract ──────────────────────────────────────────────────────────
+-- The shared spacing grid every LCEX frame anchors from. The load-bearing idea is ONE content
+-- line per container: text, flat buttons and edit-box art all start `grid` (12px) inside their
+-- container's edges. Chrome panels that sit at the `edge` (2px) window inset use `pad` (10)
+-- internally — 2 + 10 = 12 absolute, the same optical line as the title-bar tick. Full-bleed
+-- bands (zebra scroll lists, hero cards) sit at `bleed` (4) and pad row content by `rowPad`
+-- (8), so row text lands on the very same line (4 + 8 = 12).
+--
+-- Identities (asserted in Tests/run.lua — change one number, keep the algebra true):
+--   contentTop = edge + titleH + edge      grid = edge + pad      bleed = grid - rowPad
+--
+-- iconGap must stay ≤ 14: the AddonUIAudit engine treats an icon within 14px of a truncated
+-- label as its tooltip host (TEXT/TRUNCATED_NO_TOOLTIP is ERROR for this addon).
+LCEX.LAYOUT = {
+    -- Window chrome
+    edge       = 2,   -- window border → chrome strips (title bar, rails, panes, footer)
+    titleH     = 28,  -- title-bar height (CreateWindowV2's f.bar)
+    contentTop = 32,  -- first content y below the title bar (= edge + titleH + edge)
+    divider    = 4,   -- seam between side-by-side panels (rail | pane)
+    footerH    = 34,  -- bottom action-bar height
+
+    -- The content grid
+    pad   = 10,       -- content inset inside an edge-anchored chrome panel (→ 12 absolute)
+    grid  = 12,       -- content inset inside a bare window or deep panel (= edge + pad)
+    bleed = 4,        -- inset for full-bleed bands: zebra lists, hero cards (= grid - rowPad)
+
+    -- Rhythm
+    gap      = 8,     -- default gap between stacked/adjacent siblings
+    gapTight = 4,     -- compact gap (glyph clusters, tab strips, trailing row buttons)
+    section  = 16,    -- gap between unrelated control groups
+
+    -- Rows
+    rowPad    = 8,    -- row-internal left/right inset (bleed + rowPad = the grid line)
+    iconGap   = 8,    -- icon → text gap (≤ 14, see header note)
+    inlineGap = 6,    -- text → text / text → control gap inside a row
+
+    -- Controls
+    btnH     = 22,    -- standard flat-button height (footers, toolbars, forms)
+    btnHSlim = 20,    -- in-row / tab-strip flat-button height
+    btnGap   = 6,     -- gap between grouped action buttons (footer pairs)
+    tabGap   = 4,     -- gap between tab-strip buttons
+    editH    = 20,    -- InputBoxTemplate's intrinsic height
+    editPad  = 4,     -- InputBoxTemplate left-art compensation: frame x = content line + editPad
+
+    -- Lists
+    gutter = 14,      -- scrollbar gutter reserved at a list's right edge (both list helpers)
 }
 
 -- ── Paint helpers ────────────────────────────────────────────────────────────

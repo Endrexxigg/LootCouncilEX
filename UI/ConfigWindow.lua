@@ -9,8 +9,10 @@
 -- Loads after UI/Theme.lua + UI/Widgets.lua.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_ConfigWindow"
+local WIN_W      = 360
 
 -- Push profile.appearance to every created v2 window (each carries RefreshAppearance).
 -- Iterate by FIELD NAME: an array literal of window references gets nil holes for windows
@@ -64,33 +66,35 @@ end
 function LCEX:EnsureConfigWindow()
     if self.configWindow then return self.configWindow end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = 360, height = 400,
+        width = WIN_W, height = 400,
         title = self.L["Configuration"],
         savedKey = "config",
         defaultPos = { x = -220, y = 60 },
     })
 
+    -- Bare window: every control sits on the LAYOUT.grid line, symmetric left/right. Rows
+    -- advance by control height + gap; headers keep a small extra breath (gapTight) above.
     f.controls = {}
-    local y = -44
+    local y = -(LAY.contentTop + LAY.grid)
     for _, entry in ipairs(BuildSchema(self)) do
         local control
         if entry.type == "header" then
             control = f:CreateFontString(nil, "OVERLAY")
             self:ThemeText(control, "caption", "faint")
-            control:SetPoint("TOPLEFT", 16, y - 4)
+            control:SetPoint("TOPLEFT", LAY.grid, y - LAY.gapTight)
             control:SetText(tostring(entry.label):upper())
             y = y - 24
         elseif entry.type == "checkbox" then
             control = self:CreateCheckbox(f, entry.label, entry.get, entry.set)
-            control:SetPoint("TOPLEFT", 18, y)
-            y = y - 28
+            control:SetPoint("TOPLEFT", LAY.grid, y)
+            y = y - (LAY.btnHSlim + LAY.gap)
         elseif entry.type == "slider" then
             control = self:CreateSliderV2(f, {
-                width = 300, min = entry.min, max = entry.max, step = entry.step,
+                width = WIN_W - 2 * LAY.grid, min = entry.min, max = entry.max, step = entry.step,
                 label = entry.label, fmt = entry.fmt, get = entry.get, set = entry.set,
             })
-            control:SetPoint("TOPLEFT", 18, y)
-            y = y - 44
+            control:SetPoint("TOPLEFT", LAY.grid, y)
+            y = y - (34 + LAY.gap) -- CreateSliderV2's wrap is 34 tall
         end
         f.controls[#f.controls + 1] = control
     end

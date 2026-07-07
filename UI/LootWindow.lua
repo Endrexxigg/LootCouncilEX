@@ -13,29 +13,27 @@
 -- Loads after UI/Theme.lua + UI/Widgets.lua; before Core/session/Candidate + Council.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
 local FRAME_NAME = "LCEX_LootWindow"
 local RAIL_W     = 280 -- widened from 236 so item names truncate less (handoff item 11)
-local BAR_H      = 34 -- bottom bar
-local FULL_W     = 824          -- rail + the 536px right pane
-local COMPACT_W  = RAIL_W + 4   -- rail-only form (item 4): pre-session staging
+local PANE_W     = 536 -- the right (candidate) pane
+local FULL_W     = 2 * LAY.edge + RAIL_W + LAY.divider + PANE_W
+local COMPACT_W  = RAIL_W + 2 * LAY.edge -- rail-only form (item 4): pre-session staging
 
 -- ── Compact staging layout ───────────────────────────────────────────────────
 -- One content inset shared by the header, the staged-items list, the Scan/add controls and the
--- footer, plus a fixed scrollbar gutter and a deliberate footer band. Every compact-state control
--- anchors from these constants (not one-off offsets), so the left/right content boundaries line
--- up across the whole rail-only window.
-local C_INSET    = 10             -- left/right content inset inside the rail and the footer
+-- footer, all from the LAYOUT contract: the rail is an edge-anchored chrome panel, so its
+-- content line is LAYOUT.pad (12px absolute — the title-tick line). The rail list is an INSET
+-- list: its stripes start on the pad line and its rows pad content by rowPad inside.
+local C_INSET    = LAY.pad        -- left/right content inset inside the rail and the footer
 local C_ROW_H    = 30             -- staged-item row height
-local C_GUTTER   = 14             -- scrollbar gutter reserved on the list's right edge
-local C_GAP      = 8              -- vertical gap between stacked controls
+local C_GAP      = LAY.gap        -- vertical gap between stacked controls
 local C_HEADER_H = 16             -- header caption band
-local C_CTRL_H   = 22             -- Scan button height (the edit box is a fixed 20)
-local C_EDIT_H   = 20             -- InputBoxTemplate's intrinsic height
 -- Staging control band, measured up from the rail bottom: gap · addBox · gap · scanBtn · gap.
-local C_BAND_H   = C_GAP + C_EDIT_H + C_GAP + C_CTRL_H + C_GAP
+local C_BAND_H   = C_GAP + LAY.editH + C_GAP + LAY.btnH + C_GAP
 local C_CONTENT_W = RAIL_W - 2 * C_INSET
 
 -- Awarded marker: an inline texture escape (the ready-check tick), NOT a "✓" glyph —
@@ -113,8 +111,8 @@ function LCEX:EnsureLootWindow()
 
     -- Left rail --------------------------------------------------------------
     local rail = CreateFrame("Frame", nil, f)
-    rail:SetPoint("TOPLEFT", 2, -32)
-    rail:SetPoint("BOTTOMLEFT", 2, BAR_H + 2)
+    rail:SetPoint("TOPLEFT", LAY.edge, -LAY.contentTop)
+    rail:SetPoint("BOTTOMLEFT", LAY.edge, LAY.footerH + LAY.edge)
     rail:SetWidth(RAIL_W)
     self:Surface(rail, "base")
     f.rail = rail
@@ -124,10 +122,10 @@ function LCEX:EnsureLootWindow()
     f.railHeader:SetPoint("TOPLEFT", C_INSET, -C_GAP)
 
     -- Real pixel-scrolling staged-items list: top-anchored below the header, bottom set per state
-    -- in RefreshLootWindow (above the staging band out-of-session, snug in-session). The C_GUTTER
-    -- reserve keeps the flat scrollbar clear of the row content on the right.
+    -- in RefreshLootWindow (above the staging band out-of-session, snug in-session). The shared
+    -- LAYOUT.gutter reserve keeps the flat scrollbar clear of the row content on the right.
     f.railList = self:CreatePixelScrollList(rail, {
-        rowHeight = C_ROW_H, width = C_CONTENT_W, gutter = C_GUTTER, zebra = true,
+        rowHeight = C_ROW_H, width = C_CONTENT_W, zebra = true,
         buildRow = function(parent) return self:BuildLootRailRow(parent) end,
         fillRow  = function(row, entry, index) self:FillLootRailRow(row, entry, index) end,
     })
@@ -147,36 +145,39 @@ function LCEX:EnsureLootWindow()
     f.railEmpty:Hide()
 
     -- Staging controls (hidden while a session is open), sharing the content inset with the list.
-    f.scanBtn = self:CreateFlatButton(rail, self.L["Scan bags"], C_CONTENT_W, C_CTRL_H)
-    f.scanBtn:SetPoint("BOTTOMLEFT", C_INSET, C_GAP + C_EDIT_H + C_GAP) -- sits above the add box
+    f.scanBtn = self:CreateFlatButton(rail, self.L["Scan bags"], C_CONTENT_W, LAY.btnH)
+    f.scanBtn:SetPoint("BOTTOMLEFT", C_INSET, C_GAP + LAY.editH + C_GAP) -- sits above the add box
     f.scanBtn:SetScript("OnClick", function() self:LootStageScan() end)
 
+    -- editPad shifts the frame so the box ART lands on the same line as the Scan button above.
     f.addBox = self:CreateEditBox(rail, {
-        width = C_CONTENT_W,
+        width = C_CONTENT_W - LAY.editPad,
         onCommit = function(text) self:LootStageAdd(text) end,
     })
-    f.addBox:SetPoint("BOTTOMLEFT", C_INSET, C_GAP)
+    f.addBox:SetPoint("BOTTOMLEFT", C_INSET + LAY.editPad, C_GAP)
 
     -- Right pane ---------------------------------------------------------------
+    -- A deep panel: its content line is LAYOUT.grid; the candidate list is a full-bleed band
+    -- (bleed inset, rowPad-inside rows), so list text lands on the same grid line as the header.
     local pane = CreateFrame("Frame", nil, f)
-    pane:SetPoint("TOPLEFT", rail, "TOPRIGHT", 4, 0)
-    pane:SetPoint("BOTTOMRIGHT", -2, BAR_H + 2)
+    pane:SetPoint("TOPLEFT", rail, "TOPRIGHT", LAY.divider, 0)
+    pane:SetPoint("BOTTOMRIGHT", -LAY.edge, LAY.footerH + LAY.edge)
     self:Surface(pane, "page")
     f.pane = pane
 
     f.itemIcon = self:CreateItemIcon(pane, 30)
-    f.itemIcon:SetPoint("TOPLEFT", 12, -8)
+    f.itemIcon:SetPoint("TOPLEFT", LAY.grid, -LAY.gap)
 
     f.itemName = pane:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.itemName, "section", "ink")
-    f.itemName:SetPoint("LEFT", f.itemIcon, "RIGHT", 10, 0)
+    f.itemName:SetPoint("LEFT", f.itemIcon, "RIGHT", LAY.iconGap, 0)
     f.itemName:SetJustifyH("LEFT")
     f.itemName:SetWordWrap(false)
 
     f.itemCount = pane:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.itemCount, "caption", "faint")
-    f.itemCount:SetPoint("TOPRIGHT", -12, -16)
-    f.itemName:SetPoint("RIGHT", f.itemCount, "LEFT", -8, 0)
+    f.itemCount:SetPoint("TOPRIGHT", -LAY.grid, -16)
+    f.itemName:SetPoint("RIGHT", f.itemCount, "LEFT", -LAY.gap, 0)
 
     -- Tooltip on the selected item's NAME, not just its icon (item 15) — an overlay button in
     -- the row.nameBtn pattern, reading the selection live at hover time.
@@ -197,7 +198,7 @@ function LCEX:EnsureLootWindow()
     -- and the count shows even under anonymous voting (only voter NAMES hide — V7).
     f.voteTally = pane:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.voteTally, "caption", "dim")
-    f.voteTally:SetPoint("TOPRIGHT", -12, -30)
+    f.voteTally:SetPoint("TOPRIGHT", -LAY.grid, -30)
     f.voteTally:Hide()
 
     -- Hover target over the tally → the who-voted list (V6), suppressed to "Anonymous voting" when
@@ -222,25 +223,27 @@ function LCEX:EnsureLootWindow()
     end)
     f.voteTallyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    f.empty = pane:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(f.empty, "body", "faint")
-    f.empty:SetPoint("TOP", 0, -110)
-    f.empty:SetText(self.L["No responses yet."])
-    f.empty:Hide()
-
     f.candList = self:CreateScrollList(pane, {
-        rowHeight = 26, width = 480, fillHeight = true, zebra = true,
+        rowHeight = 26, fillHeight = true, zebra = true,
         buildRow = function(parent) return self:BuildLootCandRow(parent) end,
         fillRow  = function(row, entry) self:FillLootCandRow(row, entry) end,
     })
-    f.candList:SetPoint("TOPLEFT", 8, -48)
-    f.candList:SetPoint("BOTTOMRIGHT", -8, 8)
+    -- Full-bleed band below the header row (gap · 30px icon · gap), width from the anchors.
+    f.candList:SetPoint("TOPLEFT", LAY.bleed, -(LAY.gap + 30 + LAY.gap))
+    f.candList:SetPoint("BOTTOMRIGHT", -LAY.bleed, LAY.bleed)
+
+    -- Empty-state centered on the list area (the railEmpty pattern), not a fixed window offset.
+    f.empty = pane:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(f.empty, "body", "faint")
+    f.empty:SetPoint("CENTER", f.candList, "CENTER", 0, 0)
+    f.empty:SetText(self.L["No responses yet."])
+    f.empty:Hide()
 
     -- Bottom bar ---------------------------------------------------------------
     local bar = CreateFrame("Frame", nil, f)
-    bar:SetPoint("BOTTOMLEFT", 2, 2)
-    bar:SetPoint("BOTTOMRIGHT", -2, 2)
-    bar:SetHeight(BAR_H)
+    bar:SetPoint("BOTTOMLEFT", LAY.edge, LAY.edge)
+    bar:SetPoint("BOTTOMRIGHT", -LAY.edge, LAY.edge)
+    bar:SetHeight(LAY.footerH)
     self:Surface(bar, "raised")
     f.bottomBar = bar
 
@@ -250,8 +253,8 @@ function LCEX:EnsureLootWindow()
     f.status:SetJustifyH("LEFT")
     f.status:SetWordWrap(false) -- single-line: a right bound (set per-state in RefreshLootWindow) truncates, never wraps
 
-    f.endBtn = self:CreateFlatButton(bar, self.L["End session"], 100, 22, "danger")
-    f.endBtn:SetPoint("RIGHT", -8, 0)
+    f.endBtn = self:CreateFlatButton(bar, self.L["End session"], 100, LAY.btnH, "danger")
+    f.endBtn:SetPoint("RIGHT", -C_INSET, 0) -- footer buttons end on the same line the status starts on
     f.endBtn:SetScript("OnClick", function()
         -- Contextual: the ML ends the session for everyone; anyone else just closes their own
         -- view (a candidate can't end the ML's session, and EndSession's no-session path would
@@ -264,14 +267,14 @@ function LCEX:EnsureLootWindow()
         self:RefreshLootWindow()
     end)
 
-    f.startBtn = self:CreateFlatButton(bar, self.L["Start session"], 110, 22, "accent")
-    f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
+    f.startBtn = self:CreateFlatButton(bar, self.L["Start session"], 110, LAY.btnH, "accent")
+    f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -LAY.btnGap, 0)
     f.startBtn:SetScript("OnClick", function() self:LootStartStaged() end)
 
     -- Disenchant the selected item (Feature V, ML-only + session-only). Shares startBtn's slot —
     -- startBtn is hidden in-session and deBtn out-of-session, so they are never both shown.
-    f.deBtn = self:CreateFlatButton(bar, self.L["D/E"], 60, 22)
-    f.deBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
+    f.deBtn = self:CreateFlatButton(bar, self.L["D/E"], 60, LAY.btnH)
+    f.deBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -LAY.btnGap, 0)
     f.deBtn:SetScript("OnClick", function() self:LootDisenchantSelected() end)
     f.deBtn:Hide()
 
@@ -337,24 +340,25 @@ function LCEX:BuildLootRailRow(parent)
     row.sel:Hide()
 
     row.icon = self:CreateItemIcon(row, 22)
-    row.icon:SetPoint("LEFT", 8, 0)
+    row.icon:SetPoint("LEFT", LAY.rowPad, 0)
     row.statusBorder = BuildIconBorder(row) -- award-readiness edge (Feature V)
 
     row.name = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.name, "body", "ink")
-    row.name:SetPoint("LEFT", row.icon, "RIGHT", 8, 0)
+    row.name:SetPoint("LEFT", row.icon, "RIGHT", LAY.iconGap, 0)
     row.name:SetJustifyH("LEFT")
     row.name:SetWordWrap(false)
 
+    -- Badge default clears the staging remove-× zone: gapTight · 16px button · gapTight.
     row.badge = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.badge, "caption", "faint")
-    row.badge:SetPoint("RIGHT", -24, 0)
-    row.name:SetPoint("RIGHT", row.badge, "LEFT", -6, 0)
+    row.badge:SetPoint("RIGHT", -(LAY.gapTight + 16 + LAY.gapTight), 0)
+    row.name:SetPoint("RIGHT", row.badge, "LEFT", -LAY.inlineGap, 0)
 
     -- Staging-only remove ×.
     row.remove = CreateFrame("Button", nil, row)
     row.remove:SetSize(16, 16)
-    row.remove:SetPoint("RIGHT", -4, 0)
+    row.remove:SetPoint("RIGHT", -LAY.gapTight, 0)
     row.remove.fs = row.remove:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.remove.fs, "body", "faint")
     row.remove.fs:SetPoint("CENTER", 0, 0)
@@ -409,10 +413,10 @@ function LCEX:FillLootRailRow(row, entry)
 
     local f = self.lootWindow
     local a = self.activeSession
-    -- The badge's right inset is dynamic: staging leaves 24px for the remove ×; in-session the
+    -- The badge's right inset is dynamic: staging clears the remove-× zone; in-session the
     -- × is hidden, so the badge (and the name chained to it) reclaim that width (item 11).
     row.badge:ClearAllPoints()
-    row.badge:SetPoint("RIGHT", a and -6 or -24, 0)
+    row.badge:SetPoint("RIGHT", a and -LAY.rowPad or -(LAY.gapTight + 16 + LAY.gapTight), 0)
     if a then
         row.remove:Hide()
         local statusKind
@@ -471,11 +475,11 @@ function LCEX:BuildLootCandRow(parent)
 
     row.name = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.name, "body", "ink")
-    row.name:SetPoint("LEFT", 4, 0)
+    row.name:SetPoint("LEFT", LAY.rowPad, 0)
     row.name:SetWidth(110); row.name:SetJustifyH("LEFT"); row.name:SetWordWrap(false)
 
     row.nameBtn = CreateFrame("Button", nil, row)
-    row.nameBtn:SetPoint("LEFT", 4, 0)
+    row.nameBtn:SetPoint("LEFT", LAY.rowPad, 0)
     row.nameBtn:SetSize(110, 24)
     row.nameBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row.nameBtn:SetScript("OnClick", function(_, button)
@@ -492,30 +496,31 @@ function LCEX:BuildLootCandRow(parent)
 
     row.resp = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.resp, "body", "dim")
-    row.resp:SetPoint("LEFT", row.name, "RIGHT", 6, 0)
+    row.resp:SetPoint("LEFT", row.name, "RIGHT", LAY.inlineGap, 0)
     row.resp:SetWidth(52); row.resp:SetJustifyH("LEFT"); row.resp:SetWordWrap(false)
 
     row.gear = { self:CreateItemIcon(row, 18), self:CreateItemIcon(row, 18) }
-    row.gear[1]:SetPoint("LEFT", row.resp, "RIGHT", 4, 0)
-    row.gear[2]:SetPoint("LEFT", row.gear[1], "RIGHT", 2, 0)
+    row.gear[1]:SetPoint("LEFT", row.resp, "RIGHT", LAY.gapTight, 0)
+    row.gear[2]:SetPoint("LEFT", row.gear[1], "RIGHT", 2, 0) -- paired icons: half a gapTight
 
     row.note = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.note, "caption", "faint")
-    row.note:SetPoint("LEFT", row.gear[2], "RIGHT", 6, 0)
+    row.note:SetPoint("LEFT", row.gear[2], "RIGHT", LAY.inlineGap, 0)
     row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
 
-    row.award = self:CreateFlatButton(row, self.L["Award"], 56, 20, "accent")
-    row.award:SetPoint("RIGHT", -2, 0)
+    row.award = self:CreateFlatButton(row, self.L["Award"], 56, LAY.btnHSlim, "accent")
+    row.award:SetPoint("RIGHT", -LAY.gapTight, 0)
     -- Vote cluster reads [−][n][+] left→right (handoff item 2): downvote left, upvote right.
-    row.plus = self:CreateFlatButton(row, "+", 22, 20)
-    row.plus:SetPoint("RIGHT", row.award, "LEFT", -8, 0)
+    -- Cluster-internal gaps are gapTight; the cluster stands a full gap off the Award button.
+    row.plus = self:CreateFlatButton(row, "+", 22, LAY.btnHSlim)
+    row.plus:SetPoint("RIGHT", row.award, "LEFT", -LAY.gap, 0)
     row.votes = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.votes, "body", "ink")
-    row.votes:SetPoint("RIGHT", row.plus, "LEFT", -6, 0)
+    row.votes:SetPoint("RIGHT", row.plus, "LEFT", -LAY.gapTight, 0)
     row.votes:SetWidth(22); row.votes:SetJustifyH("CENTER")
-    row.minus = self:CreateFlatButton(row, "−", 22, 20)
-    row.minus:SetPoint("RIGHT", row.votes, "LEFT", -4, 0)
-    row.note:SetPoint("RIGHT", row.minus, "LEFT", -6, 0)
+    row.minus = self:CreateFlatButton(row, "−", 22, LAY.btnHSlim)
+    row.minus:SetPoint("RIGHT", row.votes, "LEFT", -LAY.gapTight, 0)
+    row.note:SetPoint("RIGHT", row.minus, "LEFT", -LAY.inlineGap, 0)
 
     return row
 end
@@ -694,7 +699,7 @@ function LCEX:RefreshLootWindow()
         -- End is shown here, so restore startBtn to its shared slot left of End (it's hidden in
         -- this state, but keep the anchor coherent for the next staging→session toggle).
         f.startBtn:ClearAllPoints()
-        f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -6, 0)
+        f.startBtn:SetPoint("RIGHT", f.endBtn, "LEFT", -LAY.btnGap, 0)
         -- Contextual label (DL-18): only the ML ends the session for everyone; anyone else
         -- (council or spectator) merely leaves their own view of it.
         f.endBtn:SetText(self.session and self.L["End session"] or self.L["Leave session"])

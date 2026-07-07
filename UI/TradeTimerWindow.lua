@@ -9,11 +9,13 @@
 -- Loads after UI/Widgets.lua and Core/TradeTimers.lua.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_TradeTimerWindow"
 local TIMER_W    = 280
 local ROW_H      = 22
-local TOP        = 30  -- below the title bar
+local TOP        = LAY.contentTop -- first bar below the title bar
+local SIDE       = LAY.edge + LAY.bleed -- bars are full-bleed bands on a bare window
 local MAX_ROWS   = 12
 local TRADE_WINDOW = 7200
 
@@ -47,21 +49,21 @@ local function BuildTimerRow(f)
     row.bar.bg:SetVertexColor(0, 0, 0, 0.4)
 
     row.icon = addon:CreateItemIcon(row, ROW_H - 4)
-    row.icon:SetPoint("LEFT", 2, 0)
+    row.icon:SetPoint("LEFT", 2, 0) -- (ROW_H - icon) / 2: vertically-derived, keeps the icon square-centered
 
     row.label = row:CreateFontString(nil, "OVERLAY")
     addon:ThemeText(row.label, "caption", "ink")
     local lf, lsz = row.label:GetFont()
     if lf then row.label:SetFont(lf, lsz, "OUTLINE") end -- readable over the fill
-    row.label:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+    row.label:SetPoint("LEFT", row.icon, "RIGHT", LAY.inlineGap, 0)
     row.label:SetJustifyH("LEFT"); row.label:SetWordWrap(false)
 
     row.time = row:CreateFontString(nil, "OVERLAY")
     addon:ThemeText(row.time, "caption", "ink")
     local tf, tsz = row.time:GetFont()
     if tf then row.time:SetFont(tf, tsz, "OUTLINE") end
-    row.time:SetPoint("RIGHT", -6, 0)
-    row.label:SetPoint("RIGHT", row.time, "LEFT", -6, 0)
+    row.time:SetPoint("RIGHT", -LAY.inlineGap, 0)
+    row.label:SetPoint("RIGHT", row.time, "LEFT", -LAY.inlineGap, 0)
 
     -- Hover: the item tooltip + the hide hint. Shift+double-click hides this item (deliberate).
     row:SetScript("OnEnter", function(r)
@@ -97,9 +99,9 @@ function LCEX:EnsureTradeTimerWindow()
     -- A user close (×) suppresses auto-show until the list next drains to empty (Gargul-like).
     f.closeButton:HookScript("OnClick", function() addon._tradeUserClosed = true end)
 
-    -- Minimize: collapse to just the soonest bar (+N). Sits left of the close ×.
+    -- Minimize: collapse to just the soonest bar (+N). Sits left of the close × (paired glyphs).
     local mini = CreateFrame("Button", nil, f.bar)
-    mini:SetSize(22, 22)
+    mini:SetSize(LAY.btnH, LAY.btnH)
     mini:SetPoint("RIGHT", f.closeButton, "LEFT", -2, 0)
     mini.fs = mini:CreateFontString(nil, "OVERLAY")
     self:ThemeText(mini.fs, "section", "dim")
@@ -167,8 +169,8 @@ function LCEX:UpdateTradeTimerWindow()
             f.rows[i] = row
         end
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", 6, -(TOP + (i - 1) * ROW_H))
-        row:SetPoint("TOPRIGHT", -6, -(TOP + (i - 1) * ROW_H))
+        row:SetPoint("TOPLEFT", SIDE, -(TOP + (i - 1) * ROW_H))
+        row:SetPoint("TOPRIGHT", -SIDE, -(TOP + (i - 1) * ROW_H))
         FillTimerRow(self, row, visible[i])
         row:Show()
     end
@@ -177,18 +179,19 @@ function LCEX:UpdateTradeTimerWindow()
     local bottom = TOP + shown * ROW_H
     local extra = self._tradeMinimized and (#visible - 1) or (#visible - shown)
     if extra > 0 then
+        -- "+N more" on the bars' left edge, in a 16px band 2px under the last bar.
         f.more:ClearAllPoints()
-        f.more:SetPoint("TOPLEFT", 10, -(bottom + 2))
+        f.more:SetPoint("TOPLEFT", SIDE, -(bottom + 2))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
-        bottom = bottom + 14
+        bottom = bottom + 16
     else
         f.more:Hide()
     end
 
     -- Grow/shrink downward (pin TOPLEFT — the PollWindow reflow pattern).
     local winTop, winLeft = f:GetTop(), f:GetLeft()
-    f:SetHeight(bottom + 6)
+    f:SetHeight(bottom + SIDE)
     if type(winTop) == "number" and type(winLeft) == "number" then
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", winLeft, winTop)

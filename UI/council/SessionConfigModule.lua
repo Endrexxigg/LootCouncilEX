@@ -7,6 +7,12 @@
 -- Loads after UI/CouncilWindow.lua; self-registers.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
+
+-- Two-column form: the left column sits on the panel's grid line; the right column starts at
+-- COL2. Each column follows the same grammar — text/checkboxes on the column line, edit boxes
+-- at +editPad, full-bleed lists at -rowPad (so their row text lands back on the column line).
+local COL2 = 320
 
 local function RefreshRoster(panel)
     local names = {}
@@ -73,20 +79,20 @@ LCEX:RegisterCouncilModule({
             get = function() return tonumber(p.pollTimeout) or 0 end,
             set = function(v) p.pollTimeout = v end,
         })
-        panel.timeout:SetPoint("TOPLEFT", 14, -16)
+        panel.timeout:SetPoint("TOPLEFT", LAY.grid, -16)
 
         -- Anonymous voting (V7) — a SHARED-config field (replicated), so the whole council agrees
         -- for a session's lifetime. Right of the deadline slider, clear of the roster column below.
         panel.anon = LCEX:CreateCheckbox(panel, LCEX.L["Anonymous voting"],
             function() return LCEX:GetConfig().anonVoting end,
             function(v) LCEX:SetConfigField("anonVoting", v) end)
-        panel.anon:SetPoint("TOPLEFT", 320, -24)
+        panel.anon:SetPoint("TOPLEFT", COL2, -16) -- column tops align with the deadline slider
 
         -- Preferred disenchanters (V5) — a ranked SHARED-config list (top = highest priority; the
         -- highest present is auto-picked for a D/E award). Add by name; ▲/▼ reorder; × removes.
         panel.deLabel = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.deLabel, "caption", "dim")
-        panel.deLabel:SetPoint("TOPLEFT", 320, -56)
+        panel.deLabel:SetPoint("TOPLEFT", COL2, -56)
         panel.deLabel:SetText(LCEX.L["Disenchanters (D/E), ranked:"])
 
         panel.deAddBox = LCEX:CreateEditBox(panel, {
@@ -103,7 +109,7 @@ LCEX:RegisterCouncilModule({
                 panel.deAddBox:SetText("")
             end,
         })
-        panel.deAddBox:SetPoint("TOPLEFT", 324, -74)
+        panel.deAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -74)
 
         panel.deList = LCEX:CreateScrollList(panel, {
             rowHeight = 20, fillHeight = true, zebra = true,
@@ -111,14 +117,14 @@ LCEX:RegisterCouncilModule({
                 local row = CreateFrame("Frame", nil, parent)
                 row.fs = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.fs, "body", "ink")
-                row.fs:SetPoint("LEFT", 10, 0)
+                row.fs:SetPoint("LEFT", LAY.rowPad, 0)
                 row.remove = GlyphButton(row, "×")
-                row.remove:SetPoint("RIGHT", -4, 0)
+                row.remove:SetPoint("RIGHT", -LAY.gapTight, 0)
                 row.down = GlyphButton(row, "▼")
-                row.down:SetPoint("RIGHT", row.remove, "LEFT", -2, 0)
+                row.down:SetPoint("RIGHT", row.remove, "LEFT", -2, 0) -- paired glyphs: half a gapTight
                 row.up = GlyphButton(row, "▲")
                 row.up:SetPoint("RIGHT", row.down, "LEFT", -2, 0)
-                row.fs:SetPoint("RIGHT", row.up, "LEFT", -6, 0)
+                row.fs:SetPoint("RIGHT", row.up, "LEFT", -LAY.inlineGap, 0)
                 row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
                 return row
             end,
@@ -131,8 +137,8 @@ LCEX:RegisterCouncilModule({
                 end)
             end,
         })
-        panel.deList:SetPoint("TOPLEFT", 316, -100)
-        panel.deList:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -8, -204)
+        panel.deList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -100) -- bleed: row text back on COL2
+        panel.deList:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -LAY.bleed, -204)
 
         -- Council roster (Feature C: the officer-authored SHARED config, replicated — CouncilConfig
         -- reads it, SetCouncilConfig writes+broadcasts it; profile.council is the pre-config default).
@@ -142,7 +148,7 @@ LCEX:RegisterCouncilModule({
                 LCEX:SetCouncilConfig({ byRank = v })
                 RefreshRoster(panel)
             end)
-        panel.byRank:SetPoint("TOPLEFT", 14, -66)
+        panel.byRank:SetPoint("TOPLEFT", LAY.grid, -66)
 
         panel.rank = LCEX:CreateSliderV2(panel, {
             width = 200, min = 0, max = 9, step = 1,
@@ -154,11 +160,11 @@ LCEX:RegisterCouncilModule({
                 RefreshRoster(panel)
             end,
         })
-        panel.rank:SetPoint("TOPLEFT", 34, -96)
+        panel.rank:SetPoint("TOPLEFT", LAY.grid + 16 + LAY.iconGap, -96) -- flush with the byRank checkbox LABEL text
 
         panel.addLabel = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.addLabel, "caption", "dim")
-        panel.addLabel:SetPoint("TOPLEFT", 14, -146)
+        panel.addLabel:SetPoint("TOPLEFT", LAY.grid, -146)
         panel.addLabel:SetText(LCEX.L["Extra members (any guild rank):"])
 
         panel.addBox = LCEX:CreateEditBox(panel, {
@@ -174,11 +180,11 @@ LCEX:RegisterCouncilModule({
                 RefreshRoster(panel)
             end,
         })
-        panel.addBox:SetPoint("TOPLEFT", 18, -164)
+        panel.addBox:SetPoint("TOPLEFT", LAY.grid + LAY.editPad, -164)
 
         panel.rosterCount = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.rosterCount, "caption", "faint")
-        panel.rosterCount:SetPoint("TOPLEFT", 14, -192)
+        panel.rosterCount:SetPoint("TOPLEFT", LAY.grid, -192)
 
         -- The resolved council (rank members + extras); extras carry a remove ×.
         panel.rosterList = LCEX:CreateScrollList(panel, {
@@ -187,10 +193,10 @@ LCEX:RegisterCouncilModule({
                 local row = CreateFrame("Frame", nil, parent)
                 row.fs = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.fs, "body", "ink")
-                row.fs:SetPoint("LEFT", 10, 0)
+                row.fs:SetPoint("LEFT", LAY.rowPad, 0)
                 row.remove = CreateFrame("Button", nil, row)
                 row.remove:SetSize(16, 16)
-                row.remove:SetPoint("LEFT", row.fs, "RIGHT", 8, 0)
+                row.remove:SetPoint("LEFT", row.fs, "RIGHT", LAY.inlineGap, 0)
                 row.remove.fs = row.remove:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.remove.fs, "body", "faint")
                 row.remove.fs:SetPoint("CENTER", 0, 0)
@@ -212,8 +218,8 @@ LCEX:RegisterCouncilModule({
                 if isExtra then row.remove:Show() else row.remove:Hide() end
             end,
         })
-        panel.rosterList:SetPoint("TOPLEFT", 4, -210)
-        panel.rosterList:SetPoint("BOTTOMRIGHT", -4, 64)
+        panel.rosterList:SetPoint("TOPLEFT", LAY.bleed, -212) -- a full gap under the D/E list's -204 bottom
+        panel.rosterList:SetPoint("BOTTOMRIGHT", -LAY.bleed, 64)
 
         -- Loot-window visibility — a SHARED-config toggle, repurposed by Phase 12 (DL-18). Off:
         -- raiders get the rail-only list view (items/award state/winners). On: raiders get the
@@ -227,7 +233,7 @@ LCEX:RegisterCouncilModule({
                 nv.lootWindow = v
                 LCEX:SetConfigField("visibility", nv)
             end)
-        panel.vis:SetPoint("BOTTOMLEFT", 14, 40)
+        panel.vis:SetPoint("BOTTOMLEFT", LAY.grid, 40)
 
         -- Guild-bank log visibility (B5) — a SHARED-config toggle. Off by default (raiders see the
         -- bank's contents + gold, but not the log or annotations); on opens the log to the whole guild.
@@ -240,12 +246,12 @@ LCEX:RegisterCouncilModule({
                 nv.gbankLog = v
                 LCEX:SetConfigField("visibility", nv)
             end)
-        panel.visGbank:SetPoint("LEFT", panel.vis, "RIGHT", 24, 0)
+        panel.visGbank:SetPoint("LEFT", panel.vis, "RIGHT", LAY.section, 0)
 
         -- DL-8 placeholder ----------------------------------------------------------
         panel.dl8 = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.dl8, "caption", "faint")
-        panel.dl8:SetPoint("BOTTOMLEFT", 14, 14)
+        panel.dl8:SetPoint("BOTTOMLEFT", LAY.grid, LAY.grid)
         panel.dl8:SetText(LCEX.L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."])
     end,
 

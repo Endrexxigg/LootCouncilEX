@@ -7,6 +7,7 @@
 -- Loads after UI/CouncilWindow.lua; self-registers.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
@@ -14,13 +15,15 @@ LCEX:RegisterCouncilModule({
     key = "history", title = LCEX.L["History"], order = 30,
 
     build = function(panel)
+        -- Filter row on the grid line; the label sits low enough that the taller edit box
+        -- centered on it still clears the panel top by the standard gap.
         panel.filterLabel = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.filterLabel, "caption", "dim")
-        panel.filterLabel:SetPoint("TOPLEFT", 10, -12)
+        panel.filterLabel:SetPoint("TOPLEFT", LAY.grid, -12)
         panel.filterLabel:SetText(LCEX.L["Winner:"])
 
         panel.filterBox = LCEX:CreateEditBox(panel, { width = 160 })
-        panel.filterBox:SetPoint("LEFT", panel.filterLabel, "RIGHT", 10, 0)
+        panel.filterBox:SetPoint("LEFT", panel.filterLabel, "RIGHT", LAY.gap + LAY.editPad, 0)
         panel.filterBox:SetScript("OnTextChanged", function(eb)
             panel.list:SetData(LCEX:BuildHistoryLog(eb:GetText()))
         end)
@@ -32,23 +35,23 @@ LCEX:RegisterCouncilModule({
                 row:RegisterForClicks("RightButtonUp")
                 row:SetScript("OnClick", function(r) LCEX:HistoryRecordMenu(r._uid, r._rec) end)
                 row.icon = LCEX:CreateItemIcon(row, 18)
-                row.icon:SetPoint("LEFT", 6, 0)
+                row.icon:SetPoint("LEFT", LAY.rowPad, 0)
                 row.item = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.item, "body", "ink")
-                row.item:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+                row.item:SetPoint("LEFT", row.icon, "RIGHT", LAY.iconGap, 0)
                 row.item:SetWidth(220); row.item:SetJustifyH("LEFT"); row.item:SetWordWrap(false)
                 row.winner = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.winner, "body", "ink")
-                row.winner:SetPoint("LEFT", row.item, "RIGHT", 8, 0)
+                row.winner:SetPoint("LEFT", row.item, "RIGHT", LAY.gap, 0)
                 row.winner:SetWidth(100); row.winner:SetJustifyH("LEFT"); row.winner:SetWordWrap(false)
                 row.resp = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.resp, "caption", "dim")
-                row.resp:SetPoint("LEFT", row.winner, "RIGHT", 8, 0)
+                row.resp:SetPoint("LEFT", row.winner, "RIGHT", LAY.gap, 0)
                 row.resp:SetWidth(50); row.resp:SetJustifyH("LEFT"); row.resp:SetWordWrap(false)
                 row.meta = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.meta, "caption", "faint")
-                row.meta:SetPoint("LEFT", row.resp, "RIGHT", 8, 0)
-                row.meta:SetPoint("RIGHT", row, "RIGHT", -8, 0)
+                row.meta:SetPoint("LEFT", row.resp, "RIGHT", LAY.gap, 0)
+                row.meta:SetPoint("RIGHT", row, "RIGHT", -LAY.rowPad, 0)
                 row.meta:SetJustifyH("LEFT"); row.meta:SetWordWrap(false)
                 return row
             end,
@@ -75,8 +78,8 @@ LCEX:RegisterCouncilModule({
                     tostring(rec.boss or "?"), date("%m/%d %H:%M", rec.ts or 0)))
             end,
         })
-        panel.list:SetPoint("TOPLEFT", 4, -36)
-        panel.list:SetPoint("BOTTOMRIGHT", -4, 4)
+        panel.list:SetPoint("TOPLEFT", LAY.bleed, -(LAY.gap + LAY.editH + LAY.gap))
+        panel.list:SetPoint("BOTTOMRIGHT", -LAY.bleed, LAY.bleed)
     end,
 
     show = function(panel)

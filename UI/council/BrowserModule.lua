@@ -10,10 +10,13 @@
 -- names/qualities resolve async through WithItemID. Loads after UI/CouncilWindow.lua.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemInfoInstant)
 
-local INDENT_BOSS, INDENT_ITEM = 14, 30
+-- Tree indents: raid text sits at rowPad; bosses step in by inlineGap (their 14px fold glyph
+-- then lands the label at ~28); items indent to 30 so their icons align under the boss LABELS.
+local INDENT_BOSS, INDENT_ITEM = LAY.rowPad + LAY.inlineGap, 30
 
 -- Collapse state (item 13): absent key = collapsed, so every play session starts folded to the
 -- raid headers. In-memory on purpose — a persisted tree would go stale across phase releases.
@@ -45,7 +48,7 @@ local function BuildRow(panel)
 
     row.mark = row:CreateFontString(nil, "OVERLAY")
     LCEX:ThemeText(row.mark, "caption", "faint")
-    row.mark:SetPoint("RIGHT", -8, 0)
+    row.mark:SetPoint("RIGHT", -LAY.rowPad, 0)
     row.mark:SetJustifyH("RIGHT")
     row.mark:SetWordWrap(false)
 
@@ -54,7 +57,7 @@ local function BuildRow(panel)
     row.noteIcon = row:CreateTexture(nil, "OVERLAY")
     row.noteIcon:SetSize(12, 12)
     row.noteIcon:SetTexture("Interface\\Buttons\\UI-GuildButton-PublicNote-Up")
-    row.noteIcon:SetPoint("RIGHT", row.mark, "LEFT", -4, 0)
+    row.noteIcon:SetPoint("RIGHT", row.mark, "LEFT", -LAY.gapTight, 0)
     row.noteIcon:Hide()
 
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -101,13 +104,13 @@ local function FillRow(panel, row, entry)
         LCEX:ApplyGradient(row.bg, LCEX.Theme.tone.raised.top, LCEX.Theme.tone.raised.bottom)
         LCEX:ThemeText(row.text, "body", "ink")
         row.text:SetTextColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3])
-        row.text:SetPoint("LEFT", 8, 0)
-        row.text:SetPoint("RIGHT", -8, 0)
+        row.text:SetPoint("LEFT", LAY.rowPad, 0)
+        row.text:SetPoint("RIGHT", -LAY.rowPad, 0)
         row.text:SetText(fold .. entry.text:upper())
     elseif entry.kind == "boss" then
         LCEX:ThemeText(row.text, "body", "ink")
         row.text:SetPoint("LEFT", INDENT_BOSS, 0)
-        row.text:SetPoint("RIGHT", -8, 0)
+        row.text:SetPoint("RIGHT", -LAY.rowPad, 0)
         row.text:SetText(fold .. entry.text)
     else -- item
         row.itemID = entry.itemID
@@ -116,8 +119,8 @@ local function FillRow(panel, row, entry)
         local instantIcon = GetItemInfoInstant and select(5, GetItemInfoInstant(entry.itemID))
         row.icon:SetItem(nil, instantIcon)
         LCEX:ThemeText(row.text, "body", "dim")
-        row.text:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
-        row.text:SetPoint("RIGHT", row.noteIcon, "LEFT", -6, 0)
+        row.text:SetPoint("LEFT", row.icon, "RIGHT", LAY.iconGap, 0)
+        row.text:SetPoint("RIGHT", row.noteIcon, "LEFT", -LAY.inlineGap, 0)
         row.text:SetText("item:" .. entry.itemID)
         if LCEX:HasUserMark(entry.itemID) then row.noteIcon:Show() end
 
@@ -200,27 +203,28 @@ LCEX:RegisterCouncilModule({
     key = "browser", title = LCEX.L["Loot Browser"], order = 10,
 
     build = function(panel)
-        -- Phase buttons across the top.
+        -- Phase buttons across the top, on the panel's grid line.
         panel.phaseButtons = {}
-        local x = 8
+        local x = LAY.grid
         for _, p in ipairs(LCEX:GetLootPhases()) do
-            local b = LCEX:CreateFlatButton(panel, p, 46, 20)
-            b:SetPoint("TOPLEFT", x, -8)
+            local b = LCEX:CreateFlatButton(panel, p, 46, LAY.btnHSlim)
+            b:SetPoint("TOPLEFT", x, -LAY.gap)
             b.phase = p
             b:SetScript("OnClick", function() ShowPhase(panel, p) end)
             panel.phaseButtons[#panel.phaseButtons + 1] = b
-            x = x + 50
+            x = x + 46 + LAY.tabGap
         end
 
         -- The browse list fills everything below the phase buttons — the old always-visible
-        -- mark editor is gone; notes are edited via the right-click menu (item 17).
+        -- mark editor is gone; notes are edited via the right-click menu (item 17). Full-bleed
+        -- band: bleed insets, rowPad-inside rows, so row text lands back on the grid line.
         panel.list = LCEX:CreateScrollList(panel, {
             rowHeight = 22, fillHeight = true, zebra = true,
             buildRow = function() return BuildRow(panel) end,
             fillRow  = function(row, entry) FillRow(panel, row, entry) end,
         })
-        panel.list:SetPoint("TOPLEFT", 4, -34)
-        panel.list:SetPoint("BOTTOMRIGHT", -4, 4)
+        panel.list:SetPoint("TOPLEFT", LAY.bleed, -(LAY.gap + LAY.btnHSlim + LAY.gap))
+        panel.list:SetPoint("BOTTOMRIGHT", -LAY.bleed, LAY.bleed)
     end,
 
     show = function(panel)

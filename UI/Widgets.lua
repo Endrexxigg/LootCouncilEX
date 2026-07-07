@@ -7,8 +7,9 @@
 -- Loads before the frame modules (LootFrame/VotingFrame/SessionFrame) that build on it.
 
 local LCEX = LootCouncilEX
+local LAY = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua) — anchor from it, not literals
 
--- Shared metrics (the theme's colors/fonts live in UI/Theme.lua).
+-- Shared metrics (the theme's colors/fonts and the LAYOUT spacing grid live in UI/Theme.lua).
 LCEX.STYLE = {
     rowHeight = 30,
 }
@@ -81,13 +82,15 @@ function LCEX:FlatScrollBar(bar)
     end
 
     -- Solid thumb in place of the default knob (matches CreateSliderV2's flat thumb pattern).
+    -- Full-track-width thumb, same as CreatePixelScrollList's — the two list types must render
+    -- identical bars.
     bar:SetWidth(6)
     bar:SetThumbTexture("Interface\\Buttons\\WHITE8X8")
     local thumb = bar:GetThumbTexture()
     if thumb then
         local c = self.Theme.text.faint
         thumb:SetVertexColor(c[1], c[2], c[3], 0.9)
-        thumb:SetSize(4, 24)
+        thumb:SetSize(6, 24)
     end
     return bar
 end
@@ -115,8 +118,10 @@ function LCEX:CreateScrollList(parent, opts)
 
     -- The template anchors its scrollbar OUTSIDE the scrollframe's right edge, so a list flush
     -- against a panel border renders its bar across the divider (handoff items 12/18). Re-anchor
-    -- it INSIDE the list, in the 24px gutter the rows already leave free. `sf.ScrollBar` is the
-    -- template's parentKey; the Slider-child scan covers a client where only the name differs.
+    -- it INSIDE the list, CENTERED in the LAYOUT.gutter strip the rows leave free (below) — the
+    -- same geometry as CreatePixelScrollList, so every list in the addon places its bar
+    -- identically. `sf.ScrollBar` is the template's parentKey; the Slider-child scan covers a
+    -- client where only the name differs.
     local bar = sf.ScrollBar
     if not bar then
         for _, child in ipairs({ sf:GetChildren() }) do
@@ -126,8 +131,9 @@ function LCEX:CreateScrollList(parent, opts)
     if bar then
         bar:ClearAllPoints()
         -- Flat-styled (arrows hidden below), so no ±16 arrow gap — run the thumb the full height.
-        bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2)
-        bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -2, 2)
+        local barPad = (LAY.gutter - 6) / 2 -- FlatScrollBar sets the track 6 wide
+        bar:SetPoint("TOPRIGHT", list, "TOPRIGHT", -barPad, -2)
+        bar:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", -barPad, 2)
         self:FlatScrollBar(bar)
         -- The flat bar hides the stock up/down arrows, so the wheel + thumb-drag are the scroll
         -- affordances. Driving the slider value routes through the template's OnValueChanged →
@@ -153,7 +159,7 @@ function LCEX:CreateScrollList(parent, opts)
                 row = opts.buildRow(list)
                 row:SetHeight(rowHeight)
                 row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -(i - 1) * rowHeight)
-                row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -24, -(i - 1) * rowHeight) -- scrollbar gap
+                row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -LAY.gutter, -(i - 1) * rowHeight) -- scrollbar gutter
                 if opts.zebra then
                     -- Shared zebra layer (DL-23): BACKGROUND sublevel 1 sits above a row's
                     -- Surface gradient (sublevel 0) and below ARTWORK selection bars, so the
@@ -215,12 +221,13 @@ end
 -- CreateScrollList — buildRow(parent)->row, fillRow(row,item,index), SetData(items), zebra — so an
 -- existing row factory drops in unchanged. `opts = { rowHeight, width, buildRow, fillRow, zebra,
 -- gutter }`; `gutter` reserves the flat scrollbar's strip on the right so row content never crashes
--- into it. The compact Loot Session staging list uses this; the Faux helper still serves the rest.
+-- into it (defaults to the shared LAYOUT.gutter, like CreateScrollList). The compact Loot Session
+-- staging list uses this; the Faux helper still serves the rest.
 function LCEX:CreatePixelScrollList(parent, opts)
     local addon     = self
     local rowHeight = opts.rowHeight or self.STYLE.rowHeight
     local width     = opts.width or 320
-    local gutter    = opts.gutter or 16
+    local gutter    = opts.gutter or LAY.gutter
 
     local list = CreateFrame("Frame", nil, parent)
     list:SetSize(width, rowHeight * (opts.visibleRows or 6))
@@ -360,7 +367,7 @@ end
 function LCEX:CreateEditBox(parent, opts)
     opts = opts or {}
     local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
-    eb:SetSize(opts.width or 200, 20)
+    eb:SetSize(opts.width or 200, LAY.editH)
     eb:SetAutoFocus(false)
     eb:SetScript("OnEscapePressed", function(self2) self2:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self2)
@@ -409,23 +416,24 @@ function LCEX:CreateWindowV2(name, opts)
     self:Surface(f, "page")
     self:SoftEdge(f)
 
-    -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right.
+    -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right. The tick
+    -- sits on the window's absolute content line (LAYOUT.grid): bar at edge + tick at pad = grid.
     local bar = CreateFrame("Frame", nil, f)
-    bar:SetPoint("TOPLEFT", 2, -2)
-    bar:SetPoint("TOPRIGHT", -2, -2)
-    bar:SetHeight(28)
+    bar:SetPoint("TOPLEFT", LAY.edge, -LAY.edge)
+    bar:SetPoint("TOPRIGHT", -LAY.edge, -LAY.edge)
+    bar:SetHeight(LAY.titleH)
     self:Surface(bar, "raised")
     f.bar = bar
 
     local tick = bar:CreateTexture(nil, "ARTWORK")
     tick:SetTexture("Interface\\Buttons\\WHITE8X8")
     tick:SetSize(3, 14)
-    tick:SetPoint("LEFT", 10, 0)
+    tick:SetPoint("LEFT", LAY.pad, 0)
     tick:SetVertexColor(self.Theme.accent[1], self.Theme.accent[2], self.Theme.accent[3], 1)
 
     local title = bar:CreateFontString(nil, "OVERLAY")
     self:ThemeText(title, "section", "ink")
-    title:SetPoint("LEFT", tick, "RIGHT", 8, 0)
+    title:SetPoint("LEFT", tick, "RIGHT", LAY.gap, 0)
     title:SetText(opts.title or "")
     f.title = title
 
@@ -440,8 +448,8 @@ function LCEX:CreateWindowV2(name, opts)
     end)
 
     local close = CreateFrame("Button", nil, bar)
-    close:SetSize(22, 22)
-    close:SetPoint("RIGHT", -4, 0)
+    close:SetSize(LAY.btnH, LAY.btnH)
+    close:SetPoint("RIGHT", -LAY.gapTight, 0)
     close.fs = close:CreateFontString(nil, "OVERLAY")
     addon:ThemeText(close.fs, "section", "dim")
     close.fs:SetPoint("CENTER", 0, 0)
@@ -514,7 +522,7 @@ end
 function LCEX:CreateFlatButton(parent, text, width, height, variant)
     local addon = self
     local b = CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
-    b:SetSize(width or 90, height or 22)
+    b:SetSize(width or 90, height or LAY.btnH)
     self:Surface(b, "overlay")
     if b.SetBackdrop then
         b:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
@@ -586,8 +594,8 @@ function LCEX:CreateNavRail(parent, opts)
         r.state.valid[key] = true
         local row = CreateFrame("Button", nil, r)
         row:SetHeight(ROW_H)
-        row:SetPoint("TOPLEFT", 0, -(#r.items) * ROW_H - 6)
-        row:SetPoint("TOPRIGHT", 0, -(#r.items) * ROW_H - 6)
+        row:SetPoint("TOPLEFT", 0, -(#r.items) * ROW_H - LAY.inlineGap)
+        row:SetPoint("TOPRIGHT", 0, -(#r.items) * ROW_H - LAY.inlineGap)
         addon:Surface(row, "base")
 
         row.bar = row:CreateTexture(nil, "ARTWORK")
@@ -600,7 +608,7 @@ function LCEX:CreateNavRail(parent, opts)
 
         row.fs = row:CreateFontString(nil, "OVERLAY")
         addon:ThemeText(row.fs, "body", "dim")
-        row.fs:SetPoint("LEFT", 14, 0)
+        row.fs:SetPoint("LEFT", LAY.pad, 0) -- the rail is an edge-anchored chrome panel: pad line
         row.fs:SetText(text)
 
         row.key = key
@@ -657,9 +665,9 @@ function LCEX:CreateCheckbox(parent, label, get, set)
 
     cb.fs = cb:CreateFontString(nil, "OVERLAY")
     self:ThemeText(cb.fs, "body", "ink")
-    cb.fs:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    cb.fs:SetPoint("LEFT", box, "RIGHT", LAY.iconGap, 0)
     cb.fs:SetText(label or "")
-    cb:SetWidth(24 + cb.fs:GetStringWidth() + 8)
+    cb:SetWidth(16 + LAY.iconGap + cb.fs:GetStringWidth() + LAY.gap) -- box + gap + label + clearance
 
     function cb.Refresh(c)
         if get() then c.tick:Show() else c.tick:Hide() end
@@ -747,25 +755,27 @@ function LCEX:ShowConfirm(opts)
     if not f then
         -- FULLSCREEN_DIALOG so the modal-ish confirm (e.g. the browser Leave-note editor) always
         -- sits ABOVE the DIALOG-strata windows it's launched from, instead of clipping under them.
+        local W = 360
         f = self:CreateWindowV2("LCEX_Confirm",
-            { width = 360, height = 150, title = self.L["Confirm"], strata = "FULLSCREEN_DIALOG" })
+            { width = W, height = 150, title = self.L["Confirm"], strata = "FULLSCREEN_DIALOG" })
 
+        -- Bare window: everything on the LAYOUT.grid line; the edit box compensates its left art.
         f.msg = f:CreateFontString(nil, "OVERLAY")
         self:ThemeText(f.msg, "body", "ink")
-        f.msg:SetPoint("TOPLEFT", 16, -40)
-        f.msg:SetPoint("TOPRIGHT", -16, -40)
+        f.msg:SetPoint("TOPLEFT", LAY.grid, -(LAY.contentTop + LAY.gap))
+        f.msg:SetPoint("TOPRIGHT", -LAY.grid, -(LAY.contentTop + LAY.gap))
         f.msg:SetJustifyH("LEFT"); f.msg:SetWordWrap(true)
 
         f.input = self:CreateEditBox(f, {
-            width = 320,
+            width = W - 2 * LAY.grid - LAY.editPad, -- art lands grid-in on both sides
             onCommit = function() f.acceptBtn:Click() end, -- Enter in the box = confirm
         })
-        f.input:SetPoint("TOPLEFT", 18, -86)
+        f.input:SetPoint("TOPLEFT", LAY.grid + LAY.editPad, -86)
 
-        f.acceptBtn = self:CreateFlatButton(f, self.L["Yes"], 90, 24, "accent")
-        f.acceptBtn:SetPoint("BOTTOMRIGHT", -14, 12)
-        f.cancelBtn = self:CreateFlatButton(f, self.L["No"], 90, 24)
-        f.cancelBtn:SetPoint("BOTTOMRIGHT", f.acceptBtn, "BOTTOMLEFT", -8, 0)
+        f.acceptBtn = self:CreateFlatButton(f, self.L["Yes"], 90, LAY.btnH, "accent")
+        f.acceptBtn:SetPoint("BOTTOMRIGHT", -LAY.grid, LAY.grid)
+        f.cancelBtn = self:CreateFlatButton(f, self.L["No"], 90, LAY.btnH)
+        f.cancelBtn:SetPoint("BOTTOMRIGHT", f.acceptBtn, "BOTTOMLEFT", -LAY.btnGap, 0)
         f.cancelBtn:SetScript("OnClick", function() f:Hide() end)
         -- Any dismiss that isn't the accept button (No / × / ESC) counts as cancel — onHide fires the
         -- cancel callback unless accept already ran. Guarded so accept's own Hide() doesn't double-fire.
@@ -835,9 +845,10 @@ function LCEX:ShowContextMenu(opts)
         menu.catcher = catcher
         menu.rows = {}
 
+        -- Title and row text share one line: title at pad; rows inset edge + fs at rowPad = pad.
         menu.title = menu:CreateFontString(nil, "OVERLAY")
         self:ThemeText(menu.title, "caption", "faint")
-        menu.title:SetPoint("TOPLEFT", 10, -6)
+        menu.title:SetPoint("TOPLEFT", LAY.pad, -6)
 
         menu:SetScript("OnHide", function() catcher:Hide() end)
         tinsert(UISpecialFrames, "LCEX_ContextMenu")
@@ -867,7 +878,7 @@ function LCEX:ShowContextMenu(opts)
             row.hl:Hide()
             row.fs = row:CreateFontString(nil, "OVERLAY")
             addon:ThemeText(row.fs, "body", "ink") -- set a font at BUILD time: SetText below errors otherwise
-            row.fs:SetPoint("LEFT", 10, 0)
+            row.fs:SetPoint("LEFT", LAY.rowPad, 0)
             row.fs:SetJustifyH("LEFT")
             row:SetScript("OnEnter", function(r) if not r._off then r.hl:Show() end end)
             row:SetScript("OnLeave", function(r) r.hl:Hide() end)
@@ -892,7 +903,7 @@ function LCEX:ShowContextMenu(opts)
         row._off = it.disabled and true or nil
         row._onClick = it.onClick
         row:Show()
-        local w = row.fs:GetStringWidth() + 24
+        local w = row.fs:GetStringWidth() + 2 * (2 + LAY.rowPad) -- mirror the title's +2*pad width
         if w > width then width = w end
     end
     for i = #items + 1, #menu.rows do menu.rows[i]:Hide() end

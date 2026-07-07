@@ -19,6 +19,7 @@
 -- file and self-register.
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_CouncilWindow"
 local RAIL_W     = 170
@@ -51,12 +52,13 @@ function LCEX:EnsureCouncilWindow()
         width = RAIL_W,
         onSelect = function(key) self:CouncilShowModule(key) end,
     })
-    f.rail:SetPoint("TOPLEFT", 2, -32)
-    f.rail:SetPoint("BOTTOMLEFT", 2, 2)
+    f.rail:SetPoint("TOPLEFT", LAY.edge, -LAY.contentTop)
+    f.rail:SetPoint("BOTTOMLEFT", LAY.edge, LAY.edge)
 
+    -- Module panels fill f.content (a deep panel): their content line is LAYOUT.grid.
     f.content = CreateFrame("Frame", nil, f)
-    f.content:SetPoint("TOPLEFT", f.rail, "TOPRIGHT", 4, 0)
-    f.content:SetPoint("BOTTOMRIGHT", -2, 2)
+    f.content:SetPoint("TOPLEFT", f.rail, "TOPRIGHT", LAY.divider, 0)
+    f.content:SetPoint("BOTTOMRIGHT", -LAY.edge, LAY.edge)
     self:Surface(f.content, "page")
 
     -- One full-size panel per registered module (built lazily on first show). Modules whose

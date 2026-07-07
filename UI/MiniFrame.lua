@@ -11,6 +11,7 @@
 -- Loads after UI/LootWindow.lua (calls ShowLootWindow) and UI/Widgets.lua (Surface/SoftEdge).
 
 local LCEX = LootCouncilEX
+local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_MiniFrame"
 local PILL_W, PILL_H = 220, 26
@@ -47,17 +48,18 @@ function LCEX:EnsureMiniFrame()
     self:Surface(f, "float")
     self:SoftEdge(f)
 
-    -- A gold tick + the status text.
+    -- A gold tick + the status text: the pill reads as a single list row (rowPad insets,
+    -- iconGap between tick and text — the title-bar tick grammar at row scale).
     local tick = f:CreateTexture(nil, "ARTWORK")
     tick:SetTexture("Interface\\Buttons\\WHITE8X8")
     tick:SetSize(3, 12)
-    tick:SetPoint("LEFT", 8, 0)
+    tick:SetPoint("LEFT", LAY.rowPad, 0)
     tick:SetVertexColor(self.Theme.accent[1], self.Theme.accent[2], self.Theme.accent[3], 1)
 
     f.text = f:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.text, "caption", "ink")
-    f.text:SetPoint("LEFT", tick, "RIGHT", 8, 0)
-    f.text:SetPoint("RIGHT", -8, 0)
+    f.text:SetPoint("LEFT", tick, "RIGHT", LAY.iconGap, 0)
+    f.text:SetPoint("RIGHT", -LAY.rowPad, 0)
     f.text:SetJustifyH("LEFT")
     f.text:SetWordWrap(false)
 
