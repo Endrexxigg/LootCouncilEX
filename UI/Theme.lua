@@ -139,6 +139,43 @@ function LCEX:Surface(frame, toneName)
     return frame
 end
 
+-- Repaint an existing Surface with `alpha` baked into the gradient vertex colors — backdrop-only
+-- opacity: children (text, buttons, icons) keep full alpha, unlike frame:SetAlpha which cascades.
+-- The 1px top-light dims with the surface so a near-invisible shell doesn't keep a bright seam.
+-- `toneName` is optional (defaults to the tone recorded by Surface); alpha 1 = the Surface look.
+-- Same 3-way client fork as ApplyGradient. Stamps tex._lcexAlpha for the selftest.
+function LCEX:SetSurfaceAlpha(frame, toneName, alpha)
+    if not (frame and frame._surface) then return end
+    local tone = self.Theme.tone[toneName or frame._tone] or self.Theme.tone.base
+    local tex = frame._surface
+    tex:Show()
+    tex:SetTexture(WHITE)
+    tex:SetAlpha(1)
+    local ok = false
+    if tex.SetGradient and CreateColor then
+        ok = pcall(tex.SetGradient, tex, "VERTICAL",
+            CreateColor(tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha),
+            CreateColor(tone.top[1], tone.top[2], tone.top[3], alpha))
+    end
+    if not ok and tex.SetGradientAlpha then
+        tex:SetGradientAlpha("VERTICAL",
+            tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha,
+            tone.top[1], tone.top[2], tone.top[3], alpha)
+        ok = true
+    end
+    if not ok then
+        tex:SetVertexColor((tone.top[1] + tone.bottom[1]) / 2,
+            (tone.top[2] + tone.bottom[2]) / 2,
+            (tone.top[3] + tone.bottom[3]) / 2, alpha)
+    end
+    tex._lcexAlpha = alpha
+    if frame._topLight then
+        frame._topLight:Show()
+        frame._topLight:SetAlpha(1)
+        frame._topLight:SetVertexColor(1, 1, 1, 0.04 * alpha)
+    end
+end
+
 -- Soft outer edge (the quiet border every themed window/card carries).
 function LCEX:SoftEdge(frame, alpha)
     if frame.SetBackdrop then

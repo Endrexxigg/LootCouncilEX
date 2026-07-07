@@ -691,6 +691,28 @@ LCEX:RegisterSelfTest("ui", "poll renders usable-item cards + queue advance", fu
     t:Ok(not f:IsShown(), "poll auto-closes when the queue drains")
 end, { cleanup = function(self) self:HidePoll() end })
 
+-- Backdrop-only opacity (profile.appearance.bgOpacity): the loot/poll shells + region surfaces
+-- repaint with baked-in alpha (SetSurfaceAlpha stamps _lcexAlpha) while the window's own alpha —
+-- what the content inherits — stays 1. Restores the prior setting afterwards.
+local prevBgOpacity
+LCEX:RegisterSelfTest("ui", "bgOpacity paints loot/poll backdrops only", function(self, t)
+    local a = self.db.profile.appearance
+    prevBgOpacity = a.bgOpacity
+    local loot, poll = self:EnsureLootWindow(), self:EnsurePoll()
+    a.bgOpacity = 0.5
+    self:ApplyAppearance()
+    t:Eq(loot._surface and loot._surface._lcexAlpha, 0.5, "loot shell surface alpha")
+    t:Eq(loot.rail._surface and loot.rail._surface._lcexAlpha, 0.5, "loot rail surface alpha")
+    t:Eq(loot.pane._surface and loot.pane._surface._lcexAlpha, 0.5, "loot pane surface alpha")
+    t:Eq(poll._surface and poll._surface._lcexAlpha, 0.5, "poll shell surface alpha")
+    t:Ok(math.abs(loot:GetAlpha() - 1) < 0.001, "loot window alpha (content) must stay 1")
+    t:Ok(math.abs(poll:GetAlpha() - 1) < 0.001, "poll window alpha (content) must stay 1")
+end, { cleanup = function(self)
+    self.db.profile.appearance.bgOpacity = prevBgOpacity
+    self:ApplyAppearance()
+    prevBgOpacity = nil
+end })
+
 LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", function(self, t)
     local class = select(2, UnitClass("player"))
     local onToken, offToken

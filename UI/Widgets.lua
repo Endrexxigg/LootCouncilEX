@@ -400,9 +400,12 @@ end
 -- ── Window v2 ────────────────────────────────────────────────────────────────
 -- Themed, movable, ESC-closable window. `name` is the GLOBAL frame name (UISpecialFrames).
 -- opts = { width, height, title, titleH, titleSizeKey, chromeInset, savedKey, defaultPos={x,y},
---          resizable, resizeWOnly, minW, minH, noClose, scale, alpha, useOpacity } — savedKey persists position
--- (and size when resizable); useOpacity
--- windows honor profile.appearance.opacity. Returns the frame; content anchors below f.bar.
+--          resizable, resizeWOnly, minW, minH, noClose, scale, alpha, useOpacity,
+--          useBgOpacity } — savedKey persists position (and size when resizable); useOpacity
+-- windows honor profile.appearance.opacity (whole-window SetAlpha, fades content too);
+-- useBgOpacity windows honor profile.appearance.bgOpacity BACKDROP-ONLY (SetSurfaceAlpha on the
+-- shell + title bar + every frame the module registers in f._bgSurfaces — text/buttons/icons
+-- stay crisp). Returns the frame; content anchors below f.bar.
 function LCEX:CreateWindowV2(name, opts)
     opts = opts or {}
     local addon = self
@@ -556,6 +559,16 @@ function LCEX:CreateWindowV2(name, opts)
         win:SetScale(((a and a.scale) or 1) * (opts.scale or 1))
         if opts.useOpacity then win:SetAlpha((a and a.opacity) or 1)
         elseif opts.alpha then win:SetAlpha(opts.alpha) end
+        if opts.useBgOpacity then
+            -- Backdrop-only: repaint each surface with alpha baked in (tone recorded by
+            -- Surface). Region/card frames register in win._bgSurfaces as they are built.
+            local bg = (a and a.bgOpacity) or 1
+            addon:SetSurfaceAlpha(win, nil, bg)
+            addon:SetSurfaceAlpha(win.bar, nil, bg)
+            for _, sub in ipairs(win._bgSurfaces or {}) do
+                addon:SetSurfaceAlpha(sub, nil, bg)
+            end
+        end
     end
     f:RefreshAppearance()
 

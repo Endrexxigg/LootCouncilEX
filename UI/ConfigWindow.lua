@@ -3,8 +3,9 @@
 -- table entry (header/checkbox/slider rows stacked vertically, all profile-backed and applied
 -- live). Officer/session settings live in the council window's Session Config module instead.
 --
--- Appearance plumbing: profile.appearance {scale, opacity} — ApplyAppearance() pushes both to
--- every v2 window (opacity only where the window opted in; the council window did).
+-- Appearance plumbing: profile.appearance {scale, opacity, bgOpacity} — ApplyAppearance()
+-- pushes all three to every v2 window via RefreshAppearance (opacity only where the window
+-- opted in — council; bgOpacity is the backdrop-only alpha the loot/poll windows layer on).
 --
 -- Loads after UI/Theme.lua + UI/Widgets.lua.
 
@@ -37,6 +38,11 @@ local function BuildSchema(self)
         { type = "slider", label = self.L["Council window opacity"], min = 0.3, max = 1.0, step = 0.05,
           get = function() return p.appearance.opacity end,
           set = function(v) p.appearance.opacity = v; self:ApplyAppearance() end },
+        -- Backdrop-only (SetSurfaceAlpha): the loot session + loot drop panels go translucent,
+        -- text/buttons/icons stay crisp — so they can sit over the raid UI without blocking it.
+        { type = "slider", label = self.L["Loot window background opacity"], min = 0.3, max = 1.0, step = 0.05,
+          get = function() return p.appearance.bgOpacity or 1.0 end,
+          set = function(v) p.appearance.bgOpacity = v; self:ApplyAppearance() end },
 
         { type = "header", label = self.L["Minimap"] },
         { type = "checkbox", label = self.L["Show the minimap button"],
@@ -77,7 +83,7 @@ end
 function LCEX:EnsureConfigWindow()
     if self.configWindow then return self.configWindow end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = WIN_W, height = 400,
+        width = WIN_W, height = 440,
         title = self.L["Configuration"],
         savedKey = "config",
         defaultPos = { x = -220, y = 60 },

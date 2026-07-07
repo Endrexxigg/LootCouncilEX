@@ -29,43 +29,6 @@ local TRADE_WINDOW = 7200
 local TIMER_TEST_ITEM_ID = 30092
 local TIMER_TEST_LINK = "|cffa335ee|Hitem:30092::::::::70:::::|h[Leggings of the Festering Swarm]|h|r"
 local TIMER_TEST_DURATION = 74 * 60
-local WHITE = "Interface\\Buttons\\WHITE8X8"
-
-local function PaintSurfaceAlpha(tex, tone, alpha)
-    tex:Show()
-    tex:SetTexture(WHITE)
-    tex:SetAlpha(1)
-    local ok = false
-    if tex.SetGradient and CreateColor then
-        ok = pcall(tex.SetGradient, tex, "VERTICAL",
-            CreateColor(tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha),
-            CreateColor(tone.top[1], tone.top[2], tone.top[3], alpha))
-    end
-    if not ok and tex.SetGradientAlpha then
-        tex:SetGradientAlpha("VERTICAL",
-            tone.bottom[1], tone.bottom[2], tone.bottom[3], alpha,
-            tone.top[1], tone.top[2], tone.top[3], alpha)
-        ok = true
-    end
-    if not ok then
-        tex:SetVertexColor((tone.top[1] + tone.bottom[1]) / 2,
-            (tone.top[2] + tone.bottom[2]) / 2,
-            (tone.top[3] + tone.bottom[3]) / 2, alpha)
-    end
-    tex._lcexAlpha = alpha
-end
-
-local function SetSurfaceAlpha(frame, toneName, alpha)
-    local tone = LCEX.Theme.tone[toneName] or LCEX.Theme.tone.base
-    if frame and frame._surface then
-        PaintSurfaceAlpha(frame._surface, tone, alpha)
-    end
-    if frame and frame._topLight then
-        frame._topLight:Show()
-        frame._topLight:SetAlpha(1)
-        frame._topLight:SetVertexColor(1, 1, 1, 0.04 * alpha)
-    end
-end
 
 local function LinkText(link) return tostring(link):match("(%[.-%])") or ("[" .. tostring(link) .. "]") end
 
@@ -198,8 +161,8 @@ function LCEX:EnsureTradeTimerWindow()
         f._surface:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
     end
     if f._topLight then f._topLight:Hide() end
-    SetSurfaceAlpha(f, "page", SHELL_ALPHA)
-    SetSurfaceAlpha(f.bar, "raised", SHELL_ALPHA)
+    self:SetSurfaceAlpha(f, "page", SHELL_ALPHA)
+    self:SetSurfaceAlpha(f.bar, "raised", SHELL_ALPHA)
     f.title:ClearAllPoints()
     f.title:SetPoint("CENTER", f.bar, "CENTER", 0, 0)
     f.title:SetFont(ROW_FONT, TITLE_FONT_SIZE, "")

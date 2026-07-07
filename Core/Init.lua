@@ -52,8 +52,9 @@ local DB_DEFAULTS = {
         -- rides sStart so every candidate's poll counts down.
         pollTimeout        = 0,
         -- Window appearance (Config window): scale for every LCEX window, opacity for the
-        -- windows that opt in (council).
-        appearance         = { scale = 1.0, opacity = 1.0 },
+        -- windows that opt in (council), bgOpacity = backdrop-only alpha for the loot
+        -- session + loot drop windows (panels translucent, text/buttons crisp).
+        appearance         = { scale = 1.0, opacity = 1.0, bgOpacity = 1.0 },
         -- LibDBIcon's saved state (position angle + hide flag) — owned by the lib.
         minimap            = { hide = false },
         useWhisperFallback = false,

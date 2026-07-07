@@ -107,6 +107,7 @@ function LCEX:EnsureLootWindow()
         title = self.L["Loot Session"],
         savedKey = "loot",
         defaultPos = { x = 0, y = 40 },
+        useBgOpacity = true, -- profile.appearance.bgOpacity: panels translucent, content crisp
     })
 
     -- Left rail --------------------------------------------------------------
@@ -282,6 +283,11 @@ function LCEX:EnsureLootWindow()
     -- surface it when the window closes on a live session (§6.13 — closing never ends the session).
     f:HookScript("OnShow", function() LCEX:UpdateMiniFrame() end)
     f:HookScript("OnHide", function() LCEX:UpdateMiniFrame() end)
+
+    -- The region surfaces ride the backdrop-only opacity with the shell (useBgOpacity above);
+    -- re-run now that they exist so a saved bgOpacity applies from the first paint.
+    f._bgSurfaces = { rail, pane, bar }
+    f:RefreshAppearance()
 
     self.lootWindow = f
     return f

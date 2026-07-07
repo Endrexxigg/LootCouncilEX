@@ -61,7 +61,9 @@ function LCEX:EnsurePoll()
         title = self.L["Loot Drop"],
         savedKey = "poll",
         defaultPos = { x = 0, y = 220 },
+        useBgOpacity = true, -- profile.appearance.bgOpacity: panels translucent, content crisp
     })
+    f._bgSurfaces = {} -- deadline bar + lazily-built cards register here (useBgOpacity)
 
     -- Deadline bar: a depleting fill + centered "Ns left". Sits in the content area (below the
     -- title bar), so — unlike a title-bar overlay — it actually renders. Shown only when armed.
@@ -80,6 +82,8 @@ function LCEX:EnsurePoll()
     bar.text:SetPoint("CENTER", 0, 0)
     bar:Hide()
     f.timerBar = bar
+    f._bgSurfaces[#f._bgSurfaces + 1] = bar
+    f:RefreshAppearance() -- apply a saved bgOpacity to the shell + bar from the first paint
 
     -- Re-anchored each render to the middle of the reserved card band (so it can never sit
     -- under an armed deadline bar); built here, positioned in RenderPollCards.
@@ -106,6 +110,11 @@ function LCEX:BuildPollCard(parent)
     card:SetHeight(CARD_H)
     self:Surface(card, "raised")
     self:SoftEdge(card, 0.1)
+    -- Cards are lazy-built: register for the backdrop-only opacity sweep (useBgOpacity) and
+    -- paint the current setting immediately so a mid-session card matches its siblings.
+    parent._bgSurfaces[#parent._bgSurfaces + 1] = card
+    local a = self.db and self.db.profile.appearance
+    self:SetSurfaceAlpha(card, nil, (a and a.bgOpacity) or 1)
 
     -- Card interior: a panel surface, so content pads by LAYOUT.pad from the card's own edges.
     card.icon = self:CreateItemIcon(card, 32)
