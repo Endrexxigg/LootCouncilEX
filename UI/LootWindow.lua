@@ -22,6 +22,12 @@ local RAIL_W     = 280 -- widened from 236 so item names truncate less (handoff 
 local PANE_W     = 536 -- the right (candidate) pane
 local FULL_W     = 2 * LAY.edge + RAIL_W + LAY.divider + PANE_W
 local COMPACT_W  = RAIL_W + 2 * LAY.edge -- rail-only form (item 4): pre-session staging
+-- User-resize floor for the two-pane session view: the rail (fixed) plus enough pane for the
+-- candidate row's fixed columns (name/resp/gear/vote-cluster/award) before the name truncates
+-- into them. Height floor keeps a workable candidate list + staging band. The grip only shows
+-- in full mode, so these never constrain the compact staging width.
+local MIN_W      = 700
+local MIN_H      = 360
 
 -- ── Compact staging layout ───────────────────────────────────────────────────
 -- One content inset shared by the header, the staged-items list, the Scan/add controls and the
@@ -108,6 +114,7 @@ function LCEX:EnsureLootWindow()
         savedKey = "loot",
         defaultPos = { x = 0, y = 40 },
         useBgOpacity = true, -- profile.appearance.bgOpacity: panels translucent, content crisp
+        resizable = true, minW = MIN_W, minH = MIN_H, -- full session view; grip hidden in compact
     })
 
     -- Left rail --------------------------------------------------------------
@@ -668,15 +675,30 @@ function LCEX:FillLootCandRow(row, entry)
 end
 
 -- Compact/full layout (item 4): with nothing to show on the right, the window is just the
--- staging rail; a live session expands to the two-pane form. Resizing pins TOPLEFT (the
+-- staging rail; a live session expands to the two-pane form. Mode changes pin TOPLEFT (the
 -- PollWindow reflow pattern) so the rail never moves — the pane grows rightward. Hiding
--- `f.pane` covers every right-side widget (all are pane children). Height never changes.
+-- `f.pane` covers every right-side widget (all are pane children).
+--
+-- User resize (full mode only): the grip persists p.w/p.h and CreateWindowV2 restores them; the
+-- pane/lists reflow off their anchors. Full mode restores the saved width (≥ MIN_W, else the
+-- default); compact forces the narrow rail-only width and hides the grip. `_suppressSizeSave`
+-- keeps a compact-mode position drag from overwriting the saved session size. The early-return
+-- means a user width drag (mode unchanged) is never fought.
 function LCEX:ApplyLootLayout(f, mode)
     if f._layoutMode == mode then return end
     f._layoutMode = mode
+    f._suppressSizeSave = (mode ~= "full")
     local winTop, winLeft = f:GetTop(), f:GetLeft()
-    f:SetWidth(mode == "full" and FULL_W or COMPACT_W)
-    if mode == "full" then f.pane:Show() else f.pane:Hide() end
+    if mode == "full" then
+        local saved = self.db and self.db.profile.ui.loot and self.db.profile.ui.loot.w
+        f:SetWidth(math.max(MIN_W, saved or FULL_W))
+        f.pane:Show()
+        if f.resizeGrip then f.resizeGrip:Show() end
+    else
+        f:SetWidth(COMPACT_W)
+        f.pane:Hide()
+        if f.resizeGrip then f.resizeGrip:Hide() end
+    end
     if type(winTop) == "number" and type(winLeft) == "number" then
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", winLeft, winTop)

@@ -62,6 +62,10 @@ function LCEX:EnsurePoll()
         savedKey = "poll",
         defaultPos = { x = 0, y = 220 },
         useBgOpacity = true, -- profile.appearance.bgOpacity: panels translucent, content crisp
+        -- Width-only resize (height stays content-computed, like the trade-timer window): the
+        -- cards/name/note gain room so a wide item name reads without truncation; buttons keep
+        -- their left cluster. minW = the tight width that still fits the 5-button response row.
+        resizable = true, resizeWOnly = true, minW = CARD_W + 2 * PAD,
     })
     f._bgSurfaces = {} -- deadline bar + lazily-built cards register here (useBgOpacity)
 
@@ -99,6 +103,15 @@ function LCEX:EnsurePoll()
     f.more:Hide()
 
     f.cards = {}
+
+    -- Width-only grip: re-layout the cards to the new width on drag. Guard on width so the
+    -- SetHeight inside RenderPollCards (which fires OnSizeChanged too) can't recurse.
+    f:SetScript("OnSizeChanged", function(win)
+        local w = win:GetWidth()
+        if win._lastRenderW and math.abs(w - win._lastRenderW) < 0.5 then return end
+        LCEX:RenderPollCards()
+    end)
+
     self.pollFrame = f
     return f
 end
@@ -192,12 +205,17 @@ function LCEX:RenderPollCards()
     local items = self._pollItems or {}
     local responses = self._pollResponses or self.RESPONSES
 
+    -- Width is user-resizable (grip); cards/bar fill it. Stamp the width we render at so the
+    -- OnSizeChanged guard treats the SetHeight below (which also fires OnSizeChanged) as a no-op.
+    local cardW = f:GetWidth() - 2 * PAD
+    f._lastRenderW = f:GetWidth()
+
     -- Deadline bar below the title bar (when armed); it shifts everything below it down.
     local top = TITLE_H + PAD
     if f.deadline then
         f.timerBar:ClearAllPoints()
         f.timerBar:SetPoint("TOPLEFT", PAD, -top)
-        f.timerBar:SetWidth(CARD_W)
+        f.timerBar:SetWidth(cardW)
         f.timerBar:Show()
         self:UpdatePollCountdown()
         top = top + TIMER_H + PAD
@@ -214,7 +232,7 @@ function LCEX:RenderPollCards()
             if not card then card = self:BuildPollCard(f); f.cards[slot] = card end
             card:ClearAllPoints()
             card:SetPoint("TOPLEFT", PAD, -(top + (slot - 1) * (CARD_H + PAD)))
-            card:SetWidth(CARD_W)
+            card:SetWidth(cardW)
             self:FillPollCard(card, itemIndex, item, responses)
             shown = shown + 1
         elseif card then

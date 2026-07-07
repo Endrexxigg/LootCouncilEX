@@ -713,6 +713,14 @@ end, { cleanup = function(self)
     prevBgOpacity = nil
 end })
 
+LCEX:RegisterSelfTest("ui", "loot + poll windows carry a user resize grip", function(self, t)
+    local loot, poll = self:EnsureLootWindow(), self:EnsurePoll()
+    t:Ok(loot.resizeGrip ~= nil, "loot window has a resize grip")
+    t:Ok(poll.resizeGrip ~= nil, "poll window has a resize grip")
+    -- Width-only poll: its height tracks content, so a stored height is never persisted.
+    t:Ok(not (self.db.profile.ui.poll and self.db.profile.ui.poll.h), "poll never persists a height")
+end)
+
 LCEX:RegisterSelfTest("ui", "poll class filter (token lines + universals)", function(self, t)
     local class = select(2, UnitClass("player"))
     local onToken, offToken

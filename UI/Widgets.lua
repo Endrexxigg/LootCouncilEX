@@ -384,14 +384,16 @@ end
 
 -- Persist a v2 window's placement into db.profile.ui[savedKey] (creates the subtable — new
 -- keys need no DB_DEFAULTS entry). Size is saved only for resizable windows; width-only
--- resize windows let content determine their height.
+-- resize windows let content determine their height. A window may set f._suppressSizeSave
+-- (e.g. the loot window in its compact rail-only mode, whose narrow width is not the user's
+-- chosen session size) so a position drag in that state can't clobber the saved size.
 local function SavePlacement(addon, f, savedKey, resizable, widthOnly)
     if not (savedKey and addon.db) then return end
     local p = addon.db.profile.ui[savedKey]
     if not p then p = {}; addon.db.profile.ui[savedKey] = p end
     local point, _, relPoint, x, y = f:GetPoint()
     p.point, p.relPoint, p.x, p.y = point, relPoint, x, y
-    if resizable then
+    if resizable and not f._suppressSizeSave then
         p.w = f:GetWidth()
         if not widthOnly then p.h = f:GetHeight() end
     end
