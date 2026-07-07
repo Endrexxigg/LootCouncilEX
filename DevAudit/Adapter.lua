@@ -54,13 +54,10 @@ AUA:RegisterAddon("LootCouncilEX", {
         function() return LCEX.configWindow end,
     },
 
-    -- Tune engine rules for this addon. A truncated item/response label with no way to
-    -- read the full text is a real bug here, so raise it to ERROR. (The engine now detects
-    -- row-mate tooltip hosts — the adjacent item icon — generically, so no per-window
-    -- tooltipProviders declaration is needed.)
-    rules = {
-        severity = { ["TEXT/TRUNCATED_NO_TOOLTIP"] = "ERROR" },
-    },
+    -- (Text severity is no longer a blanket per-rule override. Instead we classify text by
+    -- importance below via `textImportance`, so the engine escalates an UNREADABLE truncation
+    -- of a decision-relevant or user-authored field to ERROR on its own, while item/player
+    -- names stay WARN and the value is only "readable" where LCEX actually exposes it.)
 
     -- LCEX's top-level windows are independent, user-draggable frames — the player can stack
     -- them however they like (and solo, the ML sees the loot window while their own poll card
@@ -72,6 +69,22 @@ AUA:RegisterAddon("LootCouncilEX", {
     -- cross-window overlap and never hides an in-window control-over-label collision.
     expectations = {
         allowedOverlaps = { { a = "^LCEX_%a+$", b = "^LCEX_" } },
+
+        -- Text importance (pilot). Maps LCEX text fields to importance classes so the engine
+        -- can enforce readability without knowing anything LCEX-specific. `fallback` asserts
+        -- WHERE the full value is reachable — required for user-authored / decision-critical
+        -- text, whose readability the engine will NOT infer from a heuristic. Each is honest:
+        --   • candidate name + response: the row's nameBtn OnEnter shows the full name and the
+        --     full response text (UI/LootWindow.lua — "decision-relevant during a vote").
+        --   • responder note: the row stores _noteText "full text for the hover tooltip".
+        --   • staged item name: the rail row's OnEnter opens the item tooltip.
+        -- Ordered; first debugName match wins. Rail vs pane .name are scoped by container.
+        textImportance = {
+            { pattern = "%.pane%..-%.name$", class = "player-identity",   fallback = "tooltip" },
+            { pattern = "%.resp$",           class = "decision-critical", fallback = "tooltip" },
+            { pattern = "%.note$",           class = "user-authored",     fallback = "tooltip" },
+            { pattern = "%.rail%..-%.name$", class = "item-identity",     fallback = "tooltip" },
+        },
     },
 
     fixtures = LCEX.__auiaFixtures,
