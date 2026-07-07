@@ -1332,6 +1332,10 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
 
     local candRow = self.lootWindow and self.lootWindow.candList.rows[1]
     t:Ok(candRow ~= nil and candRow:IsShown(), "candidate row did not render for the response")
+    -- A truncatable response note must stay fully readable: the row carries a hover target and the
+    -- full note text (item 1's response carried "selftest note", and item 1 is the default select).
+    t:Ok(candRow ~= nil and candRow.noteBtn ~= nil, "candidate row missing the note-hover target")
+    t:Eq(candRow and candRow._noteText, "selftest note", "full note not captured for the hover tooltip")
     -- Own row must be class-colored (live ClassOf path; solo, we are always resolvable).
     local myClass = select(2, UnitClass("player"))
     local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[myClass]

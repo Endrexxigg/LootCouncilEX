@@ -72,11 +72,21 @@ local function BuildRow(panel)
             LCEX:BrowserToggle(r.panel, r.kind, r.toggleKey) -- raid/boss headers fold (item 13)
         end
     end)
-    -- Item tooltip on NAME hover, not just the icon (item 15). Header rows show nothing.
+    -- Item tooltip on NAME hover, not just the icon (item 15). Header rows show nothing. The
+    -- mark column truncates a long note, so the FULL note rides along under the item tooltip.
     row:SetScript("OnEnter", function(r)
         if r.kind ~= "item" or not r.itemID then return end
         GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
         GameTooltip:SetHyperlink(r.itemLink or ("item:" .. r.itemID))
+        if LCEX:HasUserMark(r.itemID) then
+            local mark = LCEX:BrowserMarkText(r.itemID)
+            if mark and mark ~= "" then
+                GameTooltip:AddLine(" ")
+                local d = LCEX.Theme.text.dim
+                GameTooltip:AddLine(LCEX.L["Note:"], d[1], d[2], d[3])
+                GameTooltip:AddLine(mark, 1, 1, 1, true) -- wrap the full text
+            end
+        end
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)

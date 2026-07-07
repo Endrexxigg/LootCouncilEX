@@ -522,6 +522,21 @@ function LCEX:BuildLootCandRow(parent)
     row.minus:SetPoint("RIGHT", row.votes, "LEFT", -LAY.gapTight, 0)
     row.note:SetPoint("RIGHT", row.minus, "LEFT", -LAY.inlineGap, 0)
 
+    -- The note column is narrow, so a real raider note truncates. A transparent hover target over
+    -- the note text shows the FULL note in a tooltip — a truncated note you can't read is useless.
+    -- Reads row._noteText live at hover time (set in FillLootCandRow); silent when there's no note.
+    row.noteBtn = CreateFrame("Button", nil, row)
+    row.noteBtn:SetAllPoints(row.note)
+    row.noteBtn:SetScript("OnEnter", function(b)
+        if row._noteText and row._noteText ~= "" then
+            GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(LCEX.L["Note:"], LCEX.Theme.text.dim[1], LCEX.Theme.text.dim[2], LCEX.Theme.text.dim[3])
+            GameTooltip:AddLine(row._noteText, 1, 1, 1, true) -- wrap the full text
+            GameTooltip:Show()
+        end
+    end)
+    row.noteBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     return row
 end
 
@@ -579,7 +594,8 @@ function LCEX:FillLootCandRow(row, entry)
         end
     end
 
-    row.note:SetText((data.note and data.note ~= "" and data.note) or "")
+    row._noteText = (data.note and data.note ~= "" and data.note) or nil -- full text for the hover tooltip
+    row.note:SetText(row._noteText or "")
 
     local v = data.votes or 0
     row.votes:SetText(tostring(v))

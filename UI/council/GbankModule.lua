@@ -165,6 +165,19 @@ local function BuildLogRow(panel, listFrame)
     row.note:SetPoint("RIGHT", row.gold, "LEFT", -LAY.rowPad, 0)
     row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
     row:SetScript("OnClick", function() EditNote(panel, row.groupUid, row.player) end)
+    -- Hovering a logged transaction shows its FULL annotation (the note column truncates). The
+    -- item icons keep their own item tooltips; this fires for the rest of the row. row._noteText
+    -- is the raw note set in FillLogRow (nil when there's none).
+    row:SetScript("OnEnter", function(r)
+        if r._noteText and r._noteText ~= "" then
+            GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+            local d = LCEX.Theme.text.dim
+            GameTooltip:AddLine(LCEX.L["Note:"], d[1], d[2], d[3])
+            GameTooltip:AddLine(r._noteText, 1, 1, 1, true) -- wrap the full text
+            GameTooltip:Show()
+        end
+    end)
+    row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return row
 end
 
@@ -185,6 +198,7 @@ local function FillLogRow(row, g)
     end
     row.gold:SetText((g.gold and g.gold > 0) and CoinText(g.gold) or "")
     local note = LCEX:GbankNote(g.uid)
+    row._noteText = (note and note ~= "" and note) or nil -- full text for the hover tooltip
     if note and note ~= "" then
         row.note:SetText("\226\128\156" .. note .. "\226\128\157") -- “curly quotes”
         LCEX:ThemeText(row.note, "caption", "dim")

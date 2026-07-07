@@ -31,6 +31,17 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.52.5 — Notes fully readable on hover
+The audit's leftover INFO was a real gap: a note wider than its column truncated with no way to
+read the rest. Every truncatable note now shows its FULL text in a hover tooltip. Selftest-covered
+(the candidate row carries a note-hover target + the full note text).
+
+- [ ] **Loot candidate note**: in a live session, give a candidate a long response note (via the
+  poll's note box) — hovering that note in the right-pane row shows the whole note in a tooltip.
+- [ ] **Guild-bank log note**: an annotated transaction shows its full note when you hover the row.
+- [ ] **Loot-browser note**: an item with a "Leave note…" mark shows the full note appended under
+  its item tooltip on hover.
+
 ### v0.52.4 — Window z-order (fixes windows drawing through each other)
 The `/auiaudit` run on v0.52.3 surfaced a **real bug** (screenshot: the Council loot-browser rows
 punching through the Loot Session window). Two co-shown LCEX windows shared the DIALOG strata and
