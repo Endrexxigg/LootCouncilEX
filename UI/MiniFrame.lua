@@ -14,7 +14,8 @@ local LCEX = LootCouncilEX
 local LAY  = LCEX.LAYOUT -- the shared layout contract (UI/Theme.lua)
 
 local FRAME_NAME = "LCEX_MiniFrame"
-local PILL_W, PILL_H = 220, 26
+local PILL_W, PILL_H = 220, 26   -- PILL_W is the MINIMUM; the pill grows to fit its text (item 4)
+local PILL_MAX_W = 360           -- cap; beyond this the hover tooltip carries the overflow
 
 -- Responses collected so far across all groups (full view only — a list-level spectator never
 -- stores rows, §6.13/DL-18). Counts rows that carry an actual response, not seeded placeholders.
@@ -134,5 +135,12 @@ function LCEX:UpdateMiniFrame()
                 n, CountAwarded(a)))
         end
     end
+    -- Size the pill to its text (item 4): the minimized frame isn't user-resizable, so the fixed
+    -- 220 clipped the longer status strings. Grow to fit, clamped between PILL_W and PILL_MAX_W —
+    -- the OnEnter tooltip still backs the rare string that exceeds the cap. Chrome around the text
+    -- = the tick's left inset (rowPad) + tick (3) + the tick→text gap (iconGap) + the right inset
+    -- (rowPad), matching the EnsureMiniFrame anchors.
+    local chrome = LAY.rowPad + 3 + LAY.iconGap + LAY.rowPad
+    f:SetWidth(math.max(PILL_W, math.min(PILL_MAX_W, math.ceil(f.text:GetStringWidth()) + chrome + 2)))
     f:Show()
 end

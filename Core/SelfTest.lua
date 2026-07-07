@@ -1385,6 +1385,9 @@ LCEX:RegisterSelfTest("session", "solo end-to-end: start → respond → vote �
     t:Ok(self.miniFrame and self.miniFrame:IsShown(), "pill not shown after hiding the loot window")
     t:Ok(self.session ~= nil, "hiding the loot window must not end the session")
     t:Ok((self.miniFrame.text:GetText() or ""):find("item", 1, true) ~= nil, "pill text missing item count")
+    -- Item 4: a minimized (non-resizable) pill must GROW to fit its status string, not clip it.
+    t:Ok(not self.miniFrame.text:IsTruncated(), "pill text truncated — the pill did not size to fit (item 4)")
+    t:Ok(self.miniFrame:GetWidth() >= 220, "pill narrower than its minimum")
     self:ShowLootWindow()
     t:Ok(not self.miniFrame:IsShown(), "pill not hidden after reopening the loot window")
 
