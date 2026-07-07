@@ -78,7 +78,7 @@ local function BuildRow(panel)
         if r.kind ~= "item" or not r.itemID then return end
         GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
         GameTooltip:SetHyperlink(r.itemLink or ("item:" .. r.itemID))
-        if LCEX:HasUserMark(r.itemID) then
+        if LCEX:HasUserMark(r.itemID) and r.mark:IsTruncated() then
             local mark = LCEX:BrowserMarkText(r.itemID)
             if mark and mark ~= "" then
                 GameTooltip:AddLine(" ")

@@ -31,6 +31,18 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.52.8 — Readability tooltips: cursor-anchored + only when truncated
+Refines the v0.52.6 fallbacks. The readability tooltips now anchor to the **mouse cursor** (they
+were popping up at the frame edge, away from where you're looking) and only appear when the text is
+**actually clipped** (`IsTruncated()`) — no redundant tooltip over text that already fits. Item
+tooltips (browser loot items, trade-timer bars) stay as normal item tooltips; only their *appended*
+readability lines (a marked note, the trade winner) are gated on that column truncating.
+
+- [ ] **Cursor-anchored**: hover a truncated candidate name / note / history row / mini pill / gbank
+  row — the tooltip appears at the cursor, not off at the frame's edge.
+- [ ] **Only when needed**: hover a candidate/name/note/row whose text **fits** — no tooltip pops.
+  Hover one that's **clipped** — the full value shows.
+
 ### v0.52.6 — Readable-truncation sweep (all decision text has a hover fallback)
 Applying the product invariant (`readable-truncation-invariant` in memory): any truncatable
 user-authored **or** decision-relevant string must have a way to read the full value. Swept every

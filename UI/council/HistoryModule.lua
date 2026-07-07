@@ -34,14 +34,14 @@ LCEX:RegisterCouncilModule({
                 local row = CreateFrame("Button", nil, parent)
                 row:RegisterForClicks("RightButtonUp")
                 row:SetScript("OnClick", function(r) LCEX:HistoryRecordMenu(r._uid, r._rec) end)
-                -- The winner (100px) / response (50px) / boss·date columns all truncate; hovering the
-                -- row shows the full record so no award detail is ever unreadable.
+                -- When the winner (100px) / response (50px) / boss·date columns clip, hovering the
+                -- row shows the full record at the cursor (the item itself is covered by the icon's
+                -- own tooltip). Silent when everything already fits.
                 row:SetScript("OnEnter", function(r)
                     local rec = r._rec
                     if not rec then return end
-                    GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
-                    if rec.itemLink then GameTooltip:SetHyperlink(rec.itemLink)
-                    else GameTooltip:AddLine("item:" .. tostring(rec.itemID)) end
+                    if not (r.winner:IsTruncated() or r.resp:IsTruncated() or r.meta:IsTruncated()) then return end
+                    GameTooltip:SetOwner(r, "ANCHOR_CURSOR")
                     local d = LCEX.Theme.text.dim
                     GameTooltip:AddDoubleLine(LCEX.L["Winner:"], tostring(rec.player or "?"),
                         d[1], d[2], d[3], 1, 1, 1)

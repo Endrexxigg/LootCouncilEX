@@ -165,14 +165,14 @@ local function BuildLogRow(panel, listFrame)
     row.note:SetPoint("RIGHT", row.gold, "LEFT", -LAY.rowPad, 0)
     row.note:SetJustifyH("LEFT"); row.note:SetWordWrap(false)
     row:SetScript("OnClick", function() EditNote(panel, row.groupUid, row.player) end)
-    -- Hovering a logged transaction shows its FULL actor line (who + action) and annotation — both
-    -- columns truncate. The item icons keep their own item tooltips; this fires for the rest of the
-    -- row. row._noteText is the raw note set in FillLogRow (nil when there's none).
+    -- When the actor (who + action) or the annotation column is clipped, hovering the row shows
+    -- both in full at the cursor. The item icons keep their own item tooltips; this fires for the
+    -- rest of the row. row._noteText is the raw note set in FillLogRow (nil when there's none).
     row:SetScript("OnEnter", function(r)
-        local who = r.who:GetText()
         local hasNote = r._noteText and r._noteText ~= ""
-        if not ((who and who ~= "") or hasNote) then return end
-        GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+        if not (r.who:IsTruncated() or (hasNote and r.note:IsTruncated())) then return end
+        GameTooltip:SetOwner(r, "ANCHOR_CURSOR")
+        local who = r.who:GetText()
         if who and who ~= "" then GameTooltip:AddLine(who) end -- class-colored string renders as-is
         if hasNote then
             local d = LCEX.Theme.text.dim

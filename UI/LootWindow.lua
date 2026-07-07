@@ -493,11 +493,13 @@ function LCEX:BuildLootCandRow(parent)
             LCEX:OpenPlayerDetail(row._cleanName) -- the clean name (no ✓ texture prefix)
         end
     end)
-    -- The name (110px) and response (52px) columns both truncate; hovering the name shows the FULL
-    -- candidate name and their full response text — both decision-relevant during a vote.
+    -- The name (110px) and response (52px) columns both truncate; when either is clipped, hovering
+    -- the name shows the FULL candidate name + full response — both decision-relevant during a vote.
+    -- Cursor-anchored, and only when actually truncated (no tooltip for text that already fits).
     row.nameBtn:SetScript("OnEnter", function(b)
         if not (row._cleanName and row._cleanName ~= "") then return end
-        GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+        if not (row.name:IsTruncated() or row.resp:IsTruncated()) then return end
+        GameTooltip:SetOwner(b, "ANCHOR_CURSOR")
         GameTooltip:AddLine(row._cleanName, 1, 1, 1)
         if row._respText and row._respText ~= "" then
             local d = LCEX.Theme.text.dim
@@ -541,12 +543,11 @@ function LCEX:BuildLootCandRow(parent)
     row.noteBtn = CreateFrame("Button", nil, row)
     row.noteBtn:SetAllPoints(row.note)
     row.noteBtn:SetScript("OnEnter", function(b)
-        if row._noteText and row._noteText ~= "" then
-            GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(LCEX.L["Note:"], LCEX.Theme.text.dim[1], LCEX.Theme.text.dim[2], LCEX.Theme.text.dim[3])
-            GameTooltip:AddLine(row._noteText, 1, 1, 1, true) -- wrap the full text
-            GameTooltip:Show()
-        end
+        if not (row._noteText and row._noteText ~= "" and row.note:IsTruncated()) then return end
+        GameTooltip:SetOwner(b, "ANCHOR_CURSOR")
+        GameTooltip:AddLine(LCEX.L["Note:"], LCEX.Theme.text.dim[1], LCEX.Theme.text.dim[2], LCEX.Theme.text.dim[3])
+        GameTooltip:AddLine(row._noteText, 1, 1, 1, true) -- wrap the full text
+        GameTooltip:Show()
     end)
     row.noteBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 

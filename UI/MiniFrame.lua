@@ -92,13 +92,13 @@ function LCEX:EnsureMiniFrame()
             addon:ShowLootWindow()
         end
     end)
-    -- The pill text truncates at 220px; hovering shows the full session-status string.
+    -- The pill text truncates at 220px; when it's clipped, hovering shows the full session-status
+    -- string at the cursor. The surface re-tint is unconditional; only the tooltip is gated.
     f:SetScript("OnEnter", function(b)
         addon:Surface(b, "overlay")
-        local txt = b.text:GetText()
-        if txt and txt ~= "" then
-            GameTooltip:SetOwner(b, "ANCHOR_TOP")
-            GameTooltip:AddLine(txt, 1, 1, 1, true)
+        if b.text:IsTruncated() then
+            GameTooltip:SetOwner(b, "ANCHOR_CURSOR")
+            GameTooltip:AddLine(b.text:GetText(), 1, 1, 1, true)
             GameTooltip:Show()
         end
     end)

@@ -71,7 +71,7 @@ local function BuildTimerRow(f)
         if r.link then
             GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
             GameTooltip:SetHyperlink(r.link)
-            if r._winner and r._winner ~= "" then
+            if r._winner and r._winner ~= "" and r.label:IsTruncated() then
                 local ink = addon.Theme.text.ink
                 GameTooltip:AddLine("→ " .. r._winner, ink[1], ink[2], ink[3])
             end
