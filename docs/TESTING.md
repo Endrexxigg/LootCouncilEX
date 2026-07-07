@@ -31,6 +31,25 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.52.4 — Window z-order (fixes windows drawing through each other)
+The `/auiaudit` run on v0.52.3 surfaced a **real bug** (screenshot: the Council loot-browser rows
+punching through the Loot Session window). Two co-shown LCEX windows shared the DIALOG strata and
+the same frame *level*, so the client interleaved their children by creation order. Fixed with the
+RCLootCouncil/Gargul TBC idiom in `CreateWindowV2`: a **distinct base frame level per window**
+(assigned at creation, before any child exists, 20 levels of band apart) plus **`SetToplevel(true)`**
+(a click lifts the whole window+children group above other same-strata windows). Selftest-covered
+(distinct-frame-level guard); the audit's cross-window OVERLAP cascade is separately declared
+`allowedOverlaps` in the dev adapter (independent windows may legitimately float over each other).
+
+- [ ] **No draw-through** *(the reported bug)*: open the Council window and the Loot Session
+  window overlapping — neither window's rows/text bleed through the other. Click either to bring
+  it fully to the front; the whole window (rows included) comes forward as one.
+- [ ] **`/auiaudit run LootCouncilEX`** — `STRATA/AMBIGUOUS_ZORDER` should be **gone** (windows now
+  hold distinct frame levels) and the cross-window `OVERLAP/CONTROL_LABEL` cascade should be
+  **exempted**. Net: **no new ERROR/WARN**.
+- [ ] **Nothing else shifted**: poll/loot/council/config/trade-timer still open, drag, ESC-close,
+  and (council) resize as before; the confirm popup and context menu still sit above their window.
+
 ### v0.52.3 — Global layout/alignment pass (LCEX.LAYOUT contract)
 Every frame now anchors from the shared spacing grid in `UI/Theme.lua` (one 12px content line
 per container; unified 14px scrollbar gutter in BOTH list helpers; one edit-box art compensation).

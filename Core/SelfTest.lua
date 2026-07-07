@@ -1003,6 +1003,23 @@ end, { cleanup = function(self)
     end
 end })
 
+-- Window z-order: two co-shown v2 windows must occupy DISTINCT frame levels. On the TBC client
+-- frame:Raise() alone leaves co-shown DIALOG windows at the same level, so the client interleaves
+-- their children by creation order and one window's rows draw THROUGH the other (the loot⇄council
+-- overlap). CreateWindowV2 fixes this by giving each window a distinct base level at creation plus
+-- SetToplevel(true); this guards the observable property (distinct levels) against regression.
+LCEX:RegisterSelfTest("ui", "v2 windows: co-shown windows get distinct frame levels (no draw-through)", function(self, t)
+    local loot    = self:EnsureLootWindow()
+    local council = self:EnsureCouncilWindow()
+    local la, lc = loot:GetFrameLevel(), council:GetFrameLevel()
+    t:Ok(la ~= lc, string.format(
+        "loot & council share frame level %d — their child rows will interleave on overlap", la))
+    -- The bands must be far enough apart that the lower window's deepest child still sits below the
+    -- higher window's base (CreateWindowV2 reserves 20 levels per window).
+    t:Ok(math.abs(la - lc) >= 2, string.format(
+        "window level bands only %d apart — too close to separate child stacks", math.abs(la - lc)))
+end)
+
 -- Compact staging list uses a REAL ScrollFrame (pixel scrolling): rows are children of one scroll
 -- child sliding under a clipped viewport, the flat scrollbar is a bare Slider (no stock arrows).
 -- SetData PRESERVES the pixel offset (clamped into the new range) so selection never snaps the view;

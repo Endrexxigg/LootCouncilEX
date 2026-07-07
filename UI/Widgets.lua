@@ -409,8 +409,23 @@ function LCEX:CreateWindowV2(name, opts)
     f:SetFrameStrata(opts.strata or "DIALOG")
     f:EnableMouse(true)
     f:SetClampedToScreen(true)
-    -- Bring a window to the front of its strata whenever it's shown or clicked, so overlapping
-    -- LCEX windows (all DIALOG) stop hiding under each other. Modal popups pass a higher strata.
+    -- Z-order — fixes the loot⇄council "windows drawing through each other" bug. Two co-shown LCEX
+    -- windows share the DIALOG strata, and on this (TBC 2.5.x) client frame:Raise() alone does NOT
+    -- give them distinct frame LEVELS, so the client interleaves their children by creation order
+    -- and one window's rows punch through the other. The fix is the proven RCLootCouncil/Gargul TBC
+    -- idiom, two parts:
+    --   • A DISTINCT base frame level per window, assigned HERE at creation — BEFORE any child
+    --     frame exists, so every child is born into this window's level band (a later SetFrameLevel
+    --     is not relied on to cascade to children). The 20-level band leaves room for a window's own
+    --     child-frame depth before the next window's band begins, so the two never interleave.
+    --   • SetToplevel(true): a click lifts the window AND its whole child stack above other
+    --     same-strata windows as one group.
+    addon._v2NextLevel = (addon._v2NextLevel or 100) + 20
+    f:SetFrameLevel(addon._v2NextLevel)
+    f:SetToplevel(true)
+    -- Re-raise on show / click so the most recently surfaced window comes to the front; native
+    -- Raise() moves the frame together with its children, and the distinct base levels above keep
+    -- the raised window strictly above the others' bands rather than colliding at one level.
     f:HookScript("OnShow", function(w) w:Raise() end)
     f:SetScript("OnMouseDown", function(w) w:Raise() end)
     self:Surface(f, "page")
