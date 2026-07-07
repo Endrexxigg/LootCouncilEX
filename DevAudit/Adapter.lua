@@ -62,6 +62,18 @@ AUA:RegisterAddon("LootCouncilEX", {
         severity = { ["TEXT/TRUNCATED_NO_TOOLTIP"] = "ERROR" },
     },
 
+    -- LCEX's top-level windows are independent, user-draggable frames — the player can stack
+    -- them however they like (and solo, the ML sees the loot window while their own poll card
+    -- is up, so poll+loot ARE co-visible). When two overlap, the engine sees each window's own
+    -- draggable ROOT frame as an interactive "control" covering the OTHER window's labels
+    -- (OVERLAP/CONTROL_LABEL). That's expected floating-window behavior, not a layout defect.
+    -- The pattern matches only a BARE window root as the control (no dotted child path) covering
+    -- an LCEX label; the rule already excludes a frame's own descendants, so this exempts ONLY
+    -- cross-window overlap and never hides an in-window control-over-label collision.
+    expectations = {
+        allowedOverlaps = { { a = "^LCEX_%a+$", b = "^LCEX_" } },
+    },
+
     fixtures = LCEX.__auiaFixtures,
 })
 
