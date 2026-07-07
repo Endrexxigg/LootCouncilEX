@@ -160,8 +160,8 @@ Sync flow: on login/load broadcast `pHello`; a peer that's behind sends `pSyncRe
 - `notes`: name → `{text, mod, by}`
 - `marks`: itemID → `{text, mod, by}`
 - `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (**LWW by `mod` per uid** — changed from union by Phase 12 / DL-20 so awards can be corrected). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts. A correction *appends in time*: a retraction re-writes the same uid with `retracted=true, retractedBy` and a fresh `mod`; a re-award re-writes it again with the new winner and a newer `mod` — the latest fact wins on merge, and records are never deleted (§6.15). Logged locally on every present client from the `award` broadcast (§6.1); replayed award logs are idempotent (equal `mod`+`by` → merge no-op).
-- `gearCache`: name → `{items={slot→link}, class, spec, mod}` (self-reported; `class`/`spec` let the BiS tab auto-resolve a cached player — talent-derived spec, §6.7)
-- `profCache`: name → `{profs={name→level}, mod}` (self-reported)
+- `gearCache`: name → `{items={slot→link}, class, spec, mod}` (self-reported; `class`/`spec` let the BiS tab auto-resolve a cached player — talent-derived spec, §6.7). The reporter **loopback-writes its own** record locally (not just broadcasts), so a solo addon user's same-guild alts share gear/spec account-wide without a second client (§6.2).
+- `profCache`: name → `{profs={name→level}, mod}` (self-reported; same self-loopback)
 - gbank sets (Feature B, §6.12): `gbankCache` (LWW), `gbankLog` (immutable, union), `gbankNotes` (LWW)
 
 ### 6.4 SavedVariables
@@ -174,8 +174,9 @@ LootCouncilEXDB = {
     selfReport         = true,
     tradeTimersAuto    = false,         -- opt-in trade-timer window when tradeable loot exists (§6.17)
     tradeTimersMaxRows = 10,            -- expanded trade-timer rows; 0 = all (§6.17)
-    ui                 = { lootFrame={pos}, votingFrame={pos}, sessionFrame={pos}, playerDetail={pos}, lootBrowser={pos},
-                           mini={pos}, tradeTimers={pos} },  -- Phase 12: mini session pill + trade-timer window
+    appearance         = { scale=1.0, opacity=1.0, bgOpacity=1.0 },  -- scale=every window; opacity=whole-window (council); bgOpacity=backdrop-only alpha for the loot session + loot drop windows (text/buttons stay crisp)
+    ui                 = { loot={pos,w,h}, poll={pos,w}, council={pos,w,h}, config={pos},
+                           mini={pos}, tradeTimers={pos,w} },  -- w/h persisted for resizable windows (loot/council=2D, poll/tradeTimers=width-only)
     useWhisperFallback = false,
   },
   global = {
@@ -363,13 +364,24 @@ compact staging rail for everyone (each client sees only its own local staging l
 
 **Compact/full layout (item 4).** `ApplyLootLayout(f, mode)`: `COMPACT_W = 284` (rail + insets),
 `FULL_W = 824`. Pre-session (and in-session spectators) the window is rail-only at compact width;
-a session at full level expands to `FULL_W` (pane shown). Resize pins TOPLEFT (the PollWindow
-reflow pattern) so the rail never jumps; the staging-control band (scan/add, 58px) is reclaimed by
-the list in-session. Height fixed at 470.
+a session at full level expands to a **user-resizable** two-pane form (pane shown). Mode changes
+pin TOPLEFT (the PollWindow reflow pattern) so the rail never jumps; the staging-control band
+(scan/add, 58px) is reclaimed by the list in-session.
 
-**Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (~220×26, HIGH strata,
-position → `profile.ui.mini`, NOT in `UISpecialFrames`) shown **iff a session view is active and
-the loot window is hidden** — any view level. Text: full = "Loot session: N item(s) · R
+**Resizable + backdrop opacity (pre-raid pass).** Full mode is 2D-resizable (`minW 700, minH
+360`): the rail keeps its width, the pane and both scroll lists reflow off their anchors, and the
+size persists in `profile.ui.loot.w/h`. Full mode restores the saved width (else `FULL_W`) and
+shows the grip; compact hides the grip and forces the narrow width — an `f._suppressSizeSave` flag
+(honored by `SavePlacement`) stops a compact-mode move from clobbering the saved session size. Both
+the loot window and the loot-drop poll opt into `useBgOpacity`: `profile.appearance.bgOpacity`
+drives a backdrop-only alpha (`LCEX:SetSurfaceAlpha`, Theme.lua) on the shell + region/card
+surfaces so the panels can sit over the raid UI while text/buttons/icons stay crisp. The poll is
+**width-only** resizable (height stays content-computed) so long item names get more room.
+
+**Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (min 220×26, **grows to
+fit its text** up to 360 so the status never clips — a minimized frame isn't user-resizable; HIGH
+strata, position → `profile.ui.mini`, NOT in `UISpecialFrames`) shown **iff a session view is
+active and the loot window is hidden** — any view level. Text: full = "Loot session: N item(s) · R
 response(s)"; list = "Loot session: N item(s) · A awarded". Click → `ShowLootWindow()`. With no
 live session but a recoverable one (§6.16) it reads "Unresolved loot session — click to review" →
 resume prompt. One verb `UpdateMiniFrame()` is called from Enter/LeaveSession, `RefreshLootItem`,

@@ -31,6 +31,28 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.53.5 – v0.55.2 — Pre-raid window pass (opacity, resize, layout, alt-cache)
+`/lcex selftest` covers the mechanics (own-report loopback, bgOpacity lands on the surfaces only,
+loot/poll grips exist, pill not truncated); these are the genuinely-visual / cross-character checks.
+
+- [ ] **Own-alt gear cache (v0.53.5)** *(the raid-night one)*: on an alt, wait ~6s after login **or**
+  run `/lcex report`; switch to another of your characters **in the same guild**, open the Council
+  window → **Roster**, pick the first character. Its Gear / Professions / BiS panes show the cached
+  report ("cached <ago>"), **not** "(no cached report)" — with **no other addon user online**.
+- [ ] **Background opacity (v0.54.0)**: Config (`/lcex config`) → **Loot window background opacity**.
+  Drag it down — the **Loot Session** and **Loot Drop** panels go translucent, but the item text,
+  response buttons, icons and borders stay fully opaque/readable. Setting persists over `/reload`.
+- [ ] **Loot Session resize (v0.55.0)**: with a session open (full two-pane view), drag the
+  bottom-right grip — width **and** height change, the rail stays put, the candidate pane + both
+  lists reflow, more rows show when taller. Size persists over `/reload`. In the pre-session
+  staging (rail-only) view the grip is **hidden** and the window stays narrow.
+- [ ] **Loot Drop resize (v0.55.0)**: on a loot-drop poll, drag the grip — **width only** changes,
+  long item names get more room, buttons stay put, height still fits the cards. Persists over `/reload`.
+- [ ] **Loot Drop card layout (v0.55.1)**: the card reads as one unit — item name top-aligned to the
+  (larger) icon, the response-button row's bottom level with the icon's bottom, note directly beneath.
+- [ ] **Mini pill (v0.55.2)**: minimize the loot window during a session — the pill widens to fit the
+  full "Loot session: N item(s) · M response(s)" string with **no clipping** (compare vs. the old 220px).
+
 ### v0.52.8 — Readability tooltips: cursor-anchored + only when truncated
 Refines the v0.52.6 fallbacks. The readability tooltips now anchor to the **mouse cursor** (they
 were popping up at the frame edge, away from where you're looking) and only appear when the text is
