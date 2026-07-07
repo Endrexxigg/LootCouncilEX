@@ -65,11 +65,16 @@ local function BuildTimerRow(f)
     row.time:SetPoint("RIGHT", -LAY.inlineGap, 0)
     row.label:SetPoint("RIGHT", row.time, "LEFT", -LAY.inlineGap, 0)
 
-    -- Hover: the item tooltip + the hide hint. Shift+double-click hides this item (deliberate).
+    -- Hover: the item tooltip + who owes it + the hide hint. The bar label truncates the "→ Name",
+    -- so the winner (who the item must be traded to) stays readable here. Shift+double-click hides.
     row:SetScript("OnEnter", function(r)
         if r.link then
             GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
             GameTooltip:SetHyperlink(r.link)
+            if r._winner and r._winner ~= "" then
+                local ink = addon.Theme.text.ink
+                GameTooltip:AddLine("→ " .. r._winner, ink[1], ink[2], ink[3])
+            end
             GameTooltip:AddLine(addon.L["Shift+double-click to hide"], 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end
@@ -129,8 +134,8 @@ local function FillTimerRow(self, row, entry)
     if remaining < 0 then remaining = 0 end
     row.icon:SetItem(entry.link, entry.icon)
     local name = LinkName(entry.link)
-    row.label:SetText(entry.winner and (name .. "  → " .. (entry.winner:match("^[^%-]+") or entry.winner))
-        or name)
+    row._winner = entry.winner and (entry.winner:match("^[^%-]+") or entry.winner) or nil -- for the hover tooltip
+    row.label:SetText(entry.winner and (name .. "  → " .. row._winner) or name)
     row.time:SetText(self:FormatDuration(remaining))
     row.bar:SetValue(remaining)
     local c = self:TradeBarColor(remaining, TRADE_WINDOW)

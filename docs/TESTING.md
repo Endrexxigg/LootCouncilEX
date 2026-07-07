@@ -31,6 +31,24 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.52.6 — Readable-truncation sweep (all decision text has a hover fallback)
+Applying the product invariant (`readable-truncation-invariant` in memory): any truncatable
+user-authored **or** decision-relevant string must have a way to read the full value. Swept every
+`SetWordWrap(false)` display; the ones lacking a fallback now have a hover tooltip. Item names were
+already covered by their adjacent icon tooltips.
+
+- [ ] **Candidate name + response** (loot right pane): hover a candidate's name → full name + full
+  response text (both columns are narrow and truncate).
+- [ ] **History record**: hover a row → full item, winner, response, boss · date.
+- [ ] **Trade timer**: hover a bar → the item **plus who owes it** ("→ Name"), which the bar label
+  truncates.
+- [ ] **Mini session pill**: hover it → the full session-status line.
+- [ ] **Guild-bank log**: hover a row → full actor line (who + action) and the full note.
+
+*Already had a fallback (unchanged)*: item names everywhere (adjacent item-icon tooltip); the
+selected-item name in the loot pane (name-hover); poll card item names (card icon); gear/BiS/history
+detail rows in Roster (item icon + the Gear Check view for issue tags).
+
 ### v0.52.5 — Notes fully readable on hover
 The audit's leftover INFO was a real gap: a note wider than its column truncated with no way to
 read the rest. Every truncatable note now shows its FULL text in a hover tooltip. Selftest-covered

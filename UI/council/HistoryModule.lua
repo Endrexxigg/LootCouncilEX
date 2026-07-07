@@ -34,6 +34,26 @@ LCEX:RegisterCouncilModule({
                 local row = CreateFrame("Button", nil, parent)
                 row:RegisterForClicks("RightButtonUp")
                 row:SetScript("OnClick", function(r) LCEX:HistoryRecordMenu(r._uid, r._rec) end)
+                -- The winner (100px) / response (50px) / boss·date columns all truncate; hovering the
+                -- row shows the full record so no award detail is ever unreadable.
+                row:SetScript("OnEnter", function(r)
+                    local rec = r._rec
+                    if not rec then return end
+                    GameTooltip:SetOwner(r, "ANCHOR_RIGHT")
+                    if rec.itemLink then GameTooltip:SetHyperlink(rec.itemLink)
+                    else GameTooltip:AddLine("item:" .. tostring(rec.itemID)) end
+                    local d = LCEX.Theme.text.dim
+                    GameTooltip:AddDoubleLine(LCEX.L["Winner:"], tostring(rec.player or "?"),
+                        d[1], d[2], d[3], 1, 1, 1)
+                    local respTxt = rec.retracted and LCEX.L["(retracted)"] or LCEX:ResponseText(rec.resp)
+                    if respTxt and respTxt ~= "" then
+                        GameTooltip:AddLine(tostring(respTxt), d[1], d[2], d[3])
+                    end
+                    GameTooltip:AddLine(string.format("%s · %s", tostring(rec.boss or "?"),
+                        date("%m/%d %H:%M", rec.ts or 0)), d[1], d[2], d[3])
+                    GameTooltip:Show()
+                end)
+                row:SetScript("OnLeave", function() GameTooltip:Hide() end)
                 row.icon = LCEX:CreateItemIcon(row, 18)
                 row.icon:SetPoint("LEFT", LAY.rowPad, 0)
                 row.item = row:CreateFontString(nil, "OVERLAY")

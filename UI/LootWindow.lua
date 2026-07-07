@@ -493,6 +493,19 @@ function LCEX:BuildLootCandRow(parent)
             LCEX:OpenPlayerDetail(row._cleanName) -- the clean name (no ✓ texture prefix)
         end
     end)
+    -- The name (110px) and response (52px) columns both truncate; hovering the name shows the FULL
+    -- candidate name and their full response text — both decision-relevant during a vote.
+    row.nameBtn:SetScript("OnEnter", function(b)
+        if not (row._cleanName and row._cleanName ~= "") then return end
+        GameTooltip:SetOwner(b, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(row._cleanName, 1, 1, 1)
+        if row._respText and row._respText ~= "" then
+            local d = LCEX.Theme.text.dim
+            GameTooltip:AddLine(row._respText, d[1], d[2], d[3], true)
+        end
+        GameTooltip:Show()
+    end)
+    row.nameBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.resp = row:CreateFontString(nil, "OVERLAY")
     self:ThemeText(row.resp, "body", "dim")
@@ -570,11 +583,13 @@ function LCEX:FillLootCandRow(row, entry)
     local resp = ResponseEntry(self, data.resp)
     if resp then
         row.resp:SetText(resp.text)
+        row._respText = resp.text -- full text for the name-hover tooltip (the column truncates)
         local c = resp.color
         if c then row.resp:SetTextColor(c[1], c[2], c[3]) end
     else
         -- No response yet: show the seeded reason (Waiting / Can't use / Missed kill / Left), dimmed.
-        row.resp:SetText(self:ReasonText(data.reason))
+        row._respText = self:ReasonText(data.reason)
+        row.resp:SetText(row._respText)
         self:ThemeText(row.resp, "body", "faint")
     end
     if isWinner then
