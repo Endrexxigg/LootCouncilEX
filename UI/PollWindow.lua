@@ -29,6 +29,8 @@ local MAX_CARDS  = 3
 local PAD        = LAY.grid -- the ONE margin: window edge ↔ content, and the gap between cards
 local CARD_W     = 380
 local CARD_H     = 78
+local ICON_SZ    = 40 -- item icon; its 40px height spans the name row + the response-button row,
+                      -- so the icon bottom meets the button-row bottom (aligned, item 3)
 local TITLE_H    = LAY.edge + LAY.titleH -- the title bar's bottom edge — content stacks below
 local TIMER_H    = 12   -- deadline depleting bar (present only when a deadline is armed)
 local MORE_H     = 16   -- "+N more" footer (present only when the queue exceeds MAX_CARDS)
@@ -130,12 +132,12 @@ function LCEX:BuildPollCard(parent)
     self:SetSurfaceAlpha(card, nil, (a and a.bgOpacity) or 1)
 
     -- Card interior: a panel surface, so content pads by LAYOUT.pad from the card's own edges.
-    card.icon = self:CreateItemIcon(card, 32)
+    card.icon = self:CreateItemIcon(card, ICON_SZ)
     card.icon:SetPoint("TOPLEFT", LAY.pad, -LAY.pad)
 
     card.name = card:CreateFontString(nil, "OVERLAY")
     self:ThemeText(card.name, "body", "ink")
-    card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", LAY.iconGap, -1)
+    card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", LAY.iconGap, 0) -- top-aligned with the icon
     card.name:SetPoint("RIGHT", card, "RIGHT", -LAY.pad, 0)
     card.name:SetJustifyH("LEFT")
     card.name:SetWordWrap(false)
@@ -144,7 +146,7 @@ function LCEX:BuildPollCard(parent)
 
     -- Full-width note under the icon/buttons: TOPLEFT + RIGHT anchors override CreateEditBox's
     -- default width so it fills the card; editPad lands the box ART on the card's pad line.
-    -- Its top rides the interior stack: pad + button row at -20 + 20px buttons + gapTight = 54.
+    -- Its top rides the interior stack: pad(10) + icon/button-row 40 + gapTight(4) = 54.
     card.note = self:CreateEditBox(card, {})
     card.note:SetPoint("TOPLEFT", card, "TOPLEFT", LAY.pad + LAY.editPad, -54)
     card.note:SetPoint("RIGHT", card, "RIGHT", -LAY.pad, 0)
@@ -182,6 +184,8 @@ function LCEX:FillPollCard(card, itemIndex, item, responses)
         local fs = b:GetFontString()
         if c and fs then fs:SetTextColor(c[1], c[2], c[3]) end
         b:ClearAllPoints()
+        -- y = -20: the 20px button row spans card-y -30..-50 = the 40px icon's bottom, so the
+        -- response group bottom-aligns to the icon; the top-anchored name row sits above it (item 3).
         b:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", LAY.iconGap + x, -20)
         b:SetScript("OnClick", function()
             self:OnResponseChosen(card.itemIndex, resp, self.pollNotes[card.itemIndex] or "")
