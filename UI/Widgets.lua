@@ -987,6 +987,60 @@ function LCEX:ShowConfirm(opts)
     return f
 end
 
+-- ── Export / import text frame (§6.19, DL-25) ────────────────────────────────
+-- A reused window with a scrollable multi-line edit box. Export mode pre-selects the text so
+-- ctrl-C grabs it all; import mode shows an Import button that hands the pasted text to onImport.
+--   LCEX:ShowExportFrame(title, text)                    → export (read-mostly, text selected)
+--   LCEX:ShowExportFrame(title, "", { onImport = fn })   → paste-in import (fn gets the box text)
+function LCEX:ShowExportFrame(title, text, opts)
+    opts = opts or {}
+    local W = 480
+    local f = self._exportFrame
+    if not f then
+        f = self:CreateWindowV2("LCEX_ExportFrame",
+            { width = W, height = 340, title = title or self.L["Export"], strata = "FULLSCREEN_DIALOG" })
+
+        -- A plain ScrollFrame (not Faux — no offset trap) over a multi-line edit box.
+        local scroll = CreateFrame("ScrollFrame", "LCEX_ExportScroll", f, "UIPanelScrollFrameTemplate")
+        scroll:SetPoint("TOPLEFT", LAY.grid, -(LAY.contentTop + LAY.gap))
+        scroll:SetPoint("BOTTOMRIGHT", -(LAY.grid + 24), LAY.grid + LAY.btnH + LAY.gap)
+        local eb = CreateFrame("EditBox", nil, scroll)
+        eb:SetMultiLine(true)
+        eb:SetAutoFocus(false)
+        eb:SetFontObject(_G.ChatFontNormal or _G.GameFontHighlight)
+        eb:SetWidth(W - 2 * LAY.grid - 24) -- explicit width so multi-line wraps (no h-scroll)
+        eb:SetTextInsets(4, 4, 4, 4)
+        eb:SetScript("OnEscapePressed", function(e) e:ClearFocus(); f:Hide() end)
+        scroll:SetScrollChild(eb)
+        f.eb = eb
+
+        f.closeBtn = self:CreateFlatButton(f, self.L["Close"], 90, LAY.btnH)
+        f.closeBtn:SetPoint("BOTTOMRIGHT", -LAY.grid, LAY.grid)
+        f.closeBtn:SetScript("OnClick", function() f:Hide() end)
+        f.importBtn = self:CreateFlatButton(f, self.L["Import"], 90, LAY.btnH, "accent")
+        f.importBtn:SetPoint("BOTTOMRIGHT", f.closeBtn, "BOTTOMLEFT", -LAY.btnGap, 0)
+
+        self._exportFrame = f
+    end
+    f.title:SetText(title or self.L["Export"])
+    f.eb:SetText(text or "")
+    f.eb:SetCursorPosition(0)
+    f.eb:SetFocus()
+    if opts.onImport then
+        f.importBtn:Show()
+        f.importBtn:SetScript("OnClick", function()
+            local t = f.eb:GetText()
+            f:Hide()
+            opts.onImport(t)
+        end)
+    else
+        f.importBtn:Hide()
+        f.eb:HighlightText() -- select all for a one-keystroke copy
+    end
+    f:Show()
+    return f
+end
+
 -- ── Context menu ─────────────────────────────────────────────────────────────
 -- A small themed right-click menu (Phase 12, DL-23) — native frames, no UIDropDownMenu. One
 -- reused frame plus a fullscreen click-catcher one level beneath it, so any click-away closes;

@@ -979,6 +979,17 @@ end, { cleanup = function(self)
     if self._cd3Host then self._cd3Host:Hide() end
 end })
 
+-- The export/import frame (§6.19) renders and holds a large body of text.
+LCEX:RegisterSelfTest("widgets", "export frame renders + holds text", function(self, t)
+    local blob = string.rep("winner,item,response\n", 500) -- ~10KB
+    local f = self:ShowExportFrame(self.L["Export (CSV)"], blob)
+    if t:Ok(f ~= nil and f:IsShown(), "export frame not shown") then
+        t:Ok(f.eb ~= nil and #f.eb:GetText() == #blob, "edit box did not hold the full text")
+    end
+end, { cleanup = function(self)
+    if self._exportFrame then self._exportFrame:Hide() end
+end })
+
 LCEX:RegisterSelfTest("api", "guild bank API contract (Feature B)", function(self, t)
     -- The net-new BCC guild-bank APIs the scanner relies on exist on the live client (X3). Existence
     -- only — the query/read functions need an open bank, and GetGuildBankMoneyTransaction crashes on

@@ -28,6 +28,22 @@ LCEX:RegisterCouncilModule({
             panel.list:SetData(LCEX:BuildHistoryLog(eb:GetText()))
         end)
 
+        -- Export (§6.19): the current view (honoring the winner filter) as CSV / JSON / Discord,
+        -- into the reused copy/paste frame.
+        panel.exportBtn = LCEX:CreateFlatButton(panel, LCEX.L["Export"], 80, LAY.btnH)
+        panel.exportBtn:SetPoint("LEFT", panel.filterBox, "RIGHT", LAY.gap, 0)
+        panel.exportBtn:SetScript("OnClick", function()
+            local filter = panel.filterBox:GetText()
+            LCEX:ShowContextMenu({ anchor = panel.exportBtn, title = LCEX.L["Export as…"], items = {
+                { text = LCEX.L["CSV"], onClick = function()
+                    LCEX:ShowExportFrame(LCEX.L["Export (CSV)"], LCEX:ExportCSV(filter)) end },
+                { text = LCEX.L["JSON"], onClick = function()
+                    LCEX:ShowExportFrame(LCEX.L["Export (JSON)"], LCEX:ExportJSON(filter)) end },
+                { text = LCEX.L["Discord"], onClick = function()
+                    LCEX:ShowExportFrame(LCEX.L["Export (Discord)"], LCEX:ExportDiscord(filter)) end },
+            } })
+        end)
+
         panel.list = LCEX:CreateScrollList(panel, {
             rowHeight = 24, fillHeight = true, zebra = true,
             buildRow = function(parent)

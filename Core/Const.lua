@@ -248,6 +248,16 @@ L["Inherit %s loot-council settings from %s?"] =
     "Inherit %s loot-council settings from %s?"
 L["Inherited %s loot-council settings from %s."] =
     "Inherited %s loot-council settings from %s."
+L["Export"]                                = "Export"
+L["Export as…"]                            = "Export as…"
+L["Export (CSV)"]                          = "Export (CSV)"
+L["Export (JSON)"]                         = "Export (JSON)"
+L["Export (Discord)"]                      = "Export (Discord)"
+L["CSV"]                                   = "CSV"
+L["JSON"]                                  = "JSON"
+L["Discord"]                               = "Discord"
+L["Close"]                                 = "Close"
+L["Import"]                                = "Import"
 L["Response buttons — apply to the next session:"] =
     "Response buttons — apply to the next session:"
 L["Rename response \"%s\" to:"]             = "Rename response \"%s\" to:"
