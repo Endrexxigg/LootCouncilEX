@@ -1006,6 +1006,49 @@ test("GearIssuesForItem: excluded item is never flagged", function()
     eq(#L:GearIssuesForItem("item:15138:0:0:0:0:0", 15), 0, "excluded item skips all checks")
 end)
 
+-- ── Feature G v1.1 (Phase 17) ────────────────────────────────────────────────
+test("GearIssuesForItem: useless-item FYI tag (v1.1)", function()
+    L.GearRules.itemCondition[12345] = "pvp"
+    local issues = L:GearIssuesForItem("item:12345:0:0:0:0:0", 13) -- trinket slot
+    eq(countKind(issues, "useless"), 1, "conditional item flagged")
+    eq(issues[1].text, "PvP trinket", "labeled from conditionLabel")
+    eq(countKind(L:GearIssuesForItem("item:99999:0:0:0:0:0", 13), "useless"), 0, "non-conditional item clean")
+    L.GearRules.itemCondition[12345] = nil
+end)
+
+test("GearIssuesForItem: socket-colour matching (v1.1)", function()
+    L.GearRules.gemColors[100], L.GearRules.gemColors[101] = "R", "Y"
+    L.GearRules.gemColors[102], L.GearRules.gemColors[103] = "O", "B" -- Orange = R+Y hybrid
+    H.itemStats = { EMPTY_SOCKET_RED = 1, EMPTY_SOCKET_YELLOW = 1 }    -- 1 red + 1 yellow socket
+    eq(countKind(L:GearIssuesForItem("item:30055:0:100:101:0:0", 5), "socketcolor"), 0, "R+Y gems match R+Y sockets")
+    eq(countKind(L:GearIssuesForItem("item:30055:0:102:102:0:0", 5), "socketcolor"), 0, "orange matches both parents")
+    eq(countKind(L:GearIssuesForItem("item:30055:0:103:103:0:0", 5), "socketcolor"), 1, "blue+blue can't fill R+Y")
+    eq(countKind(L:GearIssuesForItem("item:30055:0:999:103:0:0", 5), "socketcolor"), 0, "unknown gem → fail-open")
+    eq(countKind(L:GearIssuesForItem("item:30055:0:100:0:0:0", 5), "socketcolor"), 0, "empty socket → fail-open")
+    H.itemStats = nil
+    L.GearRules.gemColors[100], L.GearRules.gemColors[101] = nil, nil
+    L.GearRules.gemColors[102], L.GearRules.gemColors[103] = nil, nil
+end)
+
+test("GearMetaIssue: whole-set meta activation (v1.1), fail-open twice", function()
+    L.GearRules.gemColors[200], L.GearRules.gemColors[103], L.GearRules.gemColors[100] = "M", "B", "R"
+    L.GearRules.metaRequirements[200] = { blue = 2 }
+    -- Meta (head) + two blue gems across the set → requirement met.
+    ok(L:GearMetaIssue({ [1] = "item:30055:0:200:103:0:0", [5] = "item:30055:0:103:0:0:0" }) == nil,
+        "requirement met → no issue")
+    -- Meta + two red → requirement unmet.
+    local iss = L:GearMetaIssue({ [1] = "item:30055:0:200:100:0:0", [5] = "item:30055:0:100:0:0:0" })
+    ok(iss ~= nil and iss.kind == "metagem", "requirement unmet → metagem issue")
+    -- Unknown meta requirement → fail-open.
+    L.GearRules.metaRequirements[200] = nil
+    ok(L:GearMetaIssue({ [1] = "item:30055:0:200:100:0:0" }) == nil, "unknown meta requirement → fail-open")
+    -- Known meta but an unknown gem colour → fail-open (can't be sure it's inactive).
+    L.GearRules.metaRequirements[200] = { blue = 2 }
+    ok(L:GearMetaIssue({ [1] = "item:30055:0:200:999:0:0" }) == nil, "unknown gem colour → fail-open")
+    L.GearRules.gemColors[200], L.GearRules.gemColors[103], L.GearRules.gemColors[100] = nil, nil, nil
+    L.GearRules.metaRequirements[200] = nil
+end)
+
 test("GearIssuesForPlayer aggregates a cached report", function()
     L.db.global.gearCache["bob"] = { items = {
         [5] = "item:30055:0:0:0:0:0", -- chest, no enchant -> 1 issue

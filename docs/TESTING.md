@@ -31,6 +31,20 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.66.0 – v0.66.1 — Feature G v1.1: useless-item + meta-gem + socket-colour (§6.8)
+Headless covers all three evaluators (fail-open cases included); selftest asserts the per-colour
+`GetItemStats` contract. **The rule DATA ships minimal**, so nothing flags in-game until it's
+filled — these are code-ready, content-pending:
+
+- [ ] **`/lcex selftest`**: the "GetItemStats sockets + gear-issue engine" check now also reports the
+  per-colour `EMPTY_SOCKET_RED/YELLOW/BLUE/META` shape — confirm it prints a shape (or "none") and no
+  new failures.
+- [ ] **Later (after seeding `GearRules.itemCondition` / `gemColors` / `metaRequirements`)**: a
+  character wearing a flagged conditional item (e.g. a PvP trinket) shows `[PvP trinket]` in Roster →
+  Gear; an inactive meta shows `[Meta gem inactive]` on the head row; gems that don't satisfy a
+  socket's colour show `[Socket bonus unmet]`. All three must **never** flag when the relevant data
+  is missing (fail-open).
+
 ### v0.64.0 – v0.65.1 — Content pipeline: P3 loot + BiS/prio pipelines + loot-priority lists
 Headless covers DataAPI (P3 phases/bosses, BiS regen, prio accessors); selftest covers the P3
 data load + the prio browser render. Manual:

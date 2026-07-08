@@ -102,4 +102,37 @@ LCEX.GearRules = {
         [30311] = true, [30312] = true, [30313] = true, [30314] = true, [30316] = true,
         [30317] = true, [30318] = true,
     },
+
+    -- ── Feature G v1.1 (Phase 17) — all data ships MINIMAL; the evaluators (Core/GearIssues.lua)
+    -- are fixture-proven and fail open, so an empty table simply means "that check never fires".
+    -- Content (real itemIDs / gem colours / meta requirements) is curated in a later pass. ──────
+
+    -- itemID → a boss-conditional condition. The evaluator flags an FYI `useless` tag with the
+    -- matching conditionLabel. Conditions: "pvp" (PvP-only trinket), "undead" / "demon" (only
+    -- useful vs that creature type), "engineering" (needs the Engineering profession).
+    itemCondition = {
+        -- e.g. [<pvpTrinketID>] = "pvp", [<undeadSlayerID>] = "undead", …
+    },
+    conditionLabel = {
+        pvp = "PvP trinket", undead = "vs undead only", demon = "vs demons only",
+        engineering = "Engineering",
+    },
+
+    -- bossName → creature-type flags, for a future boss-aware surface (the report-time evaluator is
+    -- context-free; this data lets a loot-time check sharpen a conditional item's relevance).
+    encounters = {
+        -- e.g. ["Illidan Stormrage"] = { demon = true },
+    },
+
+    -- gem itemID → its socket colour: R/Y/B primary, O(range)=R+Y, G(reen)=Y+B, P(urple)=R+B
+    -- hybrids, M(eta). Drives socket-colour matching + meta-gem activation. Empty ⇒ both skip.
+    gemColors = {
+        -- e.g. [24027] = "R", [24051] = "O", …
+    },
+
+    -- meta gem itemID → the colour requirement it needs ACTIVE (counts of each primary colour across
+    -- the whole equipped set). Hybrids count toward both parents. Empty ⇒ the meta check never fires.
+    metaRequirements = {
+        -- e.g. [34220] = { blue = 2 },  -- Chaotic Skyfire Diamond (VERIFY before shipping)
+    },
 }

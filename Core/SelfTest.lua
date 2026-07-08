@@ -523,6 +523,13 @@ LCEX:RegisterSelfTest("api", "GetItemStats sockets + gear-issue engine (Feature 
     end
     t.info = "GetItemStats present; sockets on #" .. TEST_ITEM_ID .. ": "
         .. (#socketKeys > 0 and table.concat(socketKeys, ", ") or "none")
+
+    -- v1.1 (Phase 17): ItemSocketColors reads the per-COLOUR EMPTY_SOCKET_RED/YELLOW/BLUE/META keys
+    -- that socket-colour matching depends on — assert the shape (nil when the item has no sockets).
+    local colors = self:ItemSocketColors("item:" .. TEST_ITEM_ID)
+    t:Ok(colors == nil or (type(colors) == "table" and type(colors.RED) == "number"
+        and type(colors.total) == "number"), "ItemSocketColors shape (per-colour counts or nil)")
+    t:Ok(self:GearMetaIssue({}) == nil, "GearMetaIssue fail-open on empty gear")
 end)
 
 LCEX:RegisterSelfTest("api", "item data loads (WithItemID round-trip)", function(self, t)
