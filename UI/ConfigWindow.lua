@@ -60,6 +60,10 @@ local function BuildSchema(self)
         { type = "checkbox", label = self.L["Broadcast my gear/professions (self-report)"],
           get = function() return p.selfReport end,
           set = function(v) p.selfReport = v end },
+        -- RCLC interop (§6.18): as ML, mirror the session to raiders who only have RCLootCouncil.
+        { type = "checkbox", label = self.L["RCLC compatibility (raiders on RCLootCouncil)"],
+          get = function() return p.rclcBridge end,
+          set = function(v) p.rclcBridge = v end },
         { type = "checkbox", label = self.L["Show trade timers"],
           get = function() return p.tradeTimersAuto end,
           set = function(v)
@@ -83,7 +87,7 @@ end
 function LCEX:EnsureConfigWindow()
     if self.configWindow then return self.configWindow end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = WIN_W, height = 440,
+        width = WIN_W, height = 470,
         title = self.L["Configuration"],
         savedKey = "config",
         defaultPos = { x = -220, y = 60 },

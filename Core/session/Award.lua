@@ -390,6 +390,7 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
             ts        = ts,
         }, channel)
     end
+    self:BridgeAward(itemIndex, name) -- RCLC interop (§6.18): advance RCLC raiders' frames / TradeUI
     -- Log to persistent history locally. Every present client logs from the `award` broadcast;
     -- the ML logs here directly (same ts) so it doesn't depend on its own group echo — the
     -- union history dataset then propagates to council who were absent (council/History.lua).

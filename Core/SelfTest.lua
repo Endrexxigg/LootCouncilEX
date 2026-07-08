@@ -1300,6 +1300,24 @@ LCEX:RegisterSelfTest("comm", "malformed + future-version envelopes dropped", fu
     t:Ok(self._selfTestEcho ~= nil, "future-version envelope must be dropped, not dispatched")
 end, { cleanup = function(self) self._selfTestEcho = nil end })
 
+-- RCLC bridge codec (§6.18): the real AceSerializer + LibDeflate pipeline the headless harness
+-- can't run (it identity-mocks Serialize and has no LibDeflate). Proves the vendored lib is wired
+-- and both single-table and multi-arg RCLC payloads survive encode→decode; garbage decodes to nil.
+LCEX:RegisterSelfTest("comm", "RCLC codec round-trips (AceSerializer + LibDeflate)", function(self, t)
+    if not self:RCLCReady() then return t:Skip("LibDeflate not loaded — RCLC bridge inert") end
+    local mldb = self:RCLC_BuildMLDB(self.RESPONSES, 45)
+    local enc = self:RCLCEncode("mldb", mldb)
+    if not t:Ok(type(enc) == "string" and #enc > 0, "encode produced a channel-safe string") then return end
+    local cmd, args = self:RCLCDecode(enc)
+    t:Eq(cmd, "mldb", "command survived the round-trip")
+    t:Ok(args and args[1] and args[1].numButtons == mldb.numButtons, "mldb numButtons survived")
+    t:Eq(args and args[1] and args[1].buttons.default[1].text, "BiS", "nested button text survived")
+    local cmd2, a2 = self:RCLCDecode(self:RCLCEncode("awarded", 3, "Winner", "Mlchar"))
+    t:Eq(cmd2, "awarded", "multi-arg command survived")
+    t:Ok(a2 and a2[1] == 3 and a2[2] == "Winner" and a2[3] == "Mlchar", "multi-arg values survived")
+    t:Ok((self:RCLCDecode("!!!not-a-valid-blob!!!")) == nil, "garbage decodes to nil, not an error")
+end)
+
 LCEX:RegisterSelfTest("comm", "live wire loopback (GUILD echo)", function(self, t)
     if not IsInGuild() then return t:Skip("not in a guild — no addon channel to echo over") end
     local nonce = UnitName("player") .. ":" .. tostring(GetTime())

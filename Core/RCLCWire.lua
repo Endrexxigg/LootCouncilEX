@@ -24,6 +24,12 @@ local function deflate()
     return LibDeflate or nil
 end
 
+-- True once LibDeflate is available (in-game). The bridge gates its whole outbound path on this,
+-- so the headless harness (no LibDeflate) and any build missing the lib stay completely inert.
+function LCEX:RCLCReady()
+    return deflate() ~= nil
+end
+
 -- The item string from a hyperlink, minus the "item:" prefix (what RCLC puts on the wire, e.g.
 -- "40395:0:0:0:0:0:0:::::"). The candidate rebuilds "item:"..string and GetItemInfo's it.
 local function itemString(link)

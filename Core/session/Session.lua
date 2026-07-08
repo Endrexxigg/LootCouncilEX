@@ -308,6 +308,7 @@ function LCEX:StartSession(items)
 
     self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
     self:StartHeartbeat() -- tell candidates we're alive
+    self:BridgeSessionStart() -- RCLC interop (§6.18): broadcast the session to RCLC-only raiders
 end
 
 -- ── ML heartbeat (DL-6) ──────────────────────────────────────────────────────
@@ -449,6 +450,7 @@ function LCEX:ResumeSession()
     self:SaveSession()    -- re-mirror with the new live references
     self:StartHeartbeat() -- no-op out of a group; re-arms on the next roster update with a channel
     self:UpdateMiniFrame()
+    self:BridgeSessionStart() -- RCLC interop (§6.18): re-broadcast to RCLC raiders on resume too
     self:Msg(string.format(self.L["Resumed session (%s) — %d item(s)."], saved.sid, #saved.items))
     return true
 end
@@ -504,6 +506,7 @@ function LCEX:EndSession()
     if channel then
         self:Send("sEnd", sid, {}, channel)
     end
+    self:BridgeSessionEnd() -- RCLC interop (§6.18): close RCLC-only raiders' loot frames too
     self:StopHeartbeat()
     self.session = nil
     self.sessionItems = nil -- the ML-side full records (Award.lua); pendingTrades outlive the session

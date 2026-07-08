@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.56.1
+## Version: 0.56.2
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -80,6 +80,7 @@ Core\session\Council.lua
 # RCLC-only raiders respond as candidates. Wire = pure transforms + codec; Bridge = comms glue
 # (loads after Session/Award/Candidate — the functions it hooks at runtime).
 Core\RCLCWire.lua
+Core\RCLCBridge.lua
 
 # Plane B — persistent council sync over GUILD (digest/delta, LWW merge). Loads after Session
 # (ResolveCouncil) and Comms (dispatch).

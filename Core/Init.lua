@@ -39,6 +39,8 @@ local DB_DEFAULTS = {
         showGearIssues     = false, -- Feature G: show the gear-issue callouts on the Roster tab
         tradeTimersAuto    = false, -- Phase 12: opt-in trade-timer window when loot is tradeable
         tradeTimersMaxRows = 10,    -- 0 = all; minimized still always shows exactly one row
+        rclcBridge         = true,  -- Phase 13 (§6.18): speak RCLC's dialect so RCLootCouncil-only
+                                    -- raiders can respond. Inert unless in a group with a session.
 
         ui                 = {
             poll        = {},
@@ -131,6 +133,9 @@ function LCEX:OnInitialize()
 
     -- Inbound comms route to LCEX:OnCommReceived (Comms.lua), the default handler name.
     self:RegisterComm("LCEX")
+    -- RCLC interop (§6.18): a SECOND prefix for RCLootCouncil-only raiders, routed to its own
+    -- handler (RCLC uses LibDeflate + a different envelope, so it must NOT reuse OnCommReceived).
+    self:RegisterComm("RCLC", "OnRCLCReceived")
 
     -- /lcex … dispatches to LCEX:HandleSlash below.
     self:RegisterChatCommand("lcex", "HandleSlash")
