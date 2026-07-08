@@ -621,6 +621,19 @@ Left-click is the normal award, unchanged. History + announcement render the rea
 An un-upgraded client shows the raw `94` for such awards (accepted, same-version fleet, DL-20
 precedent). No per-reason "record in history?" flag — the retract path (§6.15) is the correction.
 
+### 6.21 Aggregate loot stats (Phase 15, DL-27)
+
+The council needs a fairness picture at decision time. `LCEX:BuildPlayerLootStats(name, recentN)`
+(Core/Display.lua, pure/headless) folds the award history for one player (retracted records
+skipped) into `{ total, byResp (breakdown by DISPLAY reason text, count-desc — records from
+different response-set eras merge by label, DL-8), recent (newest N), tokens (records whose itemID
+is a tier token), lastTs }`; `PlayerStatsLine(name)` renders the one-liner
+`"12 awards · BiS 3 · Major 5 · 2 tokens · last 06/28"` ("" when no history). **Stats are DERIVED,
+never stored or synced.** Two surfaces: **(i)** the Roster → History sub-tab header (the existing
+`cacheMeta` caption); **(ii)** the loot-window candidate name hover — after the existing truncation
+lines, the stats line + up to three recent awards, so the council sees a candidate's recent loot
+without leaving the vote view (the name already click-throughs to Roster).
+
 ---
 
 ## 7. Build map
@@ -825,6 +838,11 @@ history on hover at vote time; a custom announce message posts to the chosen cha
   button → reason menu → confirm → `AwardGroup(..., STATUS.CUSTOM, reason)`. History/announce
   render via `respText`; old clients show the raw `94` (accepted). No per-reason log-suppress flag.
   §6.20.
+- **DL-27 (accepted — Phase 15c, aggregate loot stats):** per-player loot analytics
+  (`BuildPlayerLootStats` / `PlayerStatsLine`, Core/Display.lua) over the award history — total,
+  response breakdown (by display text, DL-8), recent N, tier-token count, last award. **Derived,
+  never stored/synced.** Surfaced in the Roster History header and on the loot-window candidate
+  name hover (stats + recent 3), so the council sees fairness data at vote time. §6.21.
 
 ---
 
