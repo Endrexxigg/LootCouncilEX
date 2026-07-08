@@ -625,6 +625,36 @@ test("RCLC CSV import: maps rows to native records, idempotent, skips malformed"
     L.db.global.history = {}
 end)
 
+-- ── Aggregate loot stats (§6.21, DL-27) ──────────────────────────────────────
+test("BuildPlayerLootStats: totals, breakdown, recent, tokens, retracted-skip", function()
+    -- A real tier token id so the token counter fires (TierTokens is populated for current content).
+    local tokenID = next(L.TierTokens)
+    L.db.global.history = {
+        ["s:1"] = { player = "Bob", itemID = 100, itemLink = "[A]", ts = 100, respText = "BiS" },
+        ["s:2"] = { player = "Bob", itemID = 101, itemLink = "[B]", ts = 300, respText = "BiS" },
+        ["s:3"] = { player = "Bob", itemID = 102, itemLink = "[C]", ts = 200, respText = "Major" },
+        ["s:4"] = { player = "Bob", itemID = tokenID, itemLink = "[T]", ts = 400, respText = "BiS" },
+        ["s:5"] = { player = "Bob", itemID = 103, itemLink = "[D]", ts = 500, respText = "Greed", retracted = true },
+        ["s:6"] = { player = "Amy", itemID = 104, itemLink = "[E]", ts = 250, respText = "BiS" },
+    }
+    local s = L:BuildPlayerLootStats("Bob", 3)
+    eq(s.total, 4, "4 non-retracted awards for Bob")
+    eq(s.byResp[1].text, "BiS", "top response is BiS")
+    eq(s.byResp[1].n, 3, "3 BiS")
+    eq(s.byResp[2].text, "Major", "then Major")
+    eq(s.tokens, 1, "one tier token counted")
+    eq(s.lastTs, 400, "last award is the newest non-retracted ts")
+    eq(#s.recent, 3, "recent capped at 3")
+    eq(s.recent[1].ts, 400, "recent newest-first")
+
+    local line = L:PlayerStatsLine("Bob")
+    ok(line:find("4 awards", 1, true), "line shows the total")
+    ok(line:find("BiS 3", 1, true), "line shows the top breakdown")
+    ok(line:find("1 tokens", 1, true), "line shows tokens")
+    eq(L:PlayerStatsLine("Nobody"), "", "no history → empty line")
+    L.db.global.history = {}
+end)
+
 test("HistoryForPlayer filter + sort", function()
     L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
     L.db.global.history["s:2"] = { player = "Bob",   ts = 300 }

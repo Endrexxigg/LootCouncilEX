@@ -224,6 +224,51 @@ function LCEX:BuildHistoryLog(filter)
     return rows
 end
 
+-- ── Aggregate loot stats (§6.21, DL-27) ──────────────────────────────────────
+-- Per-player loot analytics over the award history (retracted records skipped): total awards, a
+-- response breakdown (bucketed on the DISPLAY reason text so records from different response-set
+-- eras merge, DL-8; sorted count-desc), the newest `recentN` records, the tier-token count, and
+-- the last award time. Pure/headless; nothing is stored or synced. HistoryForPlayer is newest-first.
+function LCEX:BuildPlayerLootStats(nameOrKey, recentN)
+    recentN = recentN or 3
+    local rows = self:HistoryForPlayer(self:NormalizeName(nameOrKey))
+    local total, tokens, lastTs = 0, 0, nil
+    local byResp, order, recent = {}, {}, {}
+    for _, rec in ipairs(rows) do
+        if not rec.retracted then
+            total = total + 1
+            if not lastTs then lastTs = rec.ts end -- newest-first, so the first is the latest
+            if rec.itemID and self:FindTokenForItem(rec.itemID) then tokens = tokens + 1 end
+            local label = self:HistoryReasonText(rec)
+            if label and label ~= "" then
+                if not byResp[label] then byResp[label] = 0; order[#order + 1] = label end
+                byResp[label] = byResp[label] + 1
+            end
+            if #recent < recentN then recent[#recent + 1] = rec end
+        end
+    end
+    local breakdown = {}
+    for _, label in ipairs(order) do breakdown[#breakdown + 1] = { text = label, n = byResp[label] } end
+    table.sort(breakdown, function(a, b)
+        if a.n ~= b.n then return a.n > b.n end
+        return a.text < b.text
+    end)
+    return { total = total, byResp = breakdown, recent = recent, tokens = tokens, lastTs = lastTs }
+end
+
+-- One formatted line: "12 awards · BiS 3 · Major 5 · 2 tokens · last 06/28" ("" when no history).
+function LCEX:PlayerStatsLine(name)
+    local s = self:BuildPlayerLootStats(name, 0)
+    if s.total == 0 then return "" end
+    local parts = { string.format(self.L["%d awards"], s.total) }
+    for i = 1, math.min(#s.byResp, 3) do
+        parts[#parts + 1] = string.format("%s %d", s.byResp[i].text, s.byResp[i].n)
+    end
+    if s.tokens > 0 then parts[#parts + 1] = string.format(self.L["%d tokens"], s.tokens) end
+    if s.lastTs then parts[#parts + 1] = string.format(self.L["last %s"], date("%m/%d", s.lastTs)) end
+    return table.concat(parts, " · ")
+end
+
 -- ── BiS display ──────────────────────────────────────────────────────────────
 -- Resolve the current BiS class/spec/phase. Class defaults to the player's class on first view
 -- (when unset/invalid) — their LIVE class if grouped, else their last self-reported class, else

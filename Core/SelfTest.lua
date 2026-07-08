@@ -668,6 +668,13 @@ end, { cleanup = function(self)
     prevOwnGear, prevOwnProf = nil, nil
 end })
 
+LCEX:RegisterSelfTest("council", "loot-stats builder shape (§6.21)", function(self, t)
+    local s = self:BuildPlayerLootStats(UnitName("player"), 3)
+    t:Ok(type(s) == "table" and type(s.total) == "number" and type(s.byResp) == "table"
+        and type(s.recent) == "table" and type(s.tokens) == "number", "stats shape")
+    t:Ok(type(self:PlayerStatsLine(UnitName("player"))) == "string", "stats line is a string")
+end)
+
 LCEX:RegisterSelfTest("council", "digest covers every dataset", function(self, t)
     local digest = self:BuildDigest()
     for _, name in ipairs(ALL_DATASETS) do

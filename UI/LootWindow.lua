@@ -511,12 +511,22 @@ function LCEX:BuildLootCandRow(parent)
     -- Cursor-anchored, and only when actually truncated (no tooltip for text that already fits).
     row.nameBtn:SetScript("OnEnter", function(b)
         if not (row._cleanName and row._cleanName ~= "") then return end
-        if not (row.name:IsTruncated() or row.resp:IsTruncated()) then return end
+        local stats = self:BuildPlayerLootStats(row._cleanName, 3)
+        local truncated = row.name:IsTruncated() or row.resp:IsTruncated()
+        if not truncated and stats.total == 0 then return end -- nothing to add
+        local d = LCEX.Theme.text.dim
         GameTooltip:SetOwner(b, "ANCHOR_CURSOR")
         GameTooltip:AddLine(row._cleanName, 1, 1, 1)
-        if row._respText and row._respText ~= "" then
-            local d = LCEX.Theme.text.dim
+        if truncated and row._respText and row._respText ~= "" then
             GameTooltip:AddLine(row._respText, d[1], d[2], d[3], true)
+        end
+        -- Loot-fairness context at vote time (§6.21): the stats line + the recent awards.
+        if stats.total > 0 then
+            GameTooltip:AddLine(self:PlayerStatsLine(row._cleanName), d[1], d[2], d[3], true)
+            for _, rec in ipairs(stats.recent) do
+                GameTooltip:AddLine(string.format("%s — %s, %s", tostring(rec.itemLink or "?"),
+                    self:HistoryReasonText(rec), date("%m/%d", rec.ts or 0)), d[1], d[2], d[3])
+            end
         end
         GameTooltip:Show()
     end)

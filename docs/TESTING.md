@@ -31,6 +31,14 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.62.0 – v0.62.1 — Aggregate loot stats at vote time (§6.21, DL-27)
+Headless + selftest cover the builder. Manual:
+
+- [ ] **Roster stats header**: council → **Roster** → pick a player with award history → the
+  **History** sub-tab shows a header line "N awards · BiS x · … · N tokens · last MM/DD".
+- [ ] **Vote-time hover**: in a live session, hover a candidate's **name** → the tooltip shows the
+  stats line + up to 3 recent awards (item, reason, date), so you see their recent loot while voting.
+
 ### v0.61.0 – v0.61.2 — Custom award reasons (§6.20, DL-26)
 Headless covers the wire (resp=CUSTOM + respText); selftest covers the editor render. Manual:
 

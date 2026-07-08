@@ -131,6 +131,11 @@ local function SelectSubTab(panel, key)
         panel.cacheMeta:SetText(LCEX:CacheMetaText(player, "gearCache")); panel.cacheMeta:Show()
     elseif key == "profs" then
         panel.cacheMeta:SetText(LCEX:CacheMetaText(player, "profCache")); panel.cacheMeta:Show()
+    elseif key == "history" then
+        -- Aggregate loot stats header (§6.21): total, response breakdown, tokens, last award.
+        local line = LCEX:PlayerStatsLine(player)
+        panel.cacheMeta:SetText(line)
+        if line ~= "" then panel.cacheMeta:Show() else panel.cacheMeta:Hide() end
     else
         panel.cacheMeta:Hide()
     end
