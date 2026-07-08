@@ -105,6 +105,7 @@ LootCouncilEX/
 │       ├── BiS.lua            # class → spec → phase → slot → {itemIDs}
 │       ├── TierTokens.lua     # tokenItemID → {class → {tierPieceItemIDs}}
 │       ├── GearRules.lua      # Feature G: enchant allowlist + gem-min-quality + excluded-gear whitelist (CLA-derived)
+│       ├── Prio.lua           # Phase 16: loot-priority lists per item (GENERATED; §6.23)
 │       └── DataAPI.lua        # pure accessors over the shipped tables
 └── UI/                        # the four-frame UI (DL-12): flat-dark, gold accent
     ├── Theme.lua              # design language: surface tones, fonts, paint helpers
@@ -634,6 +635,20 @@ never stored or synced.** Two surfaces: **(i)** the Roster → History sub-tab h
 lines, the stats line + up to three recent awards, so the council sees a candidate's recent loot
 without leaving the vote view (the name already click-throughs to Roster).
 
+### 6.23 Loot-priority lists (Phase 16, DL-29)
+
+A guild's per-item loot priority ("who gets this first"), shown so the council can honor it at
+decision time. **Static shipped data** like Loot/BiS: `Core/Data/Prio.lua` (GENERATED from
+`tools/sources/prio.csv`), shape `Prio[itemID] = { { label, chain = { {rank-group}, ... } }, ... }`
+— one or more **labeled chains** per item (e.g. "Main Raid", "Split 1"), each an ordered list of
+rank-groups where equal-priority entries share a group (encodes the sheet's `A = B > C`). Accessors
+in `DataAPI`: `GetPrioForItem(itemID)` + pure `PrioLine(chain)` → `"Enhancement = Elemental > Prot
+Paladin"`. CSV row: `itemID,chainLabel,rank,text`. **Surfaces:** the **Loot Browser** (a prio glyph
+on item rows + the full lists appended to the item tooltip) and the **live loot-session vote view**
+(a `PrioLine` under the selected item, hover for the full chains). Not on poll cards (user
+decision). Content is user-sourced (a guild sheet) and filled in a later content pass — the pipeline
+ships empty-but-proven, like BiS.
+
 ### 6.22 Announcement customization (Phase 15, DL-28)
 
 The single fixed award announcement becomes configurable (shared config, replicated): **channel**
@@ -735,6 +750,13 @@ officer exports the log and pastes it into a spreadsheet / imports an RCLC CSV; 
 "Award for Banking" reads correctly in chat and history; the council sees a candidate's award
 history on hover at vote time; a custom announce message posts to the chosen channel.
 
+**Phase 16 — Content pipeline (DL-5, DL-29).** `tools/atlas_import.lua` (sandbox-loads the installed
+AtlasLoot data → appends P3 CSV rows), a `buildBiS` stage + `bis.csv`, and the loot-priority feature
+(`Core/Data/Prio.lua` + `buildPrio` + `prio.csv` + `tools/prio_import.lua`, §6.23) with the Loot
+Browser + vote-view surfaces. *Exit:* the browser shows P3 raids; a BiS/prio row round-trips through
+the converter; a prio'd item shows its chain in the browser tooltip and under the selected loot item.
+BiS/prio content is filled in a later pass.
+
 ---
 
 ## 8. Decision log / open questions
@@ -743,7 +765,7 @@ history on hover at vote time; a custom announce message posts to the chosen cha
 - **DL-2 (out of scope v1):** cross-guild council sync via custom channel — fragile; deferred.
 - **DL-3 (accepted v1):** no ACK on Plane A; last-write-wins + re-click. Revisit only if delivery gaps appear in practice.
 - **DL-4 (accepted, no alternative):** gear/professions are self-reported; out-of-raid / non-addon users show cached or none.
-- **DL-5 (open, content task):** static datasets must be maintained each phase; consider a build-time import from a community dataset instead of hand-editing.
+- **DL-5 (resolved-by-tooling — Phase 16):** static datasets are maintained via `tools/` converters, not hand-edited Lua. `tools/build_data.lua` turns reviewable CSVs (`loot.csv`/`tokens.csv`/`bis.csv`/`prio.csv`) into `Core/Data/*.lua` (CI `--check` guards drift); `tools/atlas_import.lua` is a dev-time importer that sandboxes the installed AtlasLoot data files (`data-tbc.lua` per-raid `{slot,itemID}` rows + `ItemSet.lua` token pieces) and appends CSV rows for new phases (P1/P2 bytes untouched → no drift). CONTENT (BiS/prio opinion data) is user-sourced and filled in dedicated content passes; the pipeline ships proven-but-empty for those.
 - **DL-6 (closed, Phase 7):** ML disconnect mid-session recovery is defined. The ML heartbeats `sPing` (~30s) while a session is open; a candidate that hears nothing for 95s closes the stale view (no one is stuck). The open ML session and any owed trades are mirrored to `global.session`/`global.pendingTrades` (owner-keyed, local) and restored on login — the ML is offered `/lcex resume` (re-broadcasts `sStart` with the same sid) or `/lcex end` to discard.
 - **DL-7 (accepted v1):** loot flow is auto-loot-to-ML-bags + later sessions + handoff by **trade** within the BoP 2h window. This supersedes the original master-loot-from-corpse assumption; `GetMasterLootCandidate`/`GiveMasterLoot` are not used.
 - **DL-8 (RESOLVED, Phase 14 — v0.59.x):** response buttons are user-configurable (add/remove/rename/reorder). The set lives in the replicated shared config as `config.responses` (§6.9), stored minimally as `{ {text, pass}, ... }` and **normalized at read** by `ResponseSet()` — ids contiguous `1..N`, exactly one `key=="PASS"` pinned last, colors auto-assigned from `RESPONSE_PALETTE`, capped at `MAX_RESPONSES` (8); a garbage record falls back to the built-in defaults (§6.5). **Consistency across participants:** the set is carried in `sStart`/`sJoin` and **snapshotted onto the session** at start (§6.16), so every candidate renders the ML's set and a mid-session config edit can't swap a live session's buttons; the RCLC MLdb rebuilds from that snapshot. **History longevity:** each award stores the resolved reason text (`respText`, §6.1/§6.3), so a record's reason renders correctly after the guild later changes its set. Editor v1 = add/remove/rename/reorder only (colors auto, PASS pinned/non-editable); per-button colors, whisper keys, and require-note are out of scope (§1).
@@ -856,6 +878,10 @@ history on hover at vote time; a custom announce message posts to the chosen cha
   response breakdown (by display text, DL-8), recent N, tier-token count, last award. **Derived,
   never stored/synced.** Surfaced in the Roster History header and on the loot-window candidate
   name hover (stats + recent 3), so the council sees fairness data at vote time. §6.21.
+- **DL-29 (accepted — Phase 16, loot-priority lists):** per-item guild loot priority as static
+  shipped data (`Core/Data/Prio.lua`, GENERATED from `prio.csv`; labeled `>`/`=` rank chains).
+  Surfaced in the Loot Browser (row glyph + tooltip) and the live vote view (a `PrioLine` under the
+  selected item). Zero comms; content user-sourced (a guild sheet), filled later like BiS. §6.23.
 - **DL-28 (accepted — Phase 15d, announcement customization):** the award announcement gains a
   shared-config **channel** (`announceChannel`: auto/RAID/PARTY/GUILD/NONE), a **custom message**
   (`awardText` with `&p`/`&i`/`&r`, function-gsub so `%` is safe), and an optional session-start
