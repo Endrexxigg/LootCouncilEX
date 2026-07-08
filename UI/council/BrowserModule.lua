@@ -60,6 +60,15 @@ local function BuildRow(panel)
     row.noteIcon:SetPoint("RIGHT", row.mark, "LEFT", -LAY.gapTight, 0)
     row.noteIcon:Hide()
 
+    -- Loot-priority indicator (§6.23): a small accent glyph when the item has a prio entry; the
+    -- full chains ride the hover tooltip (below). Left of the note icon.
+    row.prioGlyph = row:CreateFontString(nil, "OVERLAY")
+    LCEX:ThemeText(row.prioGlyph, "caption", "dim")
+    row.prioGlyph:SetTextColor(LCEX.Theme.accent[1], LCEX.Theme.accent[2], LCEX.Theme.accent[3])
+    row.prioGlyph:SetText("◆")
+    row.prioGlyph:SetPoint("RIGHT", row.noteIcon, "LEFT", -LAY.gapTight, 0)
+    row.prioGlyph:Hide()
+
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetScript("OnClick", function(r, button)
         if r.itemID then
@@ -87,6 +96,16 @@ local function BuildRow(panel)
                 GameTooltip:AddLine(mark, 1, 1, 1, true) -- wrap the full text
             end
         end
+        -- Loot priority (§6.23): one "Prio (label): A = B > C" pair per labeled chain.
+        local prio = LCEX:GetPrioForItem(r.itemID)
+        if prio then
+            local d = LCEX.Theme.text.dim
+            GameTooltip:AddLine(" ")
+            for _, e in ipairs(prio) do
+                GameTooltip:AddLine(string.format(LCEX.L["Prio (%s):"], tostring(e.label)), d[1], d[2], d[3])
+                GameTooltip:AddLine(LCEX:PrioLine(e.chain), 1, 1, 1, true)
+            end
+        end
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -104,6 +123,7 @@ local function FillRow(panel, row, entry)
     row.sel:Hide()
     row.icon:Hide()
     row.noteIcon:Hide()
+    row.prioGlyph:Hide()
     row.mark:SetText("")
     row.text:ClearAllPoints()
 
@@ -133,6 +153,7 @@ local function FillRow(panel, row, entry)
         row.text:SetPoint("RIGHT", row.noteIcon, "LEFT", -LAY.inlineGap, 0)
         row.text:SetText("item:" .. entry.itemID)
         if LCEX:HasUserMark(entry.itemID) then row.noteIcon:Show() end
+        if LCEX:GetPrioForItem(entry.itemID) then row.prioGlyph:Show() end
 
         local id = entry.itemID
         row.loadingID = id

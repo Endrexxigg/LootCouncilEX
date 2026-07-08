@@ -231,6 +231,32 @@ function LCEX:EnsureLootWindow()
     end)
     f.voteTallyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    -- Loot priority for the selected item (§6.23): the Main chain inline under the item name; hover
+    -- for the full labeled chains. Sits in the lower header band (above the candidate list), hidden
+    -- when the item has no prio.
+    f.itemPrio = pane:CreateFontString(nil, "OVERLAY")
+    self:ThemeText(f.itemPrio, "caption", "dim")
+    f.itemPrio:SetPoint("TOPLEFT", f.itemName, "BOTTOMLEFT", 0, -2)
+    f.itemPrio:SetPoint("RIGHT", f.itemCount, "LEFT", -LAY.gap, 0)
+    f.itemPrio:SetJustifyH("LEFT"); f.itemPrio:SetWordWrap(false)
+    f.itemPrio:Hide()
+
+    f.itemPrioBtn = CreateFrame("Button", nil, pane)
+    f.itemPrioBtn:SetAllPoints(f.itemPrio)
+    f.itemPrioBtn:Hide()
+    f.itemPrioBtn:SetScript("OnEnter", function(b)
+        local prio = f._prioForSelected
+        if not prio then return end
+        GameTooltip:SetOwner(b, "ANCHOR_CURSOR")
+        local d = self.Theme.text.dim
+        for _, e in ipairs(prio) do
+            GameTooltip:AddLine(string.format(self.L["Prio (%s):"], tostring(e.label)), d[1], d[2], d[3])
+            GameTooltip:AddLine(self:PrioLine(e.chain), 1, 1, 1, true)
+        end
+        GameTooltip:Show()
+    end)
+    f.itemPrioBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     f.candList = self:CreateScrollList(pane, {
         rowHeight = 26, fillHeight = true, zebra = true,
         buildRow = function(parent) return self:BuildLootCandRow(parent) end,
@@ -818,6 +844,18 @@ function LCEX:RefreshLootWindow()
         f.itemIcon:Hide()
         f.itemName:SetText("")
         f.itemCount:SetText("")
+    end
+
+    -- Loot priority for the selected item (§6.23): the first (Main) chain inline; hover for all.
+    local itemID = entry and (entry.itemID
+        or (GetItemInfoInstant and entry.link and GetItemInfoInstant(entry.link)))
+    local prio = itemID and self:GetPrioForItem(itemID)
+    f._prioForSelected = prio
+    if prio and prio[1] then
+        f.itemPrio:SetText(string.format(self.L["Prio: %s"], self:PrioLine(prio[1].chain)))
+        f.itemPrio:Show(); f.itemPrioBtn:Show()
+    else
+        f.itemPrio:Hide(); f.itemPrioBtn:Hide()
     end
 
     -- Vote tally for the selected item (V6). Hidden outside a session, or when no council is

@@ -606,6 +606,21 @@ LCEX:RegisterSelfTest("data", "loot phases + tier tokens resolve", function(self
     t:Ok(type(t4) == "table" and #t4 == 2, "warrior T4 legs should map to both Warbringer sets")
 end)
 
+-- Loot priority (§6.23): a seeded entry resolves + the browser renders it without error.
+LCEX:RegisterSelfTest("data", "loot-priority accessors + browser render (§6.23)", function(self, t)
+    self.Prio[TEST_ITEM_ID] = { { label = "Main", chain = { { "A" }, { "B", "C" } } } }
+    local p = self:GetPrioForItem(TEST_ITEM_ID)
+    t:Ok(p ~= nil, "GetPrioForItem resolves the seeded entry")
+    t:Eq(self:PrioLine(p[1].chain), "A > B = C", "PrioLine renders the chain")
+    -- Render the browser over a phase that has data; the prio glyph path must not error.
+    local phase = self:GetLootPhases()[1]
+    if phase then self:OpenCouncilModule("browser") end
+    t:Ok(true, "browser rendered with a prio entry present")
+end, { cleanup = function(self)
+    self.Prio[TEST_ITEM_ID] = nil
+    if self.councilWindow then self.councilWindow:Hide() end
+end })
+
 -- ── council: Plane B against the real client (no broadcasts) ─────────────────
 LCEX:RegisterSelfTest("council", "own snapshots (gear / spec / professions)", function(self, t)
     local gear = self:SnapshotGear()

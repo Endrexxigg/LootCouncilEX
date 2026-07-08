@@ -31,6 +31,19 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.64.0 – v0.65.1 — Content pipeline: P3 loot + BiS/prio pipelines + loot-priority lists
+Headless covers DataAPI (P3 phases/bosses, BiS regen, prio accessors); selftest covers the P3
+data load + the prio browser render. Manual:
+
+- [ ] **P3 browser**: council → **Loot Browser** → the **P3** phase shows **Hyjal Summit** (5 bosses)
+  and **Black Temple** (9 bosses) with quality-colored item names. Spot-check a couple of names
+  (e.g. Archimonde drops *Cataclysm's Edge*) and flag any wrong itemID.
+- [ ] **Prio glyph + tooltip** *(needs prio content — none ships yet; test after you fill prio.csv,
+  or with a temporary `/run LootCouncilEX.Prio[<id>] = {...}`)*: a prio'd item shows a gold ◆ on its
+  browser row; hovering shows "Prio (label): A = B > C" lines.
+- [ ] **Prio in the vote view**: in a live session, selecting a prio'd item shows "Prio: …" under the
+  item name; hover it for the full labeled chains.
+
 ### v0.63.0 – v0.63.2 — Announcement customization (§6.22, DL-28)
 Headless covers the channel matrix / template / items post; selftest covers the controls render. Manual:
 
