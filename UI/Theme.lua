@@ -34,7 +34,8 @@ LCEX.Theme = {
         dim   = { 0.604, 0.627, 0.678 }, -- #9aa0ad — secondary
         faint = { 0.392, 0.416, 0.463 }, -- #646a76 — tertiary/disabled
     },
-    font = "Fonts\\FRIZQT__.TTF",
+    font = "Interface\\AddOns\\LootCouncilEX\\Media\\Fonts\\bussin.ttf", -- bundled default (Media/Fonts)
+    fontFallback = "Fonts\\FRIZQT__.TTF", -- stock font if the bundled TTF can't be loaded
     fontSize = { title = 22, section = 16, body = 13, caption = 11 },
     -- Blizzard item-quality RGB (poor..legendary), used wherever items render as text.
     quality = {
@@ -188,11 +189,21 @@ function LCEX:SoftEdge(frame, alpha)
     return frame
 end
 
+-- Apply the addon font at `size` px with optional `flags`, falling back to the stock font if the
+-- bundled TTF can't be loaded — so a bad path / missing file can never render text invisible.
+-- The single choke point for the default font: everything themed flows through here.
+function LCEX:SetThemedFont(fs, size, flags)
+    if not fs:SetFont(self.Theme.font, size, flags or "") then
+        fs:SetFont(self.Theme.fontFallback, size, flags or "")
+    end
+    return fs
+end
+
 -- Themed FontString: size from the ramp, color from the text tones. `sizeKey` defaults to
 -- body, `toneKey` to ink. SetFont always precedes SetText (callers set text after).
 function LCEX:ThemeText(fs, sizeKey, toneKey)
     local size = self.Theme.fontSize[sizeKey or "body"] or self.Theme.fontSize.body
-    fs:SetFont(self.Theme.font, size, "")
+    self:SetThemedFont(fs, size, "")
     local c = self.Theme.text[toneKey or "ink"] or self.Theme.text.ink
     fs:SetTextColor(c[1], c[2], c[3])
     return fs

@@ -35,7 +35,7 @@ function LCEX:CreateItemIcon(parent, size)
     end
     -- Optional stack-count overlay (Feature B "xN"): outlined white, bottom-right. Hidden unless > 1.
     btn.count = btn:CreateFontString(nil, "OVERLAY")
-    btn.count:SetFont(self.Theme.font, 10, "OUTLINE")
+    self:SetThemedFont(btn.count, 10, "OUTLINE")
     btn.count:SetTextColor(1, 1, 1)
     btn.count:SetPoint("BOTTOMRIGHT", -1, 1)
     btn.count:Hide()

@@ -227,7 +227,7 @@ LCEX:RegisterCouncilModule({
         LCEX:ThemeText(hero.label, "caption", "dim")
         hero.label:SetPoint("TOPLEFT", LAY.pad, -LAY.gap); hero.label:SetText(LCEX.L["Guild Bank"])
         hero.gold = hero:CreateFontString(nil, "OVERLAY")
-        hero.gold:SetFont(LCEX.Theme.font, 22, "")
+        LCEX:SetThemedFont(hero.gold, 22, "")
         hero.gold:SetTextColor(LCEX.Theme.text.ink[1], LCEX.Theme.text.ink[2], LCEX.Theme.text.ink[3])
         hero.gold:SetPoint("LEFT", LAY.pad, -4)
         hero.fresh = hero:CreateFontString(nil, "OVERLAY")
