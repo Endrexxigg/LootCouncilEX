@@ -117,7 +117,7 @@ LootCouncilEX/
     │   ├── BrowserModule.lua  # loot browser (quality colors, hierarchy, mark editor)
     │   ├── RosterModule.lua   # roster picker (renamed from Players) + Gear|History|Profs|BiS|Notes; gear-issue badges + Gear Check overview (Feature G)
     │   ├── HistoryModule.lua  # guild-wide award log
-    │   ├── SessionConfigModule.lua # officer: council roster, poll deadline, DL-8 slot
+    │   ├── SessionConfigModule.lua # officer: council roster, poll deadline, response-set editor (DL-8)
     │   └── GbankModule.lua    # Feature B: guild bank — hero gold card, tab selector, Contents/Log
     └── ConfigWindow.lua       # `config`: schema-driven user settings
 ```

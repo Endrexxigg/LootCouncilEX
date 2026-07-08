@@ -31,6 +31,35 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.59.0 – v0.59.2 — DL-8 configurable response buttons
+`/lcex selftest` covers the plumbing (the live `ResponseSet()` is well-formed — contiguous ids,
+one pinned PASS, cap, STATUS floor — and the Session-Config **response editor renders** with rows
+matching the set). Headless covers the normalizer, config read + cache, the session snapshot, and
+`respText` on award/history. These are the genuinely-visual / 2-client checks:
+
+- [ ] **Editor round-trip**: council window → **Session Config** → the new **Response buttons**
+  editor (lower-right). Add a response (type + Enter), click a name to **rename**, ▲/▼ **reorder**,
+  × **remove**. **Pass** sits pinned at the bottom, faint, labelled "(built-in)", with no controls.
+  A color swatch shows each button's auto-assigned color. Survives `/reload`.
+- [ ] **Replication (2 officers)**: officer A edits the set → officer B's editor + poll cards
+  converge on it.
+- [ ] **Poll + loot render**: start a session → the poll cards and the loot-window candidate table
+  show the **custom** buttons/labels (not BiS/Major/Minor/Greed).
+- [ ] **In-flight snapshot**: with a session live, edit the set in Session Config → the OPEN
+  session keeps its original buttons; only the **next** session uses the new set.
+- [ ] **RCLC raider** (if testing the bridge): a stock RCLC client's loot popup shows the custom
+  button texts (minus Pass).
+- [ ] **History longevity**: award with a custom response, then change the set → the history row
+  and its tooltip still show the **original** reason text (not a raw number).
+
+### v0.56.5 – v0.58.0 — Batch 0 quick wins
+Mostly headless/selftest-covered (gbank sync prints, Cd3 disabled state, DL-10 digest hash). Visual:
+
+- [ ] **Roster-row × (v0.56.5)**: Session Config → add a long-named extra council member — the ×
+  stays inside the row and the name truncates (was pushed off-row before).
+- [ ] **Gbank sync print (v0.57.0)** *(2 officers)*: officer A scans a gold **withdrawal** → officer
+  B sees a "Gbank: <name> withdrew <gold> (synced from A)" chat line; deposits/item pulls stay silent.
+
 ### v0.56.0 – v0.56.3 — RCLC interop bridge (§6.18, DL-24)
 `/lcex selftest` covers the codec (real AceSerializer + LibDeflate round-trip, single-table +
 multi-arg) and the receive path robustness; the wire transforms + inbound cResp injection are

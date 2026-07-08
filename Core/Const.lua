@@ -248,8 +248,11 @@ L["Inherit %s loot-council settings from %s?"] =
     "Inherit %s loot-council settings from %s?"
 L["Inherited %s loot-council settings from %s."] =
     "Inherited %s loot-council settings from %s."
-L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."] =
-    "Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."
+L["Response buttons — apply to the next session:"] =
+    "Response buttons — apply to the next session:"
+L["Rename response \"%s\" to:"]             = "Rename response \"%s\" to:"
+L["Response limit is %d."]                  = "Response limit is %d."
+L["%s (built-in)"]                          = "%s (built-in)"
 
 -- The guild bank module (Feature B).
 L["Guild Bank"]                            = "Guild Bank"

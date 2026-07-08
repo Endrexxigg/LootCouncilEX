@@ -60,6 +60,42 @@ local function GlyphButton(parent, glyph)
     return b
 end
 
+-- ── Response buttons (DL-8, ranked; PASS pinned last) ────────────────────────
+-- The editor shows the NORMALIZED set (ResponseSet, so PASS always appears pinned) and writes back
+-- the minimal stored form {text, pass}. The CANONICAL stored list is customs-in-order + a single
+-- PASS last, so a displayed row index maps 1:1 to a stored index — no separate index bookkeeping.
+local function RefreshResponses(panel)
+    panel.respList:SetData(LCEX:ResponseSet())
+end
+
+-- The current set as the canonical stored form (derived from the normalized set, so it always has
+-- exactly one PASS, last). Seeds from config, else from the built-in defaults.
+local function CurrentResponsesStored()
+    local list = {}
+    for _, r in ipairs(LCEX:ResponseSet()) do
+        list[#list + 1] = { text = r.text, pass = (r.key == "PASS") or nil }
+    end
+    return list
+end
+
+-- Copy the canonical stored list, let `fn` mutate it, then replicate via SetConfigField (LWW).
+local function EditResponses(panel, fn)
+    local list = CurrentResponsesStored()
+    fn(list)
+    LCEX:SetConfigField("responses", list)
+    RefreshResponses(panel)
+end
+
+-- Reorder a custom response; never moves PASS (always last) and never lets a custom step onto it.
+local function MoveResponse(panel, index, delta)
+    EditResponses(panel, function(l)
+        local passAt = #l -- canonical: PASS is last
+        local j = index + delta
+        if index == passAt or j == passAt then return end
+        if j >= 1 and j < passAt then l[index], l[j] = l[j], l[index] end
+    end)
+end
+
 LCEX:RegisterCouncilModule({
     key = "sessioncfg", title = LCEX.L["Session Config"], order = 40,
     -- Officer-only (C3): hidden from non-council, with the C4 escape hatch (solo / GM / no config yet).
@@ -223,8 +259,10 @@ LCEX:RegisterCouncilModule({
                 if isExtra then row.remove:Show() else row.remove:Hide() end
             end,
         })
-        panel.rosterList:SetPoint("TOPLEFT", LAY.bleed, -212) -- a full gap under the D/E list's -204 bottom
-        panel.rosterList:SetPoint("BOTTOMRIGHT", -LAY.bleed, 64)
+        panel.rosterList:SetPoint("TOPLEFT", LAY.bleed, -212) -- a full gap under the extra-add box
+        -- Confined to the LEFT column now (was full-bleed) so the response editor can take the lower
+        -- right column. Right edge lands just before COL2.
+        panel.rosterList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMLEFT", COL2 - LAY.gap, 64)
 
         -- Loot-window visibility — a SHARED-config toggle, repurposed by Phase 12 (DL-18). Off:
         -- raiders get the rail-only list view (items/award state/winners). On: raiders get the
@@ -253,11 +291,98 @@ LCEX:RegisterCouncilModule({
             end)
         panel.visGbank:SetPoint("LEFT", panel.vis, "RIGHT", LAY.section, 0)
 
-        -- DL-8 placeholder ----------------------------------------------------------
-        panel.dl8 = panel:CreateFontString(nil, "OVERLAY")
-        LCEX:ThemeText(panel.dl8, "caption", "faint")
-        panel.dl8:SetPoint("BOTTOMLEFT", LAY.grid, LAY.grid)
-        panel.dl8:SetText(LCEX.L["Response buttons: BiS / Major / Minor / Greed / Pass (editor coming later)."])
+        -- Response buttons (DL-8) — the guild's response set, in the lower RIGHT column under the
+        -- disenchanter list. Add by name; ▲/▼ reorder customs; × removes; click a name to rename.
+        -- PASS is a pinned built-in (faint, no controls). Edits apply to the NEXT session (a live
+        -- session keeps its snapshot, §6.5), which the label states.
+        panel.respLabel = panel:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(panel.respLabel, "caption", "dim")
+        panel.respLabel:SetPoint("TOPLEFT", COL2, -212)
+        panel.respLabel:SetText(LCEX.L["Response buttons — apply to the next session:"])
+
+        panel.respAddBox = LCEX:CreateEditBox(panel, {
+            width = 150,
+            onCommit = function(text)
+                text = strtrim(text or "")
+                if text == "" then return end
+                EditResponses(panel, function(l)
+                    if #l >= (LCEX.MAX_RESPONSES or 8) then
+                        LCEX:Msg(string.format(LCEX.L["Response limit is %d."], LCEX.MAX_RESPONSES or 8))
+                        return
+                    end
+                    for _, e in ipairs(l) do
+                        if e.text:lower() == text:lower() then return end -- dedupe (case-insensitive)
+                    end
+                    table.insert(l, #l, { text = text }) -- insert just before the pinned PASS
+                end)
+                panel.respAddBox:SetText("")
+            end,
+        })
+        panel.respAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -230)
+
+        panel.respList = LCEX:CreateScrollList(panel, {
+            rowHeight = 20, fillHeight = true, zebra = true,
+            buildRow = function(parent)
+                local row = CreateFrame("Frame", nil, parent)
+                row.swatch = row:CreateTexture(nil, "ARTWORK")
+                row.swatch:SetTexture("Interface\\Buttons\\WHITE8X8")
+                row.swatch:SetSize(10, 10)
+                row.swatch:SetPoint("LEFT", LAY.rowPad, 0)
+                row.remove = GlyphButton(row, "×")
+                row.remove:SetPoint("RIGHT", -LAY.gapTight, 0)
+                row.down = GlyphButton(row, "▼")
+                row.down:SetPoint("RIGHT", row.remove, "LEFT", -2, 0)
+                row.up = GlyphButton(row, "▲")
+                row.up:SetPoint("RIGHT", row.down, "LEFT", -2, 0)
+                -- Clickable name region (rename), bounded between the swatch and the glyph cluster.
+                row.name = CreateFrame("Button", nil, row)
+                row.name:SetHeight(18)
+                row.name:SetPoint("LEFT", row.swatch, "RIGHT", LAY.iconGap, 0)
+                row.name:SetPoint("RIGHT", row.up, "LEFT", -LAY.inlineGap, 0)
+                row.name.fs = row.name:CreateFontString(nil, "OVERLAY")
+                LCEX:ThemeText(row.name.fs, "body", "ink")
+                row.name.fs:SetPoint("LEFT", 0, 0); row.name.fs:SetPoint("RIGHT", 0, 0)
+                row.name.fs:SetJustifyH("LEFT"); row.name.fs:SetWordWrap(false)
+                return row
+            end,
+            fillRow = function(row, r, index)
+                local isPass = (r.key == "PASS")
+                row.name.fs:SetText(r.text)
+                local c = r.color or { 0.7, 0.7, 0.7 }
+                row.swatch:SetVertexColor(c[1], c[2], c[3])
+                if isPass then
+                    LCEX:ThemeText(row.name.fs, "caption", "faint")
+                    row.name.fs:SetText(string.format(LCEX.L["%s (built-in)"], r.text))
+                    row.name:EnableMouse(false); row.name:SetScript("OnClick", nil)
+                    row.up:Hide(); row.down:Hide(); row.remove:Hide()
+                    return
+                end
+                LCEX:ThemeText(row.name.fs, "body", "ink")
+                row.up:Show(); row.down:Show(); row.remove:Show()
+                row.name:EnableMouse(true)
+                row.name:SetScript("OnClick", function()
+                    LCEX:ShowConfirm({
+                        text  = string.format(LCEX.L["Rename response \"%s\" to:"], r.text),
+                        input = r.text,
+                        onAccept = function(newText)
+                            newText = strtrim(newText or "")
+                            if newText == "" then return end
+                            EditResponses(panel, function(l) if l[index] then l[index].text = newText end end)
+                        end,
+                    })
+                end)
+                row.up:SetScript("OnClick", function() MoveResponse(panel, index, -1) end)
+                row.down:SetScript("OnClick", function() MoveResponse(panel, index, 1) end)
+                row.remove:SetScript("OnClick", function()
+                    -- Keep at least one custom + PASS (never remove PASS, never empty the set).
+                    EditResponses(panel, function(l)
+                        if index ~= #l and #l > 2 then table.remove(l, index) end
+                    end)
+                end)
+            end,
+        })
+        panel.respList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -256)
+        panel.respList:SetPoint("BOTTOMRIGHT", -LAY.bleed, 64)
     end,
 
     show = function(panel)
@@ -269,5 +394,6 @@ LCEX:RegisterCouncilModule({
         panel.visGbank:Refresh()
         RefreshRoster(panel)
         RefreshDisenchanters(panel)
+        RefreshResponses(panel)
     end,
 })

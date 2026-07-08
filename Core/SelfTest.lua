@@ -929,6 +929,10 @@ LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(
             t:Ok(sp.anon ~= nil and sp.deList ~= nil and sp.deAddBox ~= nil, "Feature V session controls missing")
             t:Ok(type(sp.deList.items) == "table", "disenchanter list failed to render")
             t:Ok(sp.vis ~= nil, "loot-window visibility toggle missing (C7)")
+            -- DL-8 response editor: the add box + the list, which must render the live set (with PASS).
+            t:Ok(sp.respAddBox ~= nil and sp.respList ~= nil, "DL-8 response editor missing")
+            t:Ok(type(sp.respList.items) == "table" and #sp.respList.items == #self:ResponseSet(),
+                "response editor rows mismatch the live set")
         end
     else
         t:Ok(f.panels.sessioncfg == nil, "non-council: Session Config correctly hidden from the rail")
