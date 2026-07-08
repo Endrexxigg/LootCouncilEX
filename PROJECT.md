@@ -139,7 +139,7 @@ Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`;
 | `cResp` | candidate → ML | WHISPER | `{ item, resp, note, gear={link,link} }` (no `ilvl` — `GetAverageItemLevel` is unreliable in Classic, §6.7, so the ML shows competing-slot gear instead) |
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,reason,note,gear,votes,class}}, status={kind,voted} }` |
 | `vVote` | council → ML | WHISPER | `{ item, candidate, vote=±1|0 }` |
-| `award` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, resp, boss, instance, ts }` |
+| `award` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, resp, respText, boss, instance, ts }` (`respText` = the resolved reason text, DL-8 §6.5 — additive; old clients ignore it and fall back to `ResponseText(resp)`) |
 | `unaward` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, ts }` (award correction, §6.15) |
 | `sReq` | candidate → ML | WHISPER | `{}` (rejoin request after hearing an unknown-sid `sPing`, §6.16) |
 | `sJoin` | ML → candidate | WHISPER | `{ items, council, responses, timeout, anon, awarded }` (rejoin reply; followed by per-leader whispered `cUpdate`s) |
@@ -164,7 +164,7 @@ Sync flow: on login/load broadcast `pHello`; a peer that's behind sends `pSyncRe
 ### 6.3 Datasets (Plane B — under `global.guilds[guildKey]` per Feature C / §6.11)
 - `notes`: name → `{text, mod, by}`
 - `marks`: itemID → `{text, mod, by}`
-- `history`: uid → `{player, itemID, itemLink, ts, resp, boss, instance}` (**LWW by `mod` per uid** — changed from union by Phase 12 / DL-20 so awards can be corrected). uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts. A correction *appends in time*: a retraction re-writes the same uid with `retracted=true, retractedBy` and a fresh `mod`; a re-award re-writes it again with the new winner and a newer `mod` — the latest fact wins on merge, and records are never deleted (§6.15). Logged locally on every present client from the `award` broadcast (§6.1); replayed award logs are idempotent (equal `mod`+`by` → merge no-op).
+- `history`: uid → `{player, itemID, itemLink, ts, resp, respText, boss, instance}` (**LWW by `mod` per uid** — changed from union by Phase 12 / DL-20 so awards can be corrected). `respText` (DL-8) is the **resolved reason text** captured at award time, so the reason renders correctly even after the guild later changes its response set; readers prefer `respText or ResponseText(resp)`. uid = `sid..":"..itemIndex` (so `award` carries `itemIndex`). Records also carry `by` (the logging ML) + `mod`=ts. A correction *appends in time*: a retraction re-writes the same uid with `retracted=true, retractedBy` and a fresh `mod`; a re-award re-writes it again with the new winner and a newer `mod` — the latest fact wins on merge, and records are never deleted (§6.15). Logged locally on every present client from the `award` broadcast (§6.1); replayed award logs are idempotent (equal `mod`+`by` → merge no-op).
 - `gearCache`: name → `{items={slot→link}, class, spec, mod}` (self-reported; `class`/`spec` let the BiS tab auto-resolve a cached player — talent-derived spec, §6.7). The reporter **loopback-writes its own** record locally (not just broadcasts), so a solo addon user's same-guild alts share gear/spec account-wide without a second client (§6.2).
 - `profCache`: name → `{profs={name→level}, mod}` (self-reported; same self-loopback)
 - gbank sets (Feature B, §6.12): `gbankCache` (LWW), `gbankLog` (immutable, union), `gbankNotes` (LWW)
@@ -208,18 +208,27 @@ LootCouncilEXDB = {
 }
 ```
 
-### 6.5 Response enum
+### 6.5 Response enum (configurable — DL-8)
 ```lua
-RESPONSES = {  -- DEFAULTS; user-configurable (add/remove/rename) is Phase 3
+RESPONSES = {  -- BUILT-IN DEFAULTS (Const.lua); a guild may override via config.responses (DL-8)
   [1]={id=1,key="BIS",  text="BiS",   color={0.96,0.55,0.73}},
   [2]={id=2,key="MAJOR",text="Major", color={0.20,1.00,0.20}},
   [3]={id=3,key="MINOR",text="Minor", color={1.00,0.96,0.41}},
   [4]={id=4,key="GREED",text="Greed", color={0.70,0.70,0.70}},
-  [5]={id=5,key="PASS", text="Pass",  color={0.60,0.20,0.20}},  -- built-in: always present
+  [5]={id=5,key="PASS", text="Pass",  color={0.60,0.20,0.20}},  -- built-in: always present + last
 }
 STATUS = { ANNOUNCED=90, TIMEOUT=91, NOADDON=92, DISENCHANT=93 }
+MAX_RESPONSES = 8    -- editor cap; keeps ids well clear of the STATUS floor (90)
 ```
-`PASS` is a built-in response (a candidate must always be able to decline; timeouts resolve to a non-response). The rest are defaults the council may reconfigure once the settings UI lands (DL-8).
+`PASS` is a built-in response (a candidate must always be able to decline; timeouts resolve to a non-response). The rest are **defaults a guild may reconfigure** (DL-8, Phase 14).
+
+**Configurable set (DL-8).** The live set is `LCEX:ResponseSet()`. When a guild has authored `config.responses` (§6.9), `ResponseSet()` **derives** the runtime set from it through a pure normalizer; otherwise it returns the built-in `RESPONSES` verbatim. The stored shape is minimal — an array of `{ text, pass=true|nil }` — and ids/keys/colors are computed at read time so the invariants hold **by construction**:
+- **Contiguous ids `1..N`** (array order = display order); `N ≤ MAX_RESPONSES`.
+- **Exactly one `key=="PASS"` entry, pinned LAST** — the normalizer injects it if a stored record lacks it. `RCLC_BuildMLDB`/`numberedResponses`, `RCLC_MapResponse`, and `PassResponseId` all hard-depend on this, and the editor forbids removing/renaming/moving it.
+- **Colors auto-assigned** from `RESPONSE_PALETTE` (Const.lua) by index — the editor is add/remove/rename/reorder only in v1 (no per-button color/whisper-key/require-note; those stay out of scope, §1).
+- A corrupt/garbage stored record makes the normalizer **fall back to the built-ins** (never nil, never a crash).
+
+The set is carried in `sStart`/`sJoin` and **snapshotted per session** (§6.16), so a mid-session config edit never swaps a live session's buttons; the RCLC MLdb rebuilds from the session's snapshot. History records store the **resolved reason text** (`respText`, §6.1) so an award's reason still renders after the guild later changes its set.
 
 ### 6.6 Static data shapes
 ```lua
@@ -278,15 +287,15 @@ Features V, C, and B need a **guild-scoped, officer-authored config** shared acr
 config[guildKey] = {
   rank          = 1,                 -- officer/council rank cutoff (moved here from profile.council → resolves DL-1)  [C, SHIPPED]
   extra         = {},                -- manual council adds                                                          [C, SHIPPED]
-  responses     = { ...RESPONSES },  -- the guild's response set — PLANNED home (DL-8); NOT yet written/read as of   [DL-8]
-                                     --   v0.56.x: ResponseSet() still returns the built-in defaults (Phase 14 lands this)
+  responses     = { {text,pass}, ... },  -- the guild's response set (DL-8, Phase 14) — STORED minimal;                [C]
+                                     --   ResponseSet() derives ids/keys/colors via the normalizer. Absent ⇒ built-ins.
   anonVoting    = false,             -- hide who-voted (V7)                                                          [V]
   disenchanters = { name, ... },     -- ordered; top = highest rank (V5)                                             [V]
   visibility    = { gbankLog=false, gbankNotes=false, lootWindow=false, ... },  -- per-guild view rules (B5, C7)     [C/B]
   mod, by,
 }
 ```
-Populated incrementally: **Feature V** writes/reads `anonVoting` + `disenchanters`; **Feature C** moved `rank`/`extra` here (resolving DL-1) and layered the inherit-on-first-load prompt (C1/C5); **Feature B** adds `visibility`. The **response set (`responses`) has NOT moved here yet** — `ResponseSet()` still returns the built-in defaults; the configurable set (DL-8) lands in Phase 14. A client with no local `config[guildKey]` pulls it via the normal sync flow; C adds the "inherit `<Guild>` config from `<Player>`? Y/N" gate before adopting. Escape hatch (C4): editable when you're GM (rank 0), or no record exists yet, or you're solo/guildless. **Re-keying the *other* datasets (notes/marks/history/caches, and B's gbank) under `guildKey` + hide-on-leave is Feature C's job (C6)** — unreleased, so no migration.
+Populated incrementally: **Feature V** writes/reads `anonVoting` + `disenchanters`; **Feature C** moved `rank`/`extra` here (resolving DL-1) and layered the inherit-on-first-load prompt (C1/C5); **Feature B** adds `visibility`; **Phase 14** adds `responses` (DL-8) — the guild's response set, stored minimally and normalized at read (§6.5). A client with no local `config[guildKey]` pulls it via the normal sync flow; C adds the "inherit `<Guild>` config from `<Player>`? Y/N" gate before adopting. Escape hatch (C4): editable when you're GM (rank 0), or no record exists yet, or you're solo/guildless. **Re-keying the *other* datasets (notes/marks/history/caches, and B's gbank) under `guildKey` + hide-on-leave is Feature C's job (C6)** — unreleased, so no migration.
 
 ### 6.10 Live-session readiness + roster rows (Feature V)
 Reworks the live session so every present raider appears, plus an award-readiness border, a vote tally, anonymous voting, and a disenchant award type. Council-facing only (non-council see just the poll — C7).
@@ -459,9 +468,12 @@ never deleted. History's merge is LWW-by-`mod` per uid (§6.3) — the enabling 
 
 ### 6.16 Session persistence v2 + rejoin (Phase 12, DL-21)
 **Persist-by-reference.** `SaveSession` mirrors the ML's live `rows`, `voters`, and the view's
-`awarded` tables (plus `anon`, `savedAt`) into `db.global.session[owner]` **as references** (the
-`sessionItems` trick), so every subsequent mutation is durable at the next SavedVariables write —
-no debounced re-save plumbing. `EnterSession` pre-creates `awarded = {}` for this.
+`awarded` tables (plus `anon`, the session's `responses` snapshot, `savedAt`) into
+`db.global.session[owner]` **as references** (the `sessionItems` trick), so every subsequent
+mutation is durable at the next SavedVariables write — no debounced re-save plumbing.
+`EnterSession` pre-creates `awarded = {}` for this. The `responses` snapshot (DL-8) means a resume
+re-broadcasts the SAME response set the session started with, even if the guild config changed
+during the reload.
 
 **Resume.** On login with a saved session, a delayed (~3s) `ShowConfirm` reports age
 (`RelTime(startedAt)`), item count, and responses collected; Accept = `ResumeSession` (the
@@ -633,6 +645,18 @@ raid leader** and a stock RCLootCouncil Classic v1.4.x client — the RCLC loot 
 LCEX button texts, a response lands as a row in the LCEX table with gear icons, an award and
 `/lcex end` close the RCLC frames, and a mid-session RCLC `/reload` recovers via `reconnect`.
 
+### Post-v1 continued (phases 14+)
+
+**Phase 14 — Configurable response buttons (DL-8).** `config.responses` in the shared config
+(§6.9), a pure `NormalizeResponseSet` + a config-reading `ResponseSet()` (§6.5), the resolved
+`respText` on `award`/history (§6.1/§6.3), the per-session snapshot (§6.16), and the
+add/remove/rename/reorder editor in `SessionConfigModule` (replaces the DL-8 placeholder).
+*Exit:* an officer edits the guild's response set, it replicates to a second officer, poll cards
+and the loot window render the custom buttons, an RCLC raider gets them via MLdb, a session
+already in flight keeps its original buttons, and a history record's reason still renders after
+the set changes. Headless covers the normalizer invariants + snapshot; selftest validates the
+live configured set is well-formed.
+
 ---
 
 ## 8. Decision log / open questions
@@ -644,7 +668,7 @@ LCEX button texts, a response lands as a row in the LCEX table with gear icons, 
 - **DL-5 (open, content task):** static datasets must be maintained each phase; consider a build-time import from a community dataset instead of hand-editing.
 - **DL-6 (closed, Phase 7):** ML disconnect mid-session recovery is defined. The ML heartbeats `sPing` (~30s) while a session is open; a candidate that hears nothing for 95s closes the stale view (no one is stuck). The open ML session and any owed trades are mirrored to `global.session`/`global.pendingTrades` (owner-keyed, local) and restored on login — the ML is offered `/lcex resume` (re-broadcasts `sStart` with the same sid) or `/lcex end` to discard.
 - **DL-7 (accepted v1):** loot flow is auto-loot-to-ML-bags + later sessions + handoff by **trade** within the BoP 2h window. This supersedes the original master-loot-from-corpse assumption; `GetMasterLootCandidate`/`GiveMasterLoot` are not used.
-- **DL-8 (open, Phase 3):** response buttons are user-configurable (add/remove/rename); only the DEFAULT set (BiS/Major/Minor/Greed + built-in Pass) exists until the settings UI lands. The set used in a session will need to be consistent across participants (likely carried in `sStart` or a synced config).
+- **DL-8 (RESOLVED, Phase 14 — v0.59.x):** response buttons are user-configurable (add/remove/rename/reorder). The set lives in the replicated shared config as `config.responses` (§6.9), stored minimally as `{ {text, pass}, ... }` and **normalized at read** by `ResponseSet()` — ids contiguous `1..N`, exactly one `key=="PASS"` pinned last, colors auto-assigned from `RESPONSE_PALETTE`, capped at `MAX_RESPONSES` (8); a garbage record falls back to the built-in defaults (§6.5). **Consistency across participants:** the set is carried in `sStart`/`sJoin` and **snapshotted onto the session** at start (§6.16), so every candidate renders the ML's set and a mid-session config edit can't swap a live session's buttons; the RCLC MLdb rebuilds from that snapshot. **History longevity:** each award stores the resolved reason text (`respText`, §6.1/§6.3), so a record's reason renders correctly after the guild later changes its set. Editor v1 = add/remove/rename/reorder only (colors auto, PASS pinned/non-editable); per-button colors, whisper keys, and require-note are out of scope (§1).
 - **DL-9 (done, Phase 7):** the 2h trade window prefers the looted-at `time()` anchor; for items already in bags before login it now reads the *real* remaining time by scanning the item tooltip for the localized `BIND_TRADE_TIME_REMAINING` line (RCLC's technique — `GetContainerItemTradeTimeRemaining` is RCLC's own method, not a Blizzard global) and sets `expireAt = now + remaining`. The scan is guarded: if the string/line is absent it falls back to the prior "no timer" behavior, so it only ever adds a countdown.
 - **DL-10 (Phase 4, mitigated; RESOLVED v0.58.0):** the §6.2 digest + delta can miss records. *Directional pull* (`council/Sync.lua`): request only when the peer's `maxMod` or `n` exceeds ours (a higher count → full pull, `since=0`); a peer that's *ahead* **hellos back** (WHISPER) so a freshly-logged-in client is reached by those already online. **The disjoint-keys gap is now closed** (v0.58.0): the digest carries a third field `h`, an order-independent content hash (a commutative sum of per-record `pairHash(key, mod)` mod 2^31−1 — pure Lua 5.1, no bit ops). When two peers report the **same `n` and same `maxMod` but different `h`** (disjoint keys, e.g. each wrote a record while apart, or a stale LWW loss), **both** pull `since=0` and hello back, so each gets the other's keys and LWW converges. Old clients omit `h`; the compare nil-guards it, so a mixed fleet degrades to the prior behavior. No periodic resync needed — the hash fires on every login hello + `/lcex sync`.
 - **DL-12 (accepted, 2026-07-03 — the four-frame UI):** the UI is four holistic windows —
