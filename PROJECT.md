@@ -12,7 +12,7 @@ LootCouncil EX is a loot council addon for **World of Warcraft: The Burning Crus
 
 **Definition of done (v1):** a guild can run a full raid night on this addon — items get councilled and awarded correctly via master loot — and the council can keep synced notes and persistent gear marks across raid nights.
 
-**Non-goals (do not build):** retail/Era/SoD support; DKP/EPGP/GP point systems; PUG support / non-installed-user fallback (stub only); multiple simultaneous loot sessions; cross-guild council sync; auto-trade handoff polish.
+**Non-goals (do not build):** retail/Era/SoD support; DKP/EPGP/GP point systems; PUG support / non-installed-user (no-addon) whisper fallback (stub only); multiple simultaneous loot sessions; cross-guild council sync; auto-trade handoff polish. **Exception (Phase 13, DL-24):** raiders who run **RCLootCouncil Classic** are supported via a one-way interop bridge — the LCEX ML speaks RCLC's wire dialect so they can respond as candidates (§6.18). This is distinct from the no-addon whisper fallback, which stays out of scope.
 
 ---
 
@@ -502,6 +502,57 @@ repaint ticker while shown (display math off stored `expireAt` — no tooltip wo
 timertest` toggles one synthetic, in-memory Leggings of the Festering Swarm row so the frame can
 be visually checked without a live BoP drop.
 
+### 6.18 RCLC compatibility bridge (Phase 13, DL-24)
+
+One-way interop so raiders who run **only RCLootCouncil Classic** (v1.4.x, the modern
+LibDeflate dialect) can participate as **candidates** in an LCEX-run session. LCEX is always the
+ML here; it never acts as an RCLC candidate. Scope: candidates only — RCLC council voting is out
+of scope; RCLC users appear to LCEX as ordinary responders. Toggle `profile.rclcBridge`
+(default **on**; ConfigWindow checkbox). Files: `Core/RCLCWire.lua` (pure transforms + codec),
+`Core/RCLCBridge.lua` (comms glue). Vendored `Libs/LibDeflate`.
+
+**Dialect (verified against the RCLootCouncil_Classic v1.4.1 reference).** AceComm prefix
+`"RCLC"`; encode = `AceSerializer:Serialize(command, {args})` → `LibDeflate:CompressDeflate(_,
+{level=3})` → `EncodeForWoWAddonChannel`; decode is the reverse → `(command, dataArray)`. LCEX
+**never** touches the `"RCLCv"` version prefix (silence there = zero version popups on RCLC
+clients).
+
+**The authority constraint (vs DL-11).** RCLC candidates accept `lootTable`/`mldb`/`council`/
+`session_end`/`awarded` only from the sender their `GetML()` computes — under master loot the
+Blizzard ML, **else the raid/group leader**. Anniversary has no master-loot API, so **the LCEX
+ML must be the raid leader** or RCLC clients silently drop everything. The bridge prints one
+warning at session start when the toggle is on and the ML is not leader. (LCEX's own Plane A is
+still `sStart`-sender-authoritative per DL-11; this constraint is RCLC's, imposed only on the
+RCLC-facing traffic.)
+
+**Outbound (ML → RCLC), group channel, in order at session start:** `StartHandleLoot {}` →
+`mldb {tbl}` → `council {{[ourGuid]=true}}` → `lootTable {entries}`. Per award: `awarded
+{session, winner, owner=ML}` (loot sits in ML bags per DL-7, so the ML is the item owner/trader).
+At end: `session_end {}`. On demand: answer `MLdb_request`→mldb, `council_request`→council,
+`reconnect`→ resend the whole start set. `mldb` **must precede** `lootTable` (candidates defer
+the frame and spam `MLdb_request` otherwise). `mldb.buttons.default`/`responses.default` are
+built by `ipairs` over the **live session response set** (`ResponseSet()`), so RCLC raiders see
+LCEX's buttons and the mapping is 1:1 — when responses become user-configurable (DL-8) the bridge
+inherits it for free. `mldb.timeout` = `pollTimeout` if set, else a large default (RCLC frames
+always count down; a timed-out RCLC raider reads as a native non-responder). `lootTable` entries
+= `{ string = <link minus "item:">, session = <LCEX item index>, boss, owner = ML }`.
+
+**Inbound (RCLC → ML):** `response {session, {response=<btnIndex>|"PASS"|code, note, gear1,
+gear2, ilvl, specID, roll}}` and `lootAck {specID, ilvl, sessionData}` (gear/presence/autopass).
+Every inbound is gated on the toggle **and** an open local session **and** `InGroupWith(sender)`.
+A translated response is injected through the **existing** `dispatch.cResp(self, {sid, item,
+resp, note, gear}, senderName)` path — the exact entry point the ML already uses for its own poll
+answer — so rows, cUpdate fan-out, readiness and awards behave natively. Button index →
+`responses[idx].id`; `"PASS"`/autopass → the set's PASS id; other codes (`TIMEOUT`/`DISABLED`/…)
+→ no row change. Competing-gear links come from the candidate's prior `lootAck` (cached per
+session+player), attached to the injected `gear` field for the row's gear icons.
+
+**Not bridged (v1):** un-award (RCLC has no message for it), mid-session item adds (LCEX freezes
+the item list at start — no `lt_add`). Both-addon raiders get both popups; answers converge on
+the same row key (last write wins). No ACK on our sends — RCLC's own `reconnect`/`MLdb_request`
+retries heal a missed broadcast. No `PROTOCOL_VERSION` bump: the LCEX wire is unchanged; the RCLC
+dialect rides a separate prefix.
+
 ---
 
 ## 7. Build map
@@ -558,6 +609,15 @@ non-council raider sees the rail-only view while responding via the poll; two id
 run as one card / two awards; an un-award converges on both clients and in history; an ML
 `/reload` mid-session resumes with responses/votes/awarded intact and a reloaded candidate
 auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-end.
+
+**Phase 13 — RCLC compatibility bridge (§6.18, DL-24).** One-way interop: the LCEX ML speaks
+RCLootCouncil Classic's wire dialect so RCLC-only raiders respond as candidates. Vendored
+`Libs/LibDeflate`; `Core/RCLCWire.lua` (pure transforms + codec) + `Core/RCLCBridge.lua` (comms
+glue); `profile.rclcBridge` toggle. *Scope:* candidates only, LCEX-ML direction only, RCLC
+raiders see LCEX's buttons via MLdb. *Exit:* a 2-client run (`docs/TESTING.md`) with LCEX ML **as
+raid leader** and a stock RCLootCouncil Classic v1.4.x client — the RCLC loot frame pops with
+LCEX button texts, a response lands as a row in the LCEX table with gear icons, an award and
+`/lcex end` close the RCLC frames, and a mid-session RCLC `/reload` recovers via `reconnect`.
 
 ---
 
@@ -644,6 +704,22 @@ auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-en
   content line; call sites keep their `+ editPad` algebra). Focus hygiene rides the same widget:
   a raw-event watcher in Widgets.lua clears edit focus when combat starts or a mouse press lands
   outside the focused box's own window, so a note box can never silently eat movement keys.
+- **DL-24 (accepted — Phase 13, RCLC compatibility bridge, §6.18):** support raiders on
+  **RCLootCouncil Classic** with a **one-way** bridge — the LCEX ML speaks RCLC's wire dialect so
+  they respond as **candidates** (RCLC council voting out of scope; LCEX never acts as an RCLC
+  candidate). Amends the §1 non-goal (RCLC-installed raiders are now in scope; the no-addon
+  whisper fallback stays out). Dialect pinned to **RCLC Classic v1.4.x** (AceSerializer +
+  LibDeflate L3 + `EncodeForWoWAddonChannel`, prefix `"RCLC"`); the ancient 2.x LibCompress
+  dialect is unsupported. Key constraints: (a) RCLC derives the ML from `GetLootMethod`/roster, so
+  on Anniversary (no master-loot API) **the LCEX ML must be raid leader** — the bridge warns
+  otherwise; this is RCLC's authority model, orthogonal to LCEX's own `sStart`-sender authority
+  (DL-11). (b) RCLC raiders see **LCEX's** buttons via MLdb built from the live `ResponseSet()`,
+  so DL-8 (user-configurable responses) flows through unchanged. (c) The `"RCLCv"` version prefix
+  is never sent (zero version popups). (d) Inbound RCLC responses reuse the native
+  `dispatch.cResp` injection point, so no session-logic fork. (e) No `PROTOCOL_VERSION` bump — the
+  LCEX wire is untouched; the RCLC dialect is a separate prefix. Deferred: un-award + mid-session
+  adds to RCLC clients (no RCLC message for either); no send-ACK (RCLC's own reconnect retry
+  heals drops).
 
 ---
 

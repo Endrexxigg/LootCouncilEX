@@ -10,6 +10,9 @@
      NOT listed here separately. Referenced from LootCouncilEX.toc. -->
 <Ui xmlns="http://www.blizzard.com/wow/ui/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.blizzard.com/wow/ui/ ..\FrameXML\UI.xsd">
     <Script  file="Libs\LibStub\LibStub.lua"/>
+    <!-- LibDeflate: pure-Lua DEFLATE (no deps beyond LibStub). Only used by the RCLC-interop
+         bridge (§6.18) to speak RCLootCouncil's compressed wire dialect; harmless otherwise. -->
+    <Script  file="Libs\LibDeflate\LibDeflate.lua"/>
     <Include file="Libs\CallbackHandler-1.0\CallbackHandler-1.0.xml"/>
     <!-- Minimap button: LDB needs CallbackHandler; LibDBIcon needs LDB — keep this order. -->
     <Script  file="Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua"/>

@@ -17,6 +17,36 @@ C introduces the guild-scoping + shared-config that **B depends on**; B is large
 
 ---
 
+## Feature R — RCLC compatibility bridge (Phase 13)
+
+**Status:** **in progress** — specced (PROJECT.md §6.18, DL-24, Phase 13). Amends the §1 non-goal:
+RCLootCouncil-installed raiders are now in scope (the no-addon whisper fallback stays out).
+
+**The ask (user's words):** "have LCEX interface with RCLC directly, in the event that a raider
+(or an entire raid) has rclc installed but the master looter has LCEX, everyone can still
+participate in the session."
+
+**Answers locked (2026-07-07):**
+- **R1 — depth: candidates only.** RCLC raiders get their native loot popup + responses land in
+  the LCEX table; RCLC council voting is out of scope (they appear as ordinary responders).
+- **R2 — direction: LCEX-ML only.** LCEX never acts as an RCLC candidate against an RCLC ML.
+- **R3 — buttons: LCEX's own, via RCLC MLdb, built from the live `ResponseSet()`.** Prefer this
+  as shipped; **plan for user-configurable buttons (DL-8) coming soon** — the MLdb is built by
+  `ipairs` over the session's response set, so custom buttons flow through with no bridge change.
+
+**Build (5 commits, v0.56.x):** (1) spec + vendor `Libs/LibDeflate` + embeds.xml; (2)
+`Core/RCLCWire.lua` pure transforms (BuildMLDB/BuildLootTable/MapResponse/GearLinks) + codec +
+headless tests; (3) `Core/RCLCBridge.lua` outbound (start/award/end sends, request/reconnect
+answers, leader warning) + `profile.rclcBridge` toggle + selftest; (4) inbound
+`OnRCLCReceived`→`rclcDispatch`→native `cResp` injection + tests; (5) `docs/TESTING.md` 2-client
+section. Wire change ⇒ but **no `PROTOCOL_VERSION` bump** (X6): the LCEX wire is untouched; the
+RCLC dialect rides a separate `"RCLC"` prefix.
+
+**Deferred (v1):** un-award + mid-session item adds to RCLC clients (no RCLC message for either);
+send-ACK (RCLC's own reconnect/MLdb_request retries heal drops); the reverse direction (R2).
+
+---
+
 ## Feature G — Enchant/gem gear issues in the self-report
 
 **Status:** **shipped v0.25.6** (Phase 8) — detection layer (all four checks + CLA blacklist) **and**
