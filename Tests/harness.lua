@@ -176,7 +176,8 @@ _G.LibStub = function(name) return libs[name] end
 -- ── Load the Core files (toc order, Core only — UI is not unit-tested here) ──
 local FILES = {
     "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua", "Core/Guild.lua", "Core/Minimap.lua",
-    "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/DataAPI.lua",
+    "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/Prio.lua",
+    "Core/Data/DataAPI.lua",
     "Core/Data/GearRules.lua",
     "Core/Display.lua", "Core/Export.lua",
     "Core/session/Session.lua", "Core/session/Readiness.lua", "Core/session/Award.lua",

@@ -1,0 +1,12 @@
+# LootCouncil EX — BiS source (class → spec → phase → slot → itemID priority list).
+# Columns: class,spec,phase,slot,itemID  (one item per row; rows for the same slot accumulate
+#   in priority order → {itemID, altID, ...}). class = WoW class token; spec = a CLASS_SPECS
+#   name; slot = a BIS_SLOT_ORDER key; phase = P1..P5.
+# Regenerate Core/Data/BiS.lua with:  lua tools/build_data.lua
+# CONTENT is opinion data, filled in a dedicated content pass — seeded here with the old stub only.
+class,spec,phase,slot,itemID
+MAGE,Fire,P2,head,28830
+MAGE,Fire,P2,neck,29918
+MAGE,Fire,P2,hands,30055
+MAGE,Frost,P2,head,28830
+MAGE,Frost,P2,neck,29918

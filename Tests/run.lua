@@ -829,6 +829,16 @@ test("WithItemID", function()
     eq(u, "Test Item", "uncached -> resolves via ContinueOnItemLoad")
 end)
 
+-- Guards the bis.csv → BiS.lua migration (Phase 16): the generated table matches the old stub.
+test("DataAPI: BiS generated from bis.csv matches the seed content", function()
+    eq(L:GetBiSItems("MAGE", "Fire", "P2", "head")[1], 28830, "MAGE Fire P2 head")
+    eq(L:GetBiSItems("MAGE", "Fire", "P2", "neck")[1], 29918, "MAGE Fire P2 neck")
+    eq(L:GetBiSItems("MAGE", "Fire", "P2", "hands")[1], 30055, "MAGE Fire P2 hands")
+    eq(L:GetBiSItems("MAGE", "Frost", "P2", "head")[1], 28830, "MAGE Frost P2 head")
+    eq(#L:GetBiSForSpecPhase("MAGE", "Fire", "P2"), 3, "3 slots seeded for MAGE Fire P2")
+    eq(#L:GetBiSForSpecPhase("WARRIOR", "Arms", "P2"), 0, "no data for an unseeded class/spec")
+end)
+
 -- ── Static data accessors (Phase 6) ──────────────────────────────────────────
 test("DataAPI: loot accessors", function()
     eq(table.concat(L:GetLootPhases(), ","), "P1,P2,P3", "P1–P3 have data, in PHASES order")

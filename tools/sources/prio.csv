@@ -1,0 +1,9 @@
+# LootCouncil EX — loot-priority source (§6.23). Columns:
+#   itemID,chainLabel,rank,text
+# One row per priority entry. `chainLabel` groups entries into a named chain (e.g. "Main Raid",
+# "Split 1"); `rank` orders the chain (equal rank = equal priority, joined with "=", lower rank
+# wins with ">"); `text` is a free-form spec/role label (e.g. "Enhancement", "Prot Paladin").
+# Regenerate Core/Data/Prio.lua with:  lua tools/build_data.lua
+# CONTENT is a guild's own priority list, filled in a content pass (source: the guild sheet) —
+# ships EMPTY (header only) so the pipeline is proven but no priorities are asserted yet.
+itemID,chainLabel,rank,text
