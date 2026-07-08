@@ -655,7 +655,8 @@ LCEX:RegisterSelfTest("council", "digest covers every dataset", function(self, t
     for _, name in ipairs(ALL_DATASETS) do
         local d = digest[name]
         if t:Ok(type(d) == "table", "digest missing dataset: " .. name) then
-            t:Ok(type(d.n) == "number" and type(d.maxMod) == "number", "digest shape for " .. name)
+            t:Ok(type(d.n) == "number" and type(d.maxMod) == "number"
+                and type(d.h) == "number", "digest shape for " .. name) -- h = DL-10 content hash
         end
     end
 end)

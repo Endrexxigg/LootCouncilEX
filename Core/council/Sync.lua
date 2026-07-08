@@ -55,14 +55,29 @@ function LCEX:RegisterDataset(name, mode, store)
     self.datasets[name] = { name = name, mode = mode or "lww", store = store }
 end
 
+-- Order-independent content hash of a (key, mod) pair — pure Lua 5.1, no bit ops. A rolling
+-- polynomial over the key's bytes folded with the record's mod, mod 2^31-1. Intermediates stay
+-- < 2^38 (p < 2^31, *131 < 2^38), safe in a double. Summed commutatively across the dataset so
+-- `pairs` order is irrelevant and two peers derive the SAME digest hash from the SAME records.
+local HASH_M = 2147483647 -- 2^31 - 1
+local function pairHash(key, mod)
+    local p = 0
+    for i = 1, #key do p = (p * 131 + key:byte(i)) % HASH_M end
+    return (p * 31 + (mod % HASH_M)) % HASH_M
+end
+
+-- {n, maxMod, h}. `h` is the content hash (DL-10): it distinguishes two stores with the same count
+-- and same newest-mod but DIFFERENT records (disjoint keys, or a stale LWW loss in the middle) —
+-- which n+maxMod alone cannot. Old peers omit `h`; the compare nil-guards it.
 local function digestOf(ds)
-    local n, maxMod = 0, 0
-    for _, rec in pairs(ds.store()) do
+    local n, maxMod, h = 0, 0, 0
+    for k, rec in pairs(ds.store()) do
         n = n + 1
         local m = rec.mod or 0
         if m > maxMod then maxMod = m end
+        h = (h + pairHash(tostring(k), m)) % HASH_M
     end
-    return { n = n, maxMod = maxMod }
+    return { n = n, maxMod = maxMod, h = h }
 end
 
 -- Records strictly newer than `since` (lww), or all records (union — `since` is meaningless for
@@ -222,17 +237,29 @@ LCEX.dispatch.pHello = function(self, msg, sender)
             -- a higher record count (they hold keys we lack → request the full set, since=0). This
             -- is directional, so being ahead never triggers a wasteful backwards pull. (Works for
             -- both modes: union records carry no mod, so maxMod is 0 both sides and `n` drives it.)
+            -- Same count AND same newest-mod but a different content hash ⇒ the two stores hold
+            -- DISJOINT keys (each wrote a record while apart). Neither is "ahead", so both must pull
+            -- the full set (since=0) AND hello back, so each side gets the other's keys and LWW
+            -- converges. Only fires when both peers speak the hash (nil-guarded for old clients).
+            local hashDiverged = theirs.h ~= nil and mine.h ~= nil
+                and (theirs.n or 0) == (mine.n or 0)
+                and (theirs.maxMod or 0) == (mine.maxMod or 0)
+                and theirs.h ~= mine.h
             local needDelta, since = false, (mine.maxMod or 0)
             if (theirs.maxMod or 0) > (mine.maxMod or 0) then
                 needDelta = true
             elseif (theirs.n or 0) > (mine.n or 0) then
                 needDelta, since = true, 0 -- count mismatch in their favor (DL-10)
+            elseif hashDiverged then
+                needDelta, since = true, 0 -- disjoint keys at equal n+maxMod (DL-10)
             end
             if needDelta then
                 self:Send("pSyncReq", nil, { dataset = name, since = since }, "WHISPER", sender)
             end
-            -- We're ahead if we hold a newer record or a higher count — hello back so they pull.
-            if (mine.maxMod or 0) > (theirs.maxMod or 0) or (mine.n or 0) > (theirs.n or 0) then
+            -- We're ahead if we hold a newer record or a higher count — hello back so they pull. A
+            -- pure hash divergence has no ahead side, so both peers hello back (see above).
+            if (mine.maxMod or 0) > (theirs.maxMod or 0) or (mine.n or 0) > (theirs.n or 0)
+                or hashDiverged then
                 iAmAhead = true
             end
         elseif (mine.n or 0) > 0 then

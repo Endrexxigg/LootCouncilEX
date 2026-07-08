@@ -503,6 +503,49 @@ test("gbank sync prints gold withdrawals + annotations, stays silent otherwise",
     L.db.global.gbankLog, L.db.global.gbankNotes, L.db.global.notes, L.db.global.config = {}, {}, {}, {}
 end)
 
+-- ── DL-10 content-hash digest (disjoint keys at equal n+maxMod) ───────────────
+test("digest hash distinguishes disjoint keys; pHello pulls on divergence", function()
+    L.db.profile.council = { byRank = false, extra = { "Tester", "Peer" } }
+    L._councilSet = nil
+
+    -- Same count (1) and same maxMod (5), different KEY -> the hash must differ.
+    L.db.global.dummy = { ["a"] = { mod = 5 } }
+    local ha = L:BuildDigest().dummy.h
+    L.db.global.dummy = { ["b"] = { mod = 5 } }
+    local hb = L:BuildDigest().dummy.h
+    ok(type(ha) == "number" and type(hb) == "number", "digest carries a numeric hash")
+    ok(ha ~= hb, "disjoint keys at equal n+maxMod hash differently")
+
+    -- A peer advertises the SAME n+maxMod but a different h -> we must pull the full set (since=0).
+    L.db.global.dummy = { ["b"] = { mod = 5 } }
+    local mine = L:BuildDigest().dummy
+    H.sent = {}
+    L.dispatch.pHello(L, { digest = { dummy = { n = mine.n, maxMod = mine.maxMod, h = mine.h + 1 } } }, "Peer")
+    local pulled = false
+    for _, s in ipairs(H.sent) do
+        if s.msg.cmd == "pSyncReq" and s.msg.dataset == "dummy" then
+            pulled = true; eq(s.msg.since, 0, "hash divergence pulls since=0")
+        end
+    end
+    ok(pulled, "different hash at equal n+maxMod triggers a pull")
+
+    -- Identical digest (same h) -> no pull.
+    H.sent = {}
+    L.dispatch.pHello(L, { digest = { dummy = { n = mine.n, maxMod = mine.maxMod, h = mine.h } } }, "Peer")
+    local pulled2 = false
+    for _, s in ipairs(H.sent) do if s.msg.cmd == "pSyncReq" then pulled2 = true end end
+    ok(not pulled2, "identical hash -> no pull")
+
+    -- Old peer (digest without h) -> nil-guarded, behaves as before (no pull on equal n+maxMod).
+    H.sent = {}
+    L.dispatch.pHello(L, { digest = { dummy = { n = mine.n, maxMod = mine.maxMod } } }, "Peer")
+    local pulled3 = false
+    for _, s in ipairs(H.sent) do if s.msg.cmd == "pSyncReq" then pulled3 = true end end
+    ok(not pulled3, "old peer without h -> no spurious pull")
+
+    L.db.global.dummy = {}
+end)
+
 -- ── PlayerDetail builders (Phase 6) ──────────────────────────────────────────
 test("HistoryForPlayer filter + sort", function()
     L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
