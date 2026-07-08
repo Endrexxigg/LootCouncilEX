@@ -54,7 +54,7 @@ Player notes, item/gear marks, shared award history, and cached gear/professions
 
 - **Addon/folder:** `LootCouncilEX`. **Comms prefix:** `LCEX`. **Slash command:** `/lcex`.
 - **Libraries:** LibStub + ACE3 (AceAddon, AceEvent, AceComm, AceSerializer, AceConsole, AceDB, AceTimer). **All networking via AceComm — never raw `SendAddonMessage`.**
-- **Comms envelope:** every message is one AceSerializer-encoded table `{ v, cmd, sid, ver, ... }`. `v` = `PROTOCOL_VERSION`; drop messages with an unreadable higher major `v`. `cmd` routes through a dispatch table. `sid` identifies the session (nil for Plane B / roster messages). `ver` = the sender's human-facing addon version, stamped on **every** message so peers learn each other's version passively from any traffic (not just the vCheck handshake); the receiver records it silently before dispatch.
+- **Comms envelope:** every message is one AceSerializer-encoded table `{ v, cmd, sid, ver, ... }`. `v` = `PROTOCOL_VERSION`; drop messages with an unreadable higher major `v`. `cmd` routes through a dispatch table. `sid` identifies the session (nil for Plane B / roster messages). `ver` = the sender's human-facing addon version, stamped on **every** message so peers learn each other's version passively from any traffic (not just the vCheck handshake); the receiver records it **after** dispatch (intentional — so the vCheck handshake's own first-contact announce still fires; `Comms.OnCommReceived`).
 - **Plane B record format:** every record carries `mod` (unixtime last modified) and `by` (author char name). **Merge rule:** per key keep the greatest `mod`; ties broken by `by` alphabetically. Immutable datasets (history) merge by union of keys.
 - **UI is data-driven:** response buttons, columns, etc. build from the `RESPONSES` table, not hardcoded.
 - **Modules are small and single-purpose** per the file layout below.
@@ -81,6 +81,9 @@ LootCouncilEX/
 │   ├── Display.lua            # pure display-array builders (headless-tested; UI renders them)
 │   ├── Usable.lua             # poll class filter: token lines + TBC proficiency matrix
 │   ├── GearIssues.lua         # Feature G: parse gear links → enchant/gem issue tags (pure, headless-tested)
+│   ├── TradeTimers.lua        # Phase 12 (DL-22): bag-scan tradeable loot → the trade-timer data layer
+│   ├── RCLCWire.lua           # Phase 13 (DL-24): pure RCLC dialect transforms + codec (headless-tested)
+│   ├── RCLCBridge.lua         # Phase 13 (DL-24): RCLC interop comms glue (LCEX ML ↔ RCLC-only raiders)
 │   ├── SelfTest.lua           # /lcex selftest — in-game validation harness
 │   ├── session/               # PLANE A
 │   │   ├── Session.lua        # ML state machine (authority); sStart carries the poll deadline
@@ -107,6 +110,8 @@ LootCouncilEX/
     ├── Widgets.lua            # themed primitives: window/rail/list/button/checkbox/slider
     ├── PollWindow.lua         # `poll`: raider response cards (filtered, 3 visible, per-card note)
     ├── LootWindow.lua         # `loot`: staging list + item rail + candidate table + award
+    ├── MiniFrame.lua          # minimized-session pill (Phase 12): surfaces a hidden active session
+    ├── TradeTimerWindow.lua   # trade-timer bars window (Phase 12, DL-22; opt-in)
     ├── CouncilWindow.lua      # `council`: resizable dashboard shell + module registry
     ├── council/               # self-registering dashboard modules
     │   ├── BrowserModule.lua  # loot browser (quality colors, hierarchy, mark editor)
@@ -131,7 +136,7 @@ Envelope `{ v, cmd, sid, ver, ... }`; `sid` = `"<MLname>-<unixtime>-<counter>"`;
 | `sStart` | ML → raid | RAID | `{ items={[i]={link,quality}}, council={names}, responses, timeout, anon }` |
 | `sEnd` | ML → raid | RAID | `{}` |
 | `sPing` | ML → raid | RAID | `{}` (liveness heartbeat, ~30s while open; sid on the envelope — DL-6) |
-| `cResp` | candidate → ML | WHISPER | `{ item, resp, note, ilvl, gear={link,link} }` |
+| `cResp` | candidate → ML | WHISPER | `{ item, resp, note, gear={link,link} }` (no `ilvl` — `GetAverageItemLevel` is unreliable in Classic, §6.7, so the ML shows competing-slot gear instead) |
 | `cUpdate` | ML → raid | RAID | `{ item, rows={[name]={resp,reason,note,gear,votes,class}}, status={kind,voted} }` |
 | `vVote` | council → ML | WHISPER | `{ item, candidate, vote=±1|0 }` |
 | `award` | ML → raid | RAID | `{ item, itemID, itemIndex, winner, resp, boss, instance, ts }` |
@@ -150,7 +155,7 @@ Channel GUILD; only council members participate.
 |---|---|---|---|
 | `pReport` | any group member → GUILD | GUILD | `{ gear={slot→link}, profs={name→level}, class, spec, mod }` |
 | `pSet` | council → GUILD | GUILD | `{ dataset="notes"|"marks", key, record={text,mod,by} }` |
-| `pHello` | council → GUILD | GUILD | `{ digest={ notes={n,maxMod}, marks={n,maxMod}, history={n}, gearCache={n,maxMod}, profCache={n,maxMod} } }` |
+| `pHello` | council → GUILD | GUILD | `{ digest={ <dataset>={n,maxMod}, ... } }` — every dataset digests **uniformly** as `{n, maxMod}` (history included: it flipped from union to LWW-by-`mod` in DL-20, so it carries `maxMod` like the rest) |
 | `pSyncReq` | council → peer | WHISPER | `{ dataset, since=<mod|0> }` |
 | `pSyncData` | council → peer | WHISPER | `{ dataset, records={key→record} }` |
 
@@ -181,9 +186,17 @@ LootCouncilEXDB = {
   },
   global = {
     dbVersion = <int>,                  -- schema version; MigrateDB stamps/upgrades on load (Phase 7)
-    guilds = {                          -- Plane B, PER GUILD (config: Phase 9 foundations; notes/marks/history/caches moved here in Feature C / C6 / DL-16)
+    -- Plane B, PER GUILD (Feature C / C6 / DL-16). ACTIVE-FLAT + STASH (shipped model): the
+    -- CURRENTLY-ACTIVE guild's datasets live in FLAT top-level tables (below) so all ~25 readers
+    -- stay unchanged; only NON-active guilds are stashed under guilds[key]. Switching guild swaps
+    -- the flat tables with the stash (hide-on-leave). `activeGuild` nil ⇒ a one-time in-place
+    -- claim of the existing flat data (no migration, nothing vanishes).
+    activeGuild   = <guildKey|nil>,
+    config={}, notes={}, marks={}, history={}, gearCache={}, profCache={},   -- ACTIVE guild (flat)
+    gbankCache={}, gbankLog={}, gbankNotes={},                               -- ACTIVE guild gbank (Feature B / §6.12)
+    guilds = {                          -- NON-active guilds only (stash); same per-guild shape as the flat tables
       [guildKey] = { config={}, notes={}, marks={}, history={}, gearCache={}, profCache={},
-                     gbankCache={}, gbankLog={}, gbankNotes={} },  -- gbank sets: Feature B / §6.12
+                     gbankCache={}, gbankLog={}, gbankNotes={} },
     },
     -- Local (NOT synced) owner-keyed recovery stores so a /reload can't lose ML state (DL-6):
     pendingTrades = { [owner] = { [shortKey] = {owed records} } },  -- owed loot still to be traded out
@@ -258,21 +271,22 @@ GearRules = {
 ### 6.9 Guild identity + shared config (foundations for Features V / C / B)
 Features V, C, and B need a **guild-scoped, officer-authored config** shared across the council. Two new primitives:
 
-**Guild identity — `Core/Guild.lua`.** `LCEX:GuildKey()` = the current guild's identity from `GetGuildInfo("player")` (name, realm-qualified — **verify the API on the live client, X3**), recomputed on `PLAYER_GUILD_UPDATE`/`GUILD_ROSTER_UPDATE` and cached; nil when guildless (config editing then falls to the C4 escape hatch). An officer in >1 guild defaults to the current character's guild (B2). Same file exposes `LCEX:PresentRoster()` → `{ {name, class}, ... }` for the current raid/party (lifting the `raid1..raidN` + `UnitName`/`UnitClass` loop from `Display.lua:106-111`) — used by Feature V's row seeding and the present-council tally.
+**Guild identity — `Core/Guild.lua`.** `LCEX:GuildKey()` = the current guild's identity from `GetGuildInfo("player")` (guild **NAME only, NOT realm-qualified** — realm-qualifying would split the key across connected realms and break replication between guildmates on different home realms; **verify the API on the live client, X3**), recomputed on `PLAYER_GUILD_UPDATE`/`GUILD_ROSTER_UPDATE` and cached; nil when guildless (config editing then falls to the C4 escape hatch). An officer in >1 guild defaults to the current character's guild (B2). Same file exposes `LCEX:PresentRoster()` → `{ {name, class}, ... }` for the current raid/party (lifting the `raid1..raidN` + `UnitName`/`UnitClass` loop from `Display.lua:106-111`) — used by Feature V's row seeding and the present-council tally.
 
 **Shared config — `Core/council/Config.lua`**, a Plane-B **LWW dataset** (rides the §6.2 `RegisterDataset` / `pHello` / `pSync*` machinery) keyed by `guildKey`, **one officer-authored record per guild**, gated to council senders like `pSet`:
 ```lua
 config[guildKey] = {
-  rank          = 1,                 -- officer/council rank cutoff (moves here from profile.council → resolves DL-1)  [C]
-  extra         = {},                -- manual council adds                                                          [C]
-  responses     = { ...RESPONSES },  -- the guild's response set (resolves DL-8)                                      [C]
+  rank          = 1,                 -- officer/council rank cutoff (moved here from profile.council → resolves DL-1)  [C, SHIPPED]
+  extra         = {},                -- manual council adds                                                          [C, SHIPPED]
+  responses     = { ...RESPONSES },  -- the guild's response set — PLANNED home (DL-8); NOT yet written/read as of   [DL-8]
+                                     --   v0.56.x: ResponseSet() still returns the built-in defaults (Phase 14 lands this)
   anonVoting    = false,             -- hide who-voted (V7)                                                          [V]
   disenchanters = { name, ... },     -- ordered; top = highest rank (V5)                                             [V]
   visibility    = { gbankLog=false, gbankNotes=false, lootWindow=false, ... },  -- per-guild view rules (B5, C7)     [C/B]
   mod, by,
 }
 ```
-Populated incrementally: **Feature V** writes/reads `anonVoting` + `disenchanters`; **Feature C** moves `rank`/`extra`/`responses` here (resolving DL-1/DL-8) and layers the inherit-on-first-load prompt (C1/C5); **Feature B** adds `visibility`. A client with no local `config[guildKey]` pulls it via the normal sync flow; C adds the "inherit `<Guild>` config from `<Player>`? Y/N" gate before adopting. Escape hatch (C4): editable when you're GM (rank 0), or no record exists yet, or you're solo/guildless. **Re-keying the *other* datasets (notes/marks/history/caches, and B's gbank) under `guildKey` + hide-on-leave is Feature C's job (C6)** — unreleased, so no migration.
+Populated incrementally: **Feature V** writes/reads `anonVoting` + `disenchanters`; **Feature C** moved `rank`/`extra` here (resolving DL-1) and layered the inherit-on-first-load prompt (C1/C5); **Feature B** adds `visibility`. The **response set (`responses`) has NOT moved here yet** — `ResponseSet()` still returns the built-in defaults; the configurable set (DL-8) lands in Phase 14. A client with no local `config[guildKey]` pulls it via the normal sync flow; C adds the "inherit `<Guild>` config from `<Player>`? Y/N" gate before adopting. Escape hatch (C4): editable when you're GM (rank 0), or no record exists yet, or you're solo/guildless. **Re-keying the *other* datasets (notes/marks/history/caches, and B's gbank) under `guildKey` + hide-on-leave is Feature C's job (C6)** — unreleased, so no migration.
 
 ### 6.10 Live-session readiness + roster rows (Feature V)
 Reworks the live session so every present raider appears, plus an award-readiness border, a vote tally, anonymous voting, and a disenchant award type. Council-facing only (non-council see just the poll — C7).
@@ -565,7 +579,7 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 **Phase 2 — Loot engine (headless).** `session/Session.lua` (state machine), `session/Award.lua` (bags/loot detection, session start, award = assist-trade). Items are sourced from the ML's bags (auto-looted during the raid), not a corpse.
 *Exit:* the ML's looted epics are tracked → `/lcex start` broadcasts `sStart` → `/lcex award <n> <name>` records the winner + broadcasts `award` → opening a trade with the winner auto-fills the item (or prompts a manual drag) → the 2h trade timer warns before it lapses. Driven/verified through chat output, `/lcex test`, and a willing trade partner — no live boss required, still no real UI.
 
-**Phase 3 — Session UI → MVP.** `UI/Widgets.lua`, `SessionFrame`, `LootFrame`, `VotingFrame`, wired via `session/Candidate.lua` + `session/Council.lua`.
+**Phase 3 — Session UI → MVP.** `UI/Widgets.lua` + the session frames (originally named `SessionFrame`/`LootFrame`/`VotingFrame` — **superseded by the DL-12 four-frame redesign**, which ships this functionality as `UI/PollWindow.lua` + `UI/LootWindow.lua`), wired via `session/Candidate.lua` + `session/Council.lua`.
 *Exit:* full live loop between 2+ clients — item drops → candidates respond in a frame → council sees the table and votes → ML awards → item assigned. **This is a usable loot council addon.**
 
 **Phase 4 — Sync engine proof.** `council/Sync.lua` (GUILD transport, `pHello` digest, `pSyncReq`/`pSyncData` deltas, LWW merge) + dataset scaffolding.
@@ -574,7 +588,7 @@ Each phase has a hard scope and an exit criterion. Do not build ahead into a lat
 **Phase 5 — Council datasets.** `council/Notes.lua`, `Marks.lua`, `History.lua`, `SelfReport.lua`.
 *Exit:* notes, marks, award history, and gear/profession self-reports all sync between council members; awards log automatically from `award`.
 
-**Phase 6 — Viewers + data scaffolding.** `Data/*` (stub samples), `UI/PlayerDetail.lua` (tabbed), `UI/LootBrowser.lua` (phase tabs, boss-sorted, editable marks), tier-token reference.
+**Phase 6 — Viewers + data scaffolding.** `Data/*` (stub samples), a tabbed player-detail viewer and a phase/boss loot browser (originally `UI/PlayerDetail.lua` / `UI/LootBrowser.lua` — **superseded by the DL-12 redesign**, which ships them as the `UI/council/RosterModule.lua` and `UI/council/BrowserModule.lua` dashboard modules), tier-token reference.
 *Exit:* clicking a player opens the detail panel (gear/history/professions/BiS/notes); loot browser renders by phase/boss with editable persistent marks.
 
 **Phase 7 — Content + polish.** Populate real `Data/*` tables; edge cases (ML disconnect mid-session, stale-cache indicators, roster changes); deferred niceties.
@@ -648,7 +662,7 @@ LCEX button texts, a response lands as a row in the LCEX table with gear icons, 
   mechanism.
 - **DL-11 (accepted, Phase 3):** Plane-A session authority is bound to the **`sStart` sender**, per `sid` — candidates/council record the ML as whoever opened the session and accept subsequent `cUpdate`/`sEnd`/`award` only from that same sender carrying that `sid`. The WoW master-looter API is **not** the authority source: under DL-7 the group need not be using master loot during a council session, so `GetRaidRosterInfo`-derived ML (RCLC's model) doesn't apply here. The trusted guild model (§2) makes initial trust of the `sStart` sender acceptable for v1; `sid` stays an identifier, not a credential. On the ML's own client the session ML is simply whoever runs `/lcex start` (it broadcasts `sStart`); `PlayerIsML` governs only passive loot-tracking, a separate concern.
 - **DL-13 (accepted, 2026-07-04 — Feature G gear issues):** enchant/gem issue detection is **viewer-side** over the links already in `gearCache` + `GetItemStats` sockets — **no comms/protocol change**. The one exception: if `GetItemStats` sockets prove unreliable on Anniversary (verify via selftest, X3), a reporter-side socket count is added to `pReport`/`gearCache`. Rules ship as **static `Data/GearRules.lua`** (CLA-derived: per-slot enchant **allowlist** that fails safe on unknown enchants, gem-min-quality = rare, excluded-gear whitelist), **not** guild-editable in v1. The boss-conditional "useless item" (undead/demon/PvP/engi) + meta-gem-activation checks, and true socket-color matching, are **deferred to a fast-follow**. Model: `docs/CLA_gear_issues_findings.md`; canonical spec §6.8.
-- **DL-14 (accepted, 2026-07-04 — foundations: guild identity + shared config):** `Core/Guild.lua` derives a `guildKey` from `GetGuildInfo` (realm-qualified; verify live, X3) plus a `PresentRoster` helper. `Core/council/Config.lua` is a Plane-B **LWW dataset keyed by `guildKey`** (one officer-authored record per guild) riding the existing sync engine — the home for the response set (resolves **DL-8**) and the council rank/extra roster (resolves **DL-1** once Feature C moves them in), plus anon/disenchanters/visibility. Re-keying the other datasets under `guildKey` + hide-on-leave is Feature C (C6); unreleased ⇒ no migration. §6.9.
+- **DL-14 (accepted, 2026-07-04 — foundations: guild identity + shared config):** `Core/Guild.lua` derives a `guildKey` from `GetGuildInfo` (guild NAME only, not realm-qualified — see §6.9 for the connected-realm rationale; verify live, X3) plus a `PresentRoster` helper. `Core/council/Config.lua` is a Plane-B **LWW dataset keyed by `guildKey`** (one officer-authored record per guild) riding the existing sync engine — the home for the response set (resolves **DL-8**) and the council rank/extra roster (resolves **DL-1** once Feature C moves them in), plus anon/disenchanters/visibility. Re-keying the other datasets under `guildKey` + hide-on-leave is Feature C (C6); unreleased ⇒ no migration. §6.9.
 - **DL-15 (accepted, 2026-07-04 — Feature V voting readiness):** `session.rows` is pre-seeded one row per present raider (`PresentRoster` + `ClassCanUse`); non-rollers dim to the bottom (RCLC); the rail sorts oldest-loot-first. The ML computes a per-item **status** (awarded/de/ready/voting/waiting) and broadcasts it on `cUpdate` so all clients draw the same **rail-row** border (header unchanged). Adds a vote tally (`status.voted={n,of}`), anonymous voting (snapshotted onto `sStart.anon`, default off), and a **D/E award type** (`STATUS.DISENCHANT=93`; target = highest-ranked present+eligible `config.disenchanters`; reason renders "D/E"). **Row-set (resolved 2026-07-04, R1–R5):** the list is the union (deduped) of the **kill set** (raid snapshotted at loot time — the proxy for the kill; manual-adds → `StartSession` roster) and the **current raid** (latecomers → `missedkill`); per-item eligible = in-kill-set ∧ `ClassCanUse`. Three display tiers **ROLLED > MIGHT ROLL (`pending`) > NOT ROLLING** (dimmed). Eligibility is a **soft, fail-open gate** — it flags/warns but the ML can always award anyone; a bad snapshot must never block a legitimate award. Accumulate/union over the session (never drop a row; re-mark leave/rejoin subtly). §6.10.
 - **DL-16 (accepted, 2026-07-04 — Feature C access control + guild scoping):** the council roster moves from local `profile.council` into the shared `config` record (§6.9), officer-authored and replicated — **resolves DL-1** (one roster, now consistent guild-wide). `Core/Access.lua` gates the Session Config module and the loot window behind `AmCouncil()` + `config.visibility` (raiders see only the poll + award chat by default; per-guild opt-in). All Plane-B datasets are namespaced under `db.global.guilds[guildKey]`, so leaving a guild hides its data with no deletion (hide-on-leave, C6); local recovery stores stay account-global. First-load inherit prompt ("inherit `<Guild>` from `<Player>`? Y/N") with a GM / no-config / solo escape hatch (C4). Unreleased ⇒ no migration. §6.11.
 - **DL-17 (accepted, 2026-07-04 — Feature B guild bank):** a new `gbank` council module over a Plane-B scanner (`Core/council/Gbank.lua`). Scan all viewable tabs on `GUILDBANKFRAME_OPENED` (throttled queries); cache contents+gold (LWW `gbankCache`) and an **append-only union ledger** (`gbankLog`) built by converting the logs' **elapsed** time to absolute + a content-hash uid (dedup is hour-granular — an API limitation, accepted). Rapid same-player+action entries **group** (5-min window, "xN" icon overlay); **council-only annotations** attach to a group (LWW `gbankNotes`). All guild-scoped (§6.11) + replicated (real-time bounded by the capturing officer's sync). `config.visibility` hides logs/annotations from non-council by default (contents+gold public). **Deferred:** withdrawal-request flow, auto close-prompt/chat reminder, sync-notification chat prints. Guild-bank APIs verify on the live client (X3). §6.12.
