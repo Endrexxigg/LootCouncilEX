@@ -918,6 +918,44 @@ end, { cleanup = function(self)
     if self.councilWindow then self.councilWindow:Hide() end
 end })
 
+-- Cd3 (§6.11): the checkbox/slider disabled state, exercised on a throwaway host frame (no DB
+-- residue — nothing here writes SavedVariables; cleanup hides the host).
+LCEX:RegisterSelfTest("widgets", "checkbox + slider disabled state (Cd3)", function(self, t)
+    local host = self._cd3Host or CreateFrame("Frame", nil, UIParent)
+    self._cd3Host = host
+    host:SetSize(220, 80)
+    host:Show()
+
+    local checked = true
+    local cb = self:CreateCheckbox(host, "cd3 test", function() return checked end,
+        function(v) checked = v end)
+    cb:SetPoint("TOPLEFT", 0, 0)
+    local sval = 3
+    local sl = self:CreateSliderV2(host, { width = 180, min = 0, max = 9, step = 1, label = "cd3",
+        get = function() return sval end, set = function(v) sval = v end })
+    sl:SetPoint("TOPLEFT", 0, -30)
+
+    if not t:Ok(cb.SetFlatEnabled ~= nil and sl.SetFlatEnabled ~= nil,
+        "both widgets expose SetFlatEnabled") then return end
+
+    -- IsEnabled/IsMouseEnabled return 1/nil on the Classic client, so test truthiness, not ==false.
+    cb:SetFlatEnabled(false)
+    sl:SetFlatEnabled(false)
+    t:Ok(not cb:IsEnabled(), "disabled checkbox is not enabled")
+    t:Ok(cb._flatDisabled == true, "checkbox flagged disabled")
+    t:Ok(not sl.slider:IsMouseEnabled(), "disabled slider ignores the mouse")
+    t:Ok(sl._flatDisabled == true, "slider flagged disabled")
+
+    cb:SetFlatEnabled(true)
+    sl:SetFlatEnabled(true)
+    t:Ok(cb:IsEnabled() and true or false, "re-enabled checkbox is enabled")
+    t:Ok(cb._flatDisabled == nil, "checkbox disabled flag cleared")
+    t:Ok(sl.slider:IsMouseEnabled() and true or false, "re-enabled slider takes the mouse")
+    t:Ok(sl._flatDisabled == nil, "slider disabled flag cleared")
+end, { cleanup = function(self)
+    if self._cd3Host then self._cd3Host:Hide() end
+end })
+
 LCEX:RegisterSelfTest("api", "guild bank API contract (Feature B)", function(self, t)
     -- The net-new BCC guild-bank APIs the scanner relies on exist on the live client (X3). Existence
     -- only — the query/read functions need an open bank, and GetGuildBankMoneyTransaction crashes on

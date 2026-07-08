@@ -808,9 +808,29 @@ function LCEX:CreateCheckbox(parent, label, get, set)
         if get() then c.tick:Show() else c.tick:Hide() end
     end
     cb:SetScript("OnClick", function(c)
+        if c._flatDisabled then return end
         set(not get())
         c:Refresh()
     end)
+
+    -- Disabled state (Cd3, §6.11): faint the label + grey the tick + block the click, mirroring
+    -- the flat-button SetFlatEnabled. Value still Refreshes while disabled. Named SetFlatEnabled so
+    -- the native Button:SetEnabled is left alone.
+    function cb.SetFlatEnabled(c, on)
+        local a = addon.Theme.accent
+        if on then
+            c._flatDisabled = nil
+            c:Enable()
+            addon:ThemeText(c.fs, "body", "ink")
+            c.tick:SetVertexColor(a[1], a[2], a[3], 1)
+        else
+            c._flatDisabled = true
+            c:Disable()
+            addon:ThemeText(c.fs, "body", "faint")
+            c.tick:SetVertexColor(0.5, 0.5, 0.5, 1)
+        end
+    end
+
     cb:Refresh()
     return cb
 end
@@ -871,6 +891,26 @@ function LCEX:CreateSliderV2(parent, opts)
         w.value:SetText(fmt(v))
         settingUp = false
     end
+
+    -- Disabled state (Cd3, §6.11): EnableMouse(false) locks the thumb, label/value go faint, the
+    -- thumb greys. Value still Refreshes while disabled. Same SetFlatEnabled name as the other widgets.
+    function wrap.SetFlatEnabled(w, on)
+        local a = addon.Theme.accent
+        if on then
+            w._flatDisabled = nil
+            w.slider:EnableMouse(true)
+            addon:ThemeText(w.label, "caption", "dim")
+            addon:ThemeText(w.value, "caption", "ink")
+            w.slider:GetThumbTexture():SetVertexColor(a[1], a[2], a[3], 1)
+        else
+            w._flatDisabled = true
+            w.slider:EnableMouse(false)
+            addon:ThemeText(w.label, "caption", "faint")
+            addon:ThemeText(w.value, "caption", "faint")
+            w.slider:GetThumbTexture():SetVertexColor(0.5, 0.5, 0.5, 1)
+        end
+    end
+
     wrap:Refresh()
     return wrap
 end
