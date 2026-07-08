@@ -269,6 +269,10 @@ L["Award reasons (right-click Award):"]    = "Award reasons (right-click Award):
 L["%d awards"]                             = "%d awards"
 L["%d tokens"]                             = "%d tokens"
 L["last %s"]                               = "last %s"
+L["Items under consideration:"]            = "Items under consideration:"
+L["Announce channel: %s"]                  = "Announce channel: %s"
+L["Custom award message (&p &i &r):"]      = "Custom award message (&p &i &r):"
+L["Announce items at session start"]       = "Announce items at session start"
 L["Response buttons — apply to the next session:"] =
     "Response buttons — apply to the next session:"
 L["Rename response \"%s\" to:"]             = "Rename response \"%s\" to:"

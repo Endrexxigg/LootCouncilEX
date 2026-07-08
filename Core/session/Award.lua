@@ -505,8 +505,8 @@ function LCEX:UnawardItem(physIdx)
 
     local text = string.format(self.L["Award of %s to %s was undone."],
         (entry and entry.link) or "?", winner)
-    local ch = self:GroupChannel()
-    if self:GetConfig().announceAwards and ch then SendChatMessage(text, ch) else self:Msg(text) end
+    local ch = self:ResolveAnnounceChannel()
+    if ch then SendChatMessage(text, ch) else self:Msg(text) end
     self:RefreshLootItem(physIdx)
     return true
 end
@@ -525,19 +525,60 @@ function LCEX:AwardReasonText(resp, set)
     return nil
 end
 
--- Announce an award RCLC-style. To group chat when `config.announceAwards` is on and we are in a
--- group (default on — the whole raid sees who won what and why); otherwise just to our own chat
--- frame. ML-only path: receivers learn the award from the `award` comm, so only the ML announces.
+-- Resolve the award-announce channel from config (§6.22, DL-28). "NONE" → nil (print to the ML's
+-- own chat frame only). "auto" → the current group channel. RAID/PARTY/GUILD → that channel when
+-- it's currently valid, else fall back to the group channel (never silently drop the announce).
+function LCEX:ResolveAnnounceChannel()
+    local pref = self:GetConfig().announceChannel or "auto"
+    if pref == "NONE" then return nil end
+    if pref == "GUILD" then return IsInGuild() and "GUILD" or self:GroupChannel() end
+    if pref == "RAID"  then return IsInRaid()  and "RAID"  or self:GroupChannel() end
+    if pref == "PARTY" then return (IsInGroup() and not IsInRaid()) and "PARTY" or self:GroupChannel() end
+    return self:GroupChannel() -- "auto" (and any unknown value)
+end
+
+-- Substitute &p (player) / &i (item link) / &r (reason) in a custom award template. Function-form
+-- gsub so a `%` inside a link/name/reason can never be read as a capture reference.
+function LCEX:FormatAwardText(template, link, name, reason)
+    return (tostring(template):gsub("&[pir]", function(tok)
+        if tok == "&p" then return name or "" end
+        if tok == "&i" then return link or "" end
+        return reason or "" -- &r
+    end))
+end
+
+-- Announce an award RCLC-style to the configured channel (§6.22): a custom `awardText` template
+-- when set, else the built-in strings (with the smart "for <reason>" drop when there is no reason).
+-- NONE / no channel prints to our own frame. ML-only path: receivers learn the award from the comm.
 function LCEX:AnnounceAward(link, name, resp, respText)
     local reason = respText or self:AwardReasonText(resp)
-    local text = reason
-        and string.format(self.L["%s was awarded to %s for %s."], link, name, reason)
-        or  string.format(self.L["%s was awarded to %s."], link, name)
-    local channel = self:GroupChannel()
-    if self:GetConfig().announceAwards and channel then
+    local template = self:GetConfig().awardText
+    local text
+    if type(template) == "string" and template ~= "" then
+        text = self:FormatAwardText(template, link, name, reason or "")
+    elseif reason then
+        text = string.format(self.L["%s was awarded to %s for %s."], link, name, reason)
+    else
+        text = string.format(self.L["%s was awarded to %s."], link, name)
+    end
+    local channel = self:ResolveAnnounceChannel()
+    if channel then
         SendChatMessage(text, channel)
     else
         self:Msg(text)
+    end
+end
+
+-- Post "Items under consideration:" + one line per item to the announce channel at session start
+-- (§6.22, opt-in via config.announceItems), so absent/non-council raiders see what's up for loot.
+-- No-op when the toggle is off or the channel resolves to NONE (never floods the ML's own frame).
+function LCEX:AnnounceItemsUnderConsideration(items)
+    if not self:GetConfig().announceItems then return end
+    local ch = self:ResolveAnnounceChannel()
+    if not ch then return end
+    SendChatMessage(self.L["Items under consideration:"], ch)
+    for i, it in ipairs(items or {}) do
+        SendChatMessage(string.format("%d. %s", i, it.link or "?"), ch)
     end
 end
 

@@ -23,7 +23,10 @@ LCEX:RegisterDataset("config", "lww", function() return LCEX.db.global.config en
 -- `visibility` gates the officer-facing surfaces. Defaults: the loot/voting window is council-only
 -- (C7 — raiders see just the poll + award chat), and the guild-bank LOG + annotations are council-only
 -- (B5 — raiders still see the bank's contents + gold). Each is a per-guild opt-in.
-local DEFAULTS = { anonVoting = false, disenchanters = {}, announceAwards = true,
+local DEFAULTS = { anonVoting = false, disenchanters = {},
+                   -- Announcement customization (DL-28): channel + optional items-under-consideration.
+                   -- awardText is intentionally ABSENT (nil = the built-in message strings).
+                   announceChannel = "auto", announceItems = false,
                    awardReasons = { "Banking", "Free" }, -- quick-pick custom award reasons (DL-26)
                    visibility = { lootWindow = false, gbankLog = false } }
 

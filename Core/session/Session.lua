@@ -343,6 +343,7 @@ function LCEX:StartSession(items)
             timeout = timeout, anon = anon,
         }, channel)
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
+        self:AnnounceItemsUnderConsideration(items) -- optional "Items under consideration:" post (§6.22)
     else
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) [local only, not in a group]."],
             sid, #items))

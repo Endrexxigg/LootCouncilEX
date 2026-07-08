@@ -1408,18 +1408,55 @@ test("AwardReasonText: D/E, response text, or nil for announced", function()
     eq(L:AwardReasonText(L.STATUS.ANNOUNCED), nil, "announced -> no reason clause")
 end)
 
-test("AnnounceAward: raid chat when configured + grouped, else local", function()
+test("AnnounceAward: channel from config, custom template, NONE→local (DL-28)", function()
     H.inRaid, H.group = true, { "Amy", "Tester" }
-    L.db.global.config = {} -- announceAwards defaults on
+    L.db.global.config = {} -- announceChannel defaults to "auto"
     L:AnnounceAward("item:100", "Amy", 1)
-    eq(#H.chat, 1, "announced to chat when grouped + on")
-    eq(H.chat[1].chan, "RAID", "announce channel is RAID")
+    eq(#H.chat, 1, "auto → announced to chat when grouped")
+    eq(H.chat[1].chan, "RAID", "auto resolves to RAID in a raid")
     ok(H.chat[1].text:find("for BiS"), "reason rides the message")
-    -- Toggle off -> the message stays in the ML's own chat frame, not raid chat.
+
+    -- NONE → the message stays in the ML's own chat frame, not raid chat.
     H.chat = {}
-    L:SetConfigField("announceAwards", false)
+    L:SetConfigField("announceChannel", "NONE")
     L:AnnounceAward("item:100", "Amy", L.STATUS.DISENCHANT)
-    eq(#H.chat, 0, "no raid chat when the toggle is off")
+    eq(#H.chat, 0, "NONE → no raid chat")
+
+    -- GUILD choice + a custom &p/&i/&r template (with a % that must survive function-gsub).
+    H.chat = {}
+    L:SetConfigField("announceChannel", "GUILD")
+    L:SetConfigField("awardText", "&p won &i (&r) 100%!")
+    L:AnnounceAward("item:100", "Amy", 1)
+    eq(#H.chat, 1, "GUILD → announced")
+    eq(H.chat[1].chan, "GUILD", "channel is GUILD")
+    eq(H.chat[1].text, "Amy won item:100 (BiS) 100%!", "template substitutes &p/&i/&r, % intact")
+
+    -- FormatAwardText direct: a % in the item link is not read as a capture.
+    eq(L:FormatAwardText("&i", "50%off", "N", "R"), "50%off", "percent in link is literal")
+    L.db.global.config = {}
+end)
+
+test("Items-under-consideration announce at session start (DL-28)", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    L.db.global.config = {}
+    L:SetConfigField("announceItems", true)
+    L:StartSession({ { link = "item:100", quality = 4 }, { link = "item:200", quality = 4 } })
+    local header, count = false, 0
+    for _, c in ipairs(H.chat) do
+        if c.text:find("Items under consideration", 1, true) then header = true end
+        if c.text:match("^%d+%. ") then count = count + 1 end
+    end
+    ok(header, "posted the header")
+    eq(count, 2, "one line per item")
+    L:EndSession()
+    -- Off by default: no items post.
+    H.chat = {}
+    L.db.global.config = {}
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    local any = false
+    for _, c in ipairs(H.chat) do if c.text:find("consideration", 1, true) then any = true end end
+    ok(not any, "no items post when the toggle is off")
+    L:EndSession()
     L.db.global.config = {}
 end)
 
