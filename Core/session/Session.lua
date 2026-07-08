@@ -97,24 +97,68 @@ function LCEX:IsCouncil(name)
     return self.session.councilSet ~= nil and self.session.councilSet[n] == true
 end
 
--- The response set carried in sStart so every candidate renders the same buttons (DL-8).
--- Defaults to the built-in RESPONSES until the settings UI makes it configurable (Phase 3).
-function LCEX:ResponseSet()
-    return self.RESPONSES
+-- Derive the runtime response set from a STORED config list (an array of `{ text, pass=true|nil }`).
+-- Pure (DL-8, §6.5). Guarantees the invariants BY CONSTRUCTION: contiguous ids 1..N, exactly one
+-- key=="PASS" pinned LAST, palette colors by index, N ≤ MAX_RESPONSES. Returns nil on garbage (not
+-- a table, or no usable custom entry) so the caller falls back to the built-in RESPONSES.
+function LCEX:NormalizeResponseSet(stored)
+    if type(stored) ~= "table" then return nil end
+    local function trim(s) return type(s) == "string" and s:match("^%s*(.-)%s*$") or "" end
+    local passDefault = self.RESPONSES[#self.RESPONSES].text -- "Pass"
+    local customs, passText = {}, nil
+    for _, e in ipairs(stored) do
+        if type(e) == "table" then
+            local text = trim(e.text)
+            if e.pass then
+                if not passText then passText = (text ~= "" and text) or passDefault end
+            elseif text ~= "" then
+                customs[#customs + 1] = text
+            end
+        end
+    end
+    if #customs == 0 then return nil end -- a set with no real options is treated as corrupt
+    local cap = (self.MAX_RESPONSES or 8) - 1 -- reserve one slot for the pinned PASS
+    while #customs > cap do customs[#customs] = nil end
+    local out = {}
+    for i, text in ipairs(customs) do
+        out[i] = { id = i, key = "R" .. i, text = text,
+                   color = self.RESPONSE_PALETTE[i] or { 0.7, 0.7, 0.7 } }
+    end
+    local pid = #out + 1
+    out[pid] = { id = pid, key = "PASS", text = passText or passDefault, color = self.PASS_COLOR }
+    return out
 end
 
--- Display text for a response id. Falls back to the raw id (e.g. a STATUS sentinel).
+-- The live response set (DL-8): the guild's configured set (config.responses) normalized, else the
+-- built-in RESPONSES. Carried in sStart so every candidate renders the same buttons. Cached on the
+-- config RECORD's table identity — every SetRecord/mergeRecords write installs a fresh record table,
+-- so this invalidates in O(1) with no hooks; ResponseText is called per rendered history row.
+function LCEX:ResponseSet()
+    local rec = self:ConfigRecord()
+    local stored = rec and rec.responses
+    if not stored then
+        self._respCacheSrc, self._respCache = nil, nil
+        return self.RESPONSES
+    end
+    if self._respCacheSrc == rec and self._respCache then return self._respCache end
+    local norm = self:NormalizeResponseSet(stored) or self.RESPONSES
+    self._respCacheSrc, self._respCache = rec, norm
+    return norm
+end
+
+-- Display text for a response id (from the live set). Falls back to the raw id (e.g. a STATUS
+-- sentinel, or an id from an older set no longer configured — history prefers the stored respText).
 function LCEX:ResponseText(id)
-    for _, r in ipairs(self.RESPONSES) do
+    for _, r in ipairs(self:ResponseSet()) do
         if r.id == id then return r.text end
     end
     return tostring(id)
 end
 
--- The id of the built-in PASS response (a decline / non-roll), used to classify "rollers" in the
--- loot window's 3-tier sort (V1).
+-- The id of the PASS response (a decline / non-roll), used to classify "rollers" in the loot
+-- window's 3-tier sort (V1). Reads the live set; PASS is always present (normalizer invariant).
 function LCEX:PassResponseId()
-    for _, r in ipairs(self.RESPONSES) do
+    for _, r in ipairs(self:ResponseSet()) do
         if r.key == "PASS" then return r.id end
     end
     return 5
@@ -278,9 +322,12 @@ function LCEX:StartSession(items)
     -- Anonymous voting (V7) is snapshotted from the shared config at start and rides sStart, so it
     -- is fixed for the session's lifetime (mid-session config edits don't retroactively de-anon it).
     local anon = self:GetConfig().anonVoting and true or false
+    -- Snapshot the response set (DL-8) onto the session so a mid-session config edit can't swap a
+    -- live session's buttons — sStart/sJoin/resume all carry THIS set, and it persists across reload.
+    local responses = self:ResponseSet()
     self.session = {
         sid = sid, items = items, council = council, councilSet = councilSet,
-        rows = {}, voters = {}, startedAt = time(), anon = anon,
+        rows = {}, voters = {}, startedAt = time(), anon = anon, responses = responses,
         groups = self:BuildItemGroups(items), -- duplicate grouping (§6.14)
     }
 
@@ -292,7 +339,7 @@ function LCEX:StartSession(items)
     local channel = self:GroupChannel()
     if channel then
         self:Send("sStart", sid, {
-            items = items, council = council, responses = self:ResponseSet(),
+            items = items, council = council, responses = responses,
             timeout = timeout, anon = anon,
         }, channel)
         self:Msg(string.format(self.L["Session started (%s) — %d item(s) broadcast."], sid, #items))
@@ -303,7 +350,7 @@ function LCEX:StartSession(items)
 
     -- Enter our own view of the session (solo or grouped) so the ML can respond/vote and can
     -- preview the frames without a second client. The sStart echo is ignored (see Candidate).
-    self:EnterSession(sid, UnitName("player"), items, self:ResponseSet(), council, timeout, anon)
+    self:EnterSession(sid, UnitName("player"), items, responses, council, timeout, anon)
     self:SeedSessionRows() -- pre-seed each item's rows from its roster (V1) and push to the council
 
     self:SaveSession()    -- mirror to the DB so a /reload can resume it (DL-6)
@@ -347,7 +394,7 @@ function LCEX:SaveSession()
     self.db.global.session[owner] = {
         sid = s.sid, items = s.items, council = s.council,
         sessionItems = self.sessionItems, startedAt = s.startedAt,
-        rows = s.rows, voters = s.voters, anon = s.anon,
+        rows = s.rows, voters = s.voters, anon = s.anon, responses = s.responses,
         awarded = a and a.awarded, savedAt = time(),
     }
 end
@@ -417,9 +464,13 @@ function LCEX:ResumeSession()
     -- anon is restored from the SAVE (it was snapshotted onto the session at start, §6.16) — not
     -- re-read from config, so the session's anonymity can't silently change across a reload.
     local anon = saved.anon and true or false
+    -- The response set is restored from the SAVE (the session's own snapshot, DL-8) — not re-read
+    -- from current config, so a config edit during the reload can't change a resumed session's set.
+    local responses = saved.responses or self:ResponseSet()
     self.session = {
         sid = saved.sid, items = saved.items, council = saved.council, councilSet = councilSet,
         rows = {}, voters = saved.voters or {}, startedAt = saved.startedAt or time(), anon = anon,
+        responses = responses,
         groups = self:BuildItemGroups(saved.items), -- duplicate grouping (§6.14)
     }
     self.sessionItems = saved.sessionItems
@@ -429,13 +480,13 @@ function LCEX:ResumeSession()
     local channel = self:GroupChannel()
     if channel then
         self:Send("sStart", saved.sid, {
-            items = saved.items, council = saved.council, responses = self:ResponseSet(),
+            items = saved.items, council = saved.council, responses = responses,
             timeout = timeout, anon = anon,
         }, channel)
     else
         self:Msg(self.L["Resuming locally — you're not in a group, so this is read-only recovery."])
     end
-    self:EnterSession(saved.sid, UnitName("player"), saved.items, self:ResponseSet(), saved.council, timeout, anon)
+    self:EnterSession(saved.sid, UnitName("player"), saved.items, responses, saved.council, timeout, anon)
     -- Restore the awarded mirror BEFORE seeding so ComputeItemStatus sees it (border/tally correct).
     if self.activeSession then self.activeSession.awarded = saved.awarded or {} end
     self:SeedSessionRows() -- fresh seed (late joiners appear) …
@@ -594,7 +645,7 @@ LCEX.dispatch.sReq = function(self, msg, sender)
         if left and left > 0 then timeout = left end
     end
     self:Send("sJoin", s.sid, {
-        items = s.items, council = s.council, responses = self:ResponseSet(),
+        items = s.items, council = s.council, responses = s.responses or self:ResponseSet(),
         timeout = timeout, anon = s.anon, awarded = (a and a.awarded) or {},
     }, "WHISPER", sender)
     -- Then the live aggregate per group leader (AceComm keeps per-target order, so sJoin lands first).

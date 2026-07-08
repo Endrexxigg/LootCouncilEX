@@ -45,7 +45,7 @@ LCEX:RegisterCouncilModule({
                     local d = LCEX.Theme.text.dim
                     GameTooltip:AddDoubleLine(LCEX.L["Winner:"], tostring(rec.player or "?"),
                         d[1], d[2], d[3], 1, 1, 1)
-                    local respTxt = rec.retracted and LCEX.L["(retracted)"] or LCEX:ResponseText(rec.resp)
+                    local respTxt = rec.retracted and LCEX.L["(retracted)"] or LCEX:HistoryReasonText(rec)
                     if respTxt and respTxt ~= "" then
                         GameTooltip:AddLine(tostring(respTxt), d[1], d[2], d[3])
                     end
@@ -92,7 +92,7 @@ LCEX:RegisterCouncilModule({
                     LCEX:ThemeText(row.item, "body", "ink")
                     local cc = LCEX:ClassColor(LCEX:ClassOf(rec.player) or LCEX:CachedClass(rec.player))
                     row.winner:SetTextColor(cc[1], cc[2], cc[3])
-                    row.resp:SetText(LCEX:ResponseText(rec.resp))
+                    row.resp:SetText(LCEX:HistoryReasonText(rec))
                 end
                 row.meta:SetText(string.format("%s · %s",
                     tostring(rec.boss or "?"), date("%m/%d %H:%M", rec.ts or 0)))

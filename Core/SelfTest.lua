@@ -355,6 +355,24 @@ LCEX:RegisterSelfTest("load", "RESPONSES table well-formed (UI is data-driven fr
     for name, s in pairs(self.STATUS) do
         t:Ok(s > #self.RESPONSES, "STATUS." .. name .. " overlaps response ids")
     end
+
+    -- DL-8: the LIVE set (built-in or the guild's configured one) must satisfy the same invariants,
+    -- since every consumer builds from ResponseSet(), not RESPONSES.
+    local set = self:ResponseSet()
+    t:Ok(type(set) == "table" and #set >= 2, "ResponseSet has at least two entries")
+    local livePass, passLast = 0, false
+    for i, r in ipairs(set) do
+        t:Eq(r.id, i, "ResponseSet[" .. i .. "].id contiguous")
+        t:Ok(type(r.text) == "string" and type(r.color) == "table" and #r.color == 3,
+            "ResponseSet[" .. i .. "] text/color")
+        if r.key == "PASS" then livePass = livePass + 1; passLast = (i == #set) end
+    end
+    t:Eq(livePass, 1, "ResponseSet has exactly one PASS")
+    t:Ok(passLast, "PASS is the last entry")
+    t:Ok(#set <= (self.MAX_RESPONSES or 8), "ResponseSet within MAX_RESPONSES")
+    for name, s in pairs(self.STATUS) do
+        t:Ok(s > #set, "STATUS." .. name .. " clears the live response ids")
+    end
 end)
 
 LCEX:RegisterSelfTest("load", "db schema + migration stamp", function(self, t)

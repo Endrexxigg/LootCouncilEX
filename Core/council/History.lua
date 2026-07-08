@@ -28,6 +28,7 @@ function LCEX:BuildHistoryRecord(f)
         itemLink    = f.itemLink,
         ts          = f.ts or time(),
         resp        = f.resp,
+        respText    = f.respText, -- DL-8: resolved reason text so it renders after a set change
         boss        = f.boss,
         instance    = f.instance,
         by          = f.by,
@@ -58,7 +59,8 @@ LCEX.dispatch.award = function(self, msg, sender)
     local uid = (msg.sid or "nosession") .. ":" .. tostring(msg.itemIndex)
     self:LogAward(uid, {
         winner = msg.winner, itemID = msg.itemID, itemLink = msg.item,
-        ts = msg.ts, resp = msg.resp, boss = msg.boss, instance = msg.instance, by = sender,
+        ts = msg.ts, resp = msg.resp, respText = msg.respText,
+        boss = msg.boss, instance = msg.instance, by = sender,
     })
     -- Mirror award progress into the live session view (loot-window rail badges).
     local a = self.activeSession
@@ -85,6 +87,12 @@ LCEX.dispatch.unaward = function(self, msg, sender)
     })
     if a.awarded then a.awarded[msg.itemIndex] = nil end
     self:RefreshLootItem(msg.itemIndex)
+end
+
+-- The display reason for a history record (DL-8): the stored resolved text when present, else the
+-- current set's text for the id (which may render as a raw id for one no longer configured).
+function LCEX:HistoryReasonText(rec)
+    return rec.respText or self:ResponseText(rec.resp)
 end
 
 -- Award-history records for a player (normalized key), or ALL when key is nil — newest first.

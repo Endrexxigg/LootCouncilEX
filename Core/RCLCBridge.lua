@@ -52,9 +52,11 @@ end
 
 -- The RCLC mldb for the live session's response set + poll deadline. One builder, reused by the
 -- session-start broadcast and the on-demand request answers, so RCLC raiders always see the same
--- (LCEX) buttons — and inherit DL-8 user-configurable responses automatically once those land.
+-- (LCEX) buttons. Prefers the SESSION's snapshot set (DL-8) so RCLC raiders get the same buttons a
+-- native candidate does, even if the guild config changed mid-session; falls back to the live set.
 function LCEX:RCLCMLDB()
-    return self:RCLC_BuildMLDB(self:ResponseSet(), self.db and self.db.profile.pollTimeout)
+    local set = (self.session and self.session.responses) or self:ResponseSet()
+    return self:RCLC_BuildMLDB(set, self.db and self.db.profile.pollTimeout)
 end
 
 -- ── Outbound session hooks (called from Session.lua / Award.lua) ─────────────

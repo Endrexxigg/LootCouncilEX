@@ -17,10 +17,10 @@ LCEX.PROTOCOL_VERSION = 1
 -- Candidate response options. UI columns/buttons and comms responses are built from
 -- this table, never hardcoded (PROJECT.md §6.5). Index order = display order.
 --
--- These are DEFAULTS. Making the set user-configurable (add/remove/rename) is Phase 3,
--- once there is a settings UI and the responses actually drive candidate/voting frames.
--- `PASS` is a built-in: it must always exist so a candidate can decline and so timeouts
--- resolve to a non-response.
+-- These are the built-in DEFAULTS. A guild may reconfigure the set (add/remove/rename/reorder) via
+-- config.responses; LCEX:ResponseSet() (Session.lua) derives the live set from the stored form
+-- through a normalizer (DL-8, §6.5). `PASS` is a built-in: it must always exist so a candidate can
+-- decline and so timeouts resolve to a non-response, and the normalizer keeps it pinned last.
 LCEX.RESPONSES = {
     [1] = { id = 1, key = "BIS",   text = "BiS",   color = { 0.96, 0.55, 0.73 } },
     [2] = { id = 2, key = "MAJOR", text = "Major", color = { 0.20, 1.00, 0.20 } },
@@ -28,6 +28,21 @@ LCEX.RESPONSES = {
     [4] = { id = 4, key = "GREED", text = "Greed", color = { 0.70, 0.70, 0.70 } },
     [5] = { id = 5, key = "PASS",  text = "Pass",  color = { 0.60, 0.20, 0.20 } },
 }
+
+-- DL-8: the editor cap (custom responses + the pinned PASS) and the color palette the normalizer
+-- assigns by index. The first four match the default BiS/Major/Minor/Greed colors so a set left at
+-- the defaults renders identically; PASS always takes PASS_COLOR (its own dark red).
+LCEX.MAX_RESPONSES = 8
+LCEX.RESPONSE_PALETTE = {
+    { 0.96, 0.55, 0.73 }, -- 1
+    { 0.20, 1.00, 0.20 }, -- 2
+    { 1.00, 0.96, 0.41 }, -- 3
+    { 0.70, 0.70, 0.70 }, -- 4
+    { 0.45, 0.68, 1.00 }, -- 5 blue
+    { 0.78, 0.55, 0.95 }, -- 6 purple
+    { 1.00, 0.62, 0.30 }, -- 7 orange
+}
+LCEX.PASS_COLOR = { 0.60, 0.20, 0.20 }
 
 -- Non-response status codes (PROJECT.md §6.5). Kept numerically clear of RESPONSES ids.
 LCEX.STATUS = {

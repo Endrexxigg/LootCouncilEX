@@ -375,6 +375,9 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
     self:EnsureTradeTicker()
     self:SaveOwedTrades() -- persist the new debt immediately (DL-6)
 
+    -- Resolve the reason TEXT once against the session's own response set (DL-8) and carry it on the
+    -- award + history record, so the reason renders correctly even after the guild changes its set.
+    local respText = self:AwardReasonText(resp)
     -- Strictly-increasing per-uid ts so a re-award after a same-second retraction still wins (§6.15).
     local ts = self:NextHistoryTs(uid)
     local channel = self:GroupChannel()
@@ -385,6 +388,7 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
             itemIndex = itemIndex, -- so receivers can build the history uid (sid:itemIndex)
             winner    = name,
             resp      = resp,
+            respText  = respText, -- DL-8: resolved reason text (additive; old clients ignore it)
             boss      = entry.boss,
             instance  = entry.instance,
             ts        = ts,
@@ -396,12 +400,13 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
     -- union history dataset then propagates to council who were absent (council/History.lua).
     self:LogAward(uid, {
         winner = name, itemID = entry.itemID, itemLink = entry.link, ts = ts,
-        resp = resp, boss = entry.boss, instance = entry.instance, by = UnitName("player"),
+        resp = resp, respText = respText, boss = entry.boss, instance = entry.instance,
+        by = UnitName("player"),
     })
     self:Msg(string.format(
         self.L["Recorded: %s → %s. Trade it to them within the window to hand it off."],
         entry.link, name))
-    self:AnnounceAward(entry.link, name, resp) -- RCLC-like "<item> awarded to <player> for <reason>"
+    self:AnnounceAward(entry.link, name, resp, respText) -- RCLC-like "<item> awarded to <player> for <reason>"
 
     -- Track award progress on the live view (the loot window's rail badges). Receivers learn
     -- the same fact from the `award` broadcast (council/History.lua).
@@ -507,10 +512,13 @@ end
 
 -- Human-readable award reason for a resp code (§6.10): D/E for a disenchant, the poll response text
 -- for a real response, or nil when the ML assigned it outside the poll (ANNOUNCED) — then the
--- announcement drops the "for <reason>" clause.
-function LCEX:AwardReasonText(resp)
+-- announcement drops the "for <reason>" clause. `set` defaults to the SESSION's snapshot set (or
+-- the live set outside a session), so the reason maps against the same buttons the session ran with
+-- (DL-8) rather than the guild's possibly-changed current set.
+function LCEX:AwardReasonText(resp, set)
     if resp == self.STATUS.DISENCHANT then return self.L["D/E"] end
-    for _, r in ipairs(self.RESPONSES) do
+    set = set or (self.activeSession and self.activeSession.responses) or self:ResponseSet()
+    for _, r in ipairs(set) do
         if r.id == resp then return r.text end
     end
     return nil
@@ -519,8 +527,8 @@ end
 -- Announce an award RCLC-style. To group chat when `config.announceAwards` is on and we are in a
 -- group (default on — the whole raid sees who won what and why); otherwise just to our own chat
 -- frame. ML-only path: receivers learn the award from the `award` comm, so only the ML announces.
-function LCEX:AnnounceAward(link, name, resp)
-    local reason = self:AwardReasonText(resp)
+function LCEX:AnnounceAward(link, name, resp, respText)
+    local reason = respText or self:AwardReasonText(resp)
     local text = reason
         and string.format(self.L["%s was awarded to %s for %s."], link, name, reason)
         or  string.format(self.L["%s was awarded to %s."], link, name)

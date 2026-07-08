@@ -1594,6 +1594,118 @@ test("LAYOUT contract identities", function()
 end)
 
 -- ── RCLC interop bridge — pure transforms + codec (§6.18, DL-24) ──────────────
+-- ── DL-8 configurable response buttons ───────────────────────────────────────
+test("NormalizeResponseSet: contiguous ids, pinned PASS, cap, garbage fallback", function()
+    local set = L:NormalizeResponseSet({ { text = "Need" }, { text = "Greed" }, { text = "Off" },
+        { text = "Pass", pass = true } })
+    eq(#set, 4, "3 customs + PASS")
+    eq(set[1].id, 1, "id 1 contiguous")
+    eq(set[1].text, "Need", "custom text kept")
+    eq(set[1].key, "R1", "derived custom key")
+    ok(set[1].color and #set[1].color == 3, "palette color assigned")
+    eq(set[4].key, "PASS", "PASS pinned last")
+    eq(set[4].id, 4, "PASS id contiguous")
+
+    -- PASS injected when the stored list omits it.
+    local set2 = L:NormalizeResponseSet({ { text = "Need" }, { text = "Greed" } })
+    eq(#set2, 3, "2 customs + injected PASS")
+    eq(set2[3].key, "PASS", "PASS injected last")
+
+    -- Whitespace trimmed; empty entries dropped.
+    local set3 = L:NormalizeResponseSet({ { text = "  Need  " }, { text = "   " },
+        { text = "Pass", pass = true } })
+    eq(set3[1].text, "Need", "text trimmed")
+    eq(#set3, 2, "empty custom dropped")
+
+    -- Clamp to MAX_RESPONSES.
+    local many = {}
+    for i = 1, 20 do many[i] = { text = "R" .. i } end
+    many[#many + 1] = { text = "Pass", pass = true }
+    local set4 = L:NormalizeResponseSet(many)
+    ok(#set4 <= L.MAX_RESPONSES, "clamped to MAX_RESPONSES")
+    eq(set4[#set4].key, "PASS", "PASS still last after clamp")
+
+    -- Garbage → nil (caller falls back to the built-ins).
+    ok(L:NormalizeResponseSet(nil) == nil, "nil → nil")
+    ok(L:NormalizeResponseSet("x") == nil, "non-table → nil")
+    ok(L:NormalizeResponseSet({}) == nil, "empty → nil")
+    ok(L:NormalizeResponseSet({ { text = "Pass", pass = true } }) == nil, "only PASS → nil")
+end)
+
+test("ResponseSet: reads config, falls back to defaults, cache invalidates on write", function()
+    L.db.global.config = {}
+    eq(L:ResponseSet(), L.RESPONSES, "no config → built-in defaults")
+
+    L:SetConfigField("responses", { { text = "Need" }, { text = "Greed" }, { text = "Pass", pass = true } })
+    local set = L:ResponseSet()
+    eq(#set, 3, "configured set has 3 entries")
+    eq(set[1].text, "Need", "first custom text")
+    ok(L:ResponseSet() == set, "cached: same table on a repeat call")
+
+    L:SetConfigField("responses", { { text = "BiS" }, { text = "Pass", pass = true } })
+    local set2 = L:ResponseSet()
+    ok(set2 ~= set, "cache invalidated after a config write")
+    eq(#set2, 2, "new set has 2 entries")
+
+    L:SetConfigField("responses", {}) -- empty array → normalizer nil → defaults
+    eq(L:ResponseSet(), L.RESPONSES, "empty responses → built-in defaults")
+    L.db.global.config = {}
+end)
+
+test("session snapshots the response set; a mid-session config edit can't swap it (DL-8)", function()
+    H.inRaid, H.group = true, { "Tester", "Latecomer" }
+    L.db.global.config = {}
+    L:SetConfigField("responses", { { text = "Alpha" }, { text = "Pass", pass = true } })
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    eq(L.session.responses[1].text, "Alpha", "session snapshots the set at start")
+
+    L:SetConfigField("responses", { { text = "Beta" }, { text = "Pass", pass = true } })
+    eq(L:ResponseSet()[1].text, "Beta", "the live set changed")
+    eq(L.session.responses[1].text, "Alpha", "but the session keeps its snapshot")
+
+    L:SaveSession()
+    eq(L.db.global.session[L:OwnerKey()].responses[1].text, "Alpha", "saved session carries the snapshot")
+
+    H.sent = {}
+    L.dispatch.sReq(L, { sid = L.session.sid }, "Latecomer")
+    local join
+    for _, s in ipairs(H.sent) do if s.msg.cmd == "sJoin" then join = s.msg end end
+    ok(join ~= nil and join.responses[1].text == "Alpha", "sJoin answers with the snapshot, not the live set")
+    L:EndSession()
+    L.db.global.config = {}
+end)
+
+test("award stores + broadcasts respText resolved from the session set (DL-8)", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    L.db.global.config = {}
+    L:SetConfigField("responses", { { text = "Need" }, { text = "Greed" }, { text = "Pass", pass = true } })
+    L.sessionItems = { { link = "item:100", itemID = 100, quality = 4,
+        roster = { { name = "Amy", class = "MAGE" } } } }
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    ok(L:AwardItem(1, "Amy", 1), "award recorded (forced resp id 1 = Need)")
+    local uid = L.session.sid .. ":1"
+    eq(L.db.global.history[uid].resp, 1, "history carries the resp id")
+    eq(L.db.global.history[uid].respText, "Need", "history carries the resolved reason text")
+    local awardMsg
+    for _, s in ipairs(H.sent) do if s.msg.cmd == "award" then awardMsg = s.msg end end
+    ok(awardMsg and awardMsg.respText == "Need", "award msg carries respText")
+
+    -- The reason still renders after the guild changes its set.
+    L:SetConfigField("responses", { { text = "BiS" }, { text = "Pass", pass = true } })
+    eq(L:HistoryReasonText(L.db.global.history[uid]), "Need", "respText survives a set change")
+    L:EndSession()
+    L.db.global.config = {}
+end)
+
+test("RCLC_BuildMLDB: a custom set yields N-1 numbered buttons (DL-8)", function()
+    local set = L:NormalizeResponseSet({ { text = "Need" }, { text = "Greed" }, { text = "Off" },
+        { text = "Pass", pass = true } })
+    local mldb = L:RCLC_BuildMLDB(set, 0)
+    eq(mldb.numButtons, 3, "3 customs → 3 buttons (PASS excluded)")
+    eq(mldb.buttons.default[1].text, "Need", "first custom button text")
+    eq(mldb.buttons.default[3].text, "Off", "third custom button text")
+end)
+
 test("RCLC_BuildMLDB: LCEX buttons minus PASS, colors +alpha, timeout fallback", function()
     local mldb = L:RCLC_BuildMLDB(L.RESPONSES, 0)
     -- PASS (index 5) is dropped — RCLC renders its own Pass; 4 numbered buttons remain.
