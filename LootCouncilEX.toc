@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.56.0
+## Version: 0.56.1
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -75,6 +75,11 @@ UI\ConfigWindow.lua
 Core\session\Candidate.lua
 # Plane A — council side: consumes cUpdate, casts vVote, tallies on the ML.
 Core\session\Council.lua
+
+# Phase 13 — RCLootCouncil interop (§6.18, DL-24): the LCEX ML speaks RCLC's wire dialect so
+# RCLC-only raiders respond as candidates. Wire = pure transforms + codec; Bridge = comms glue
+# (loads after Session/Award/Candidate — the functions it hooks at runtime).
+Core\RCLCWire.lua
 
 # Plane B — persistent council sync over GUILD (digest/delta, LWW merge). Loads after Session
 # (ResolveCouncil) and Comms (dispatch).

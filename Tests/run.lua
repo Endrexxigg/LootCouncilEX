@@ -1514,6 +1514,68 @@ test("LAYOUT contract identities", function()
     eq((LAY.gutter - 6) % 2, 0, "gutter centers the 6px bar on whole pixels")
 end)
 
+-- ── RCLC interop bridge — pure transforms + codec (§6.18, DL-24) ──────────────
+test("RCLC_BuildMLDB: LCEX buttons minus PASS, colors +alpha, timeout fallback", function()
+    local mldb = L:RCLC_BuildMLDB(L.RESPONSES, 0)
+    -- PASS (index 5) is dropped — RCLC renders its own Pass; 4 numbered buttons remain.
+    eq(mldb.numButtons, 4, "numButtons excludes PASS")
+    eq(mldb.buttons.default.numButtons, 4, "buttons.default carries numButtons")
+    eq(mldb.buttons.default[1].text, "BiS", "button 1 text")
+    eq(mldb.buttons.default[4].text, "Greed", "button 4 text")
+    eq(mldb.responses.default[2].text, "Major", "response 2 text")
+    eq(#mldb.responses.default[2].color, 4, "color gains an alpha channel")
+    eq(mldb.responses.default[2].color[4], 1, "alpha = 1")
+    eq(mldb.timeout, 300, "timeout 0 -> long default (RCLC frames always count down)")
+    eq(L:RCLC_BuildMLDB(L.RESPONSES, 45).timeout, 45, "positive timeout passes through")
+end)
+
+test("RCLC_BuildLootTable: index==session, ML owner, item string, boss", function()
+    local items = {
+        [1] = { link = "|cff1eff00|Hitem:30219:0:0:0:0:0:0:0:0|h[Item A]|h|r", quality = 3 },
+        [2] = { link = "item:40395", quality = 4 },
+    }
+    local lt = L:RCLC_BuildLootTable(items, "Bosslady", { [2] = { boss = "Illidan" } })
+    eq(lt[1].session, 1, "session == item index")
+    eq(lt[1].string, "30219:0:0:0:0:0:0:0:0", "item string stripped of the item: prefix")
+    eq(lt[1].owner, "Bosslady", "owner is the ML")
+    eq(lt[2].string, "40395", "bare item: string parses too")
+    eq(lt[2].boss, "Illidan", "boss folded in from sessionItems")
+    eq(lt[1].boss, nil, "no boss when sessionItems lacks the index")
+end)
+
+test("RCLC_MapResponse: btn index / PASS / autopass / unknown", function()
+    eq(L:RCLC_MapResponse(1, L.RESPONSES), 1, "button 1 -> BiS id")
+    eq(L:RCLC_MapResponse(4, L.RESPONSES), 4, "button 4 -> Greed id")
+    eq(L:RCLC_MapResponse("PASS", L.RESPONSES), 5, "PASS code -> PASS id")
+    eq(L:RCLC_MapResponse(true, L.RESPONSES), 5, "autopass (true) -> PASS id")
+    eq(L:RCLC_MapResponse("TIMEOUT", L.RESPONSES), nil, "TIMEOUT -> no row change")
+    eq(L:RCLC_MapResponse(99, L.RESPONSES), nil, "out-of-range index -> nil")
+end)
+
+test("RCLC_GearLinks: rebuilds links, drops nils", function()
+    local g = L:RCLC_GearLinks("30219:0:0", "40395")
+    eq(#g, 2, "two links")
+    eq(g[1], "item:30219:0:0", "gear1 relinked")
+    eq(g[2], "item:40395", "gear2 relinked")
+    eq(#L:RCLC_GearLinks("30219", nil), 1, "nil gear2 dropped")
+    eq(#L:RCLC_GearLinks(nil, nil), 0, "no gear -> empty")
+end)
+
+-- The vendored LibDeflate must parse + round-trip under the CI's Lua 5.1 (the wire codec's
+-- correctness beyond this — real AceSerializer multi-arg — is a /lcex selftest, since the harness
+-- identity-mocks Serialize). Load it standalone (LibStub nil'd) so it takes the no-LibStub branch.
+test("RCLCWire: LibDeflate round-trips a channel-encoded blob (vendored, Lua 5.1)", function()
+    local savedLibStub = _G.LibStub
+    _G.LibStub = nil
+    local ld = assert(loadfile("Libs/LibDeflate/LibDeflate.lua"))()
+    _G.LibStub = savedLibStub
+    ok(type(ld) == "table" and ld.CompressDeflate ~= nil, "LibDeflate loaded standalone")
+    local blob = "response" .. string.char(0, 1, 2, 255) .. string.rep("BiS/Major/Minor/Greed", 40)
+    local enc = ld:EncodeForWoWAddonChannel(ld:CompressDeflate(blob, { level = 3 }))
+    ok(type(enc) == "string" and #enc > 0, "encoded to a channel-safe string")
+    eq(ld:DecompressDeflate(ld:DecodeForWoWAddonChannel(enc)), blob, "round-trip restores bytes")
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)

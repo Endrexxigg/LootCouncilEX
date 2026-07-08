@@ -182,6 +182,7 @@ local FILES = {
     "Core/session/Session.lua", "Core/session/Readiness.lua", "Core/session/Award.lua",
     "Core/TradeTimers.lua",
     "Core/session/Candidate.lua", "Core/session/Council.lua",
+    "Core/RCLCWire.lua",
     "Core/council/Sync.lua", "Core/council/Notes.lua", "Core/council/Marks.lua",
     "Core/council/History.lua", "Core/council/SelfReport.lua", "Core/council/Config.lua",
     "Core/council/Gbank.lua", "Core/Access.lua",
