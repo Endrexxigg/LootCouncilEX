@@ -178,7 +178,7 @@ local FILES = {
     "Core/Init.lua", "Core/Const.lua", "Core/Comms.lua", "Core/Roster.lua", "Core/Guild.lua", "Core/Minimap.lua",
     "Core/Data/Loot.lua", "Core/Data/BiS.lua", "Core/Data/TierTokens.lua", "Core/Data/DataAPI.lua",
     "Core/Data/GearRules.lua",
-    "Core/Display.lua",
+    "Core/Display.lua", "Core/Export.lua",
     "Core/session/Session.lua", "Core/session/Readiness.lua", "Core/session/Award.lua",
     "Core/TradeTimers.lua",
     "Core/session/Candidate.lua", "Core/session/Council.lua",

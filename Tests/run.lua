@@ -547,6 +547,44 @@ test("digest hash distinguishes disjoint keys; pHello pulls on divergence", func
 end)
 
 -- ── PlayerDetail builders (Phase 6) ──────────────────────────────────────────
+-- ── History export (§6.19, DL-25) ────────────────────────────────────────────
+test("Export builders: CSV quoting, JSON escaping, Discord shape, filter, respText", function()
+    L.db.global.history = {
+        ["s:1"] = { player = "Bob", itemID = 30, itemLink = "[Big Axe]", ts = 1000,
+                    resp = 1, respText = "BiS", boss = "Gruul, the Dragonkiller", instance = "GL", by = "ML" },
+        ["s:2"] = { player = "Amy", itemID = 40, itemLink = "[Wand]", ts = 2000,
+                    resp = 2, boss = "Mag", instance = "ML", by = "ML", retracted = true },
+    }
+    -- CSV: header + 2 rows, newest-first (Amy ts=2000 first), comma-bearing boss quoted.
+    local csv = L:ExportCSV(nil)
+    local lines = {}
+    for ln in (csv .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = ln end
+    eq(lines[1], "winner,date,time,itemID,itemName,response,boss,instance,by,retracted", "CSV header")
+    ok(lines[2]:find("^Amy,", 1), "newest row first (Amy)")
+    ok(lines[2]:find(",yes$"), "retracted flagged")
+    ok(lines[3]:find('"Gruul, the Dragonkiller"'), "comma-bearing boss is quoted")
+    ok(lines[3]:find(",BiS,"), "reason uses stored respText")
+
+    -- Filter narrows to one winner.
+    local csvBob = L:ExportCSV("bob")
+    local n = 0
+    for _ in (csvBob .. "\n"):gmatch("(.-)\n") do n = n + 1 end
+    eq(n, 2, "filtered CSV = header + Bob only")
+
+    -- JSON: valid-ish, escapes the quote-free fields, boolean retracted.
+    local json = L:ExportJSON(nil)
+    ok(json:find('^%[') and json:find('%]$'), "JSON is a bracketed array")
+    ok(json:find('"winner":"Amy"'), "winner field")
+    ok(json:find('"retracted":true'), "retracted boolean")
+    ok(json:find('"response":"BiS"'), "reason field")
+
+    -- Discord: bold item, struck-through when retracted.
+    local disc = L:ExportDiscord(nil)
+    ok(disc:find("**[Big Axe]** → Bob", 1, true), "Discord line shape")
+    ok(disc:find("~~", 1, true), "retracted line struck through")
+    L.db.global.history = {}
+end)
+
 test("HistoryForPlayer filter + sort", function()
     L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
     L.db.global.history["s:2"] = { player = "Bob",   ts = 300 }
