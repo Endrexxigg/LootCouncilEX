@@ -634,6 +634,19 @@ never stored or synced.** Two surfaces: **(i)** the Roster → History sub-tab h
 lines, the stats line + up to three recent awards, so the council sees a candidate's recent loot
 without leaving the vote view (the name already click-throughs to Roster).
 
+### 6.22 Announcement customization (Phase 15, DL-28)
+
+The single fixed award announcement becomes configurable (shared config, replicated): **channel**
+`announceChannel` (`auto` = the group channel · `RAID` · `PARTY` · `GUILD` · `NONE` = ML chat frame
+only), a **custom message** `awardText` (nil = the built-in strings with the smart reason-clause
+drop; else a template with `&p` player / `&i` item / `&r` reason placeholders), and an optional
+**items-under-consideration** announce (`announceItems`) that posts "Items under consideration:" +
+one line per item to the channel at session start (so absent/non-council raiders see what's being
+distributed). Placeholder substitution uses **function-replacement gsub** so a `%` in a
+link/name/reason can't corrupt the output. `ResolveAnnounceChannel()` falls back to the group
+channel when a chosen channel isn't currently valid. Replaces the old code-default `announceAwards`
+bool (unreleased ⇒ no migration).
+
 ---
 
 ## 7. Build map
@@ -843,6 +856,12 @@ history on hover at vote time; a custom announce message posts to the chosen cha
   response breakdown (by display text, DL-8), recent N, tier-token count, last award. **Derived,
   never stored/synced.** Surfaced in the Roster History header and on the loot-window candidate
   name hover (stats + recent 3), so the council sees fairness data at vote time. §6.21.
+- **DL-28 (accepted — Phase 15d, announcement customization):** the award announcement gains a
+  shared-config **channel** (`announceChannel`: auto/RAID/PARTY/GUILD/NONE), a **custom message**
+  (`awardText` with `&p`/`&i`/`&r`, function-gsub so `%` is safe), and an optional session-start
+  **items-under-consideration** post (`announceItems`). `ResolveAnnounceChannel` falls back to the
+  group channel when a chosen one is invalid; NONE prints to the ML's own frame. Replaces the old
+  `announceAwards` bool (unreleased ⇒ no migration). §6.22.
 
 ---
 
