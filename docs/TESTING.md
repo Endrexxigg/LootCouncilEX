@@ -31,17 +31,24 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.53.5 – v0.55.2 — Pre-raid window pass (opacity, resize, layout, alt-cache)
+### v0.53.5 – v0.55.4 — Pre-raid window pass (opacity, resize, layout, alt-cache)
 `/lcex selftest` covers the mechanics (own-report loopback, bgOpacity lands on the surfaces only,
-loot/poll grips exist, pill not truncated); these are the genuinely-visual / cross-character checks.
+the bare poll shell, loot/poll grips exist, pill not truncated); these are the genuinely-visual /
+cross-character checks.
 
+- [ ] **Loot Drop bare shell (v0.55.4)**: on a loot-drop poll there is **no big panel** anymore —
+  just a slim "Loot Drop" header strip, the timer bar (when armed), and the floating item cards.
+  Clicks in the empty margins between them **pass through** to the world/raid frames behind; the
+  "+ N more" line under the last card is **green + outlined** with no background. Dragging (header),
+  the width grip, ESC-close and the × all still work.
 - [ ] **Own-alt gear cache (v0.53.5)** *(the raid-night one)*: on an alt, wait ~6s after login **or**
   run `/lcex report`; switch to another of your characters **in the same guild**, open the Council
   window → **Roster**, pick the first character. Its Gear / Professions / BiS panes show the cached
   report ("cached <ago>"), **not** "(no cached report)" — with **no other addon user online**.
 - [ ] **Background opacity (v0.54.0)**: Config (`/lcex config`) → **Loot window background opacity**.
-  Drag it down — the **Loot Session** and **Loot Drop** panels go translucent, but the item text,
-  response buttons, icons and borders stay fully opaque/readable. Setting persists over `/reload`.
+  Drag it down — the **Loot Session** panels and the **Loot Drop** header/timer/cards go translucent,
+  but the item text, response buttons, icons and borders stay fully opaque/readable. Setting
+  persists over `/reload`.
 - [ ] **Loot Session resize (v0.55.0)**: with a session open (full two-pane view), drag the
   bottom-right grip — width **and** height change, the rail stays put, the candidate pane + both
   lists reflow, more rows show when taller. Size persists over `/reload`. In the pre-session

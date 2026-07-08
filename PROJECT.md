@@ -376,7 +376,11 @@ shows the grip; compact hides the grip and forces the narrow width — an `f._su
 the loot window and the loot-drop poll opt into `useBgOpacity`: `profile.appearance.bgOpacity`
 drives a backdrop-only alpha (`LCEX:SetSurfaceAlpha`, Theme.lua) on the shell + region/card
 surfaces so the panels can sit over the raid UI while text/buttons/icons stay crisp. The poll is
-**width-only** resizable (height stays content-computed) so long item names get more room.
+**width-only** resizable (height stays content-computed) so long item names get more room, and its
+shell is **bare** (`CreateWindowV2 { bare }`): the window paints no surface/border and takes no
+mouse — mid-fight it reads as a slim header strip + timer bar + floating item cards, clicks in the
+margins fall through to the raid UI, and the "+N more" overflow line floats success-green with an
+outline instead of sitting on a panel.
 
 **Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (min 220×26, **grows to
 fit its text** up to 360 so the status never clips — a minimized frame isn't user-resizable; HIGH

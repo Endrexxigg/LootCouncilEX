@@ -31,9 +31,11 @@ local CARD_W     = 380
 local CARD_H     = 78
 local ICON_SZ    = 40 -- item icon; its 40px height spans the name row + the response-button row,
                       -- so the icon bottom meets the button-row bottom (aligned, item 3)
-local TITLE_H    = LAY.edge + LAY.titleH -- the title bar's bottom edge — content stacks below
+local HEADER_H   = 20 -- slim header strip: the poll shell is BARE (chromeless), so the header is
+                      -- deliberately small — just a drag handle with the title + close
+local TITLE_H    = LAY.edge + HEADER_H -- the header's bottom edge — content stacks below
 local TIMER_H    = 12   -- deadline depleting bar (present only when a deadline is armed)
-local MORE_H     = 16   -- "+N more" footer (present only when the queue exceeds MAX_CARDS)
+local MORE_H     = 16   -- "+N more" line under the last card (only when the queue overflows)
 
 -- Remove `itemIndex` (a VALUE, not a position) from the queue. Pure — headless-tested.
 function LCEX:_PollQueueRemove(queue, itemIndex)
@@ -63,7 +65,10 @@ function LCEX:EnsurePoll()
         title = self.L["Loot Drop"],
         savedKey = "poll",
         defaultPos = { x = 0, y = 220 },
-        useBgOpacity = true, -- profile.appearance.bgOpacity: panels translucent, content crisp
+        -- Bare shell: no window backdrop/border and no mouse on the margins — mid-fight the poll
+        -- reads as floating item cards + a slim header, not a big panel over the raid UI.
+        bare = true, titleH = HEADER_H, titleSizeKey = "caption",
+        useBgOpacity = true, -- profile.appearance.bgOpacity: header/timer/cards translucent, content crisp
         -- Width-only resize (height stays content-computed, like the trade-timer window): the
         -- cards/name/note gain room so a wide item name reads without truncation; buttons keep
         -- their left cluster. minW = the tight width that still fits the 5-button response row.
@@ -92,16 +97,20 @@ function LCEX:EnsurePoll()
     f:RefreshAppearance() -- apply a saved bgOpacity to the shell + bar from the first paint
 
     -- Re-anchored each render to the middle of the reserved card band (so it can never sit
-    -- under an armed deadline bar); built here, positioned in RenderPollCards.
+    -- under an armed deadline bar); built here, positioned in RenderPollCards. The shell is
+    -- bare, so this floats over the world — outlined for readability.
     f.empty = f:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(f.empty, "body", "faint")
+    self:ThemeText(f.empty, "body", "dim")
+    self:SetThemedFont(f.empty, self.Theme.fontSize.body, "OUTLINE")
     f.empty:SetPoint("TOP", 0, -(TITLE_H + PAD))
     f.empty:SetText(self.L["Nothing for you this round."])
     f.empty:Hide()
 
-    -- Overflow footer: how many queued items are hidden below the visible cards.
+    -- Overflow line under the last card: how many queued items are still hidden. Floats on the
+    -- bare shell with no background — success-green + outline so it stands out over the world.
     f.more = f:CreateFontString(nil, "OVERLAY")
-    self:ThemeText(f.more, "caption", "faint")
+    self:SetThemedFont(f.more, self.Theme.fontSize.body, "OUTLINE")
+    f.more:SetTextColor(self.Theme.success[1], self.Theme.success[2], self.Theme.success[3])
     f.more:Hide()
 
     f.cards = {}

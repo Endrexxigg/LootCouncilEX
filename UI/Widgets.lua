@@ -403,11 +403,14 @@ end
 -- Themed, movable, ESC-closable window. `name` is the GLOBAL frame name (UISpecialFrames).
 -- opts = { width, height, title, titleH, titleSizeKey, chromeInset, savedKey, defaultPos={x,y},
 --          resizable, resizeWOnly, minW, minH, noClose, scale, alpha, useOpacity,
---          useBgOpacity } — savedKey persists position (and size when resizable); useOpacity
+--          useBgOpacity, bare } — savedKey persists position (and size when resizable); useOpacity
 -- windows honor profile.appearance.opacity (whole-window SetAlpha, fades content too);
 -- useBgOpacity windows honor profile.appearance.bgOpacity BACKDROP-ONLY (SetSurfaceAlpha on the
 -- shell + title bar + every frame the module registers in f._bgSurfaces — text/buttons/icons
--- stay crisp). Returns the frame; content anchors below f.bar.
+-- stay crisp). `bare` = chromeless shell (poll): the window itself paints NO surface/border and
+-- takes NO mouse — only its children (title bar, cards, grip) render and interact, so the
+-- empty margins neither obstruct the raid UI visually nor swallow clicks meant for it.
+-- Returns the frame; content anchors below f.bar.
 function LCEX:CreateWindowV2(name, opts)
     opts = opts or {}
     local addon = self
@@ -438,8 +441,14 @@ function LCEX:CreateWindowV2(name, opts)
     -- the raised window strictly above the others' bands rather than colliding at one level.
     f:HookScript("OnShow", function(w) w:Raise() end)
     f:SetScript("OnMouseDown", function(w) w:Raise() end)
-    self:Surface(f, "page")
-    self:SoftEdge(f)
+    if opts.bare then
+        -- Chromeless: no shell paint, and the shell rect must not eat mouse events — clicks in
+        -- the margins between children fall through to whatever is behind the window.
+        f:EnableMouse(false)
+    else
+        self:Surface(f, "page")
+        self:SoftEdge(f)
+    end
 
     -- Title bar: the drag handle. A 3px gold tick + title text; close × on the right unless
     -- noClose is set for passive HUD frames. The tick

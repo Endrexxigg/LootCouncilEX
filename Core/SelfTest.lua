@@ -704,7 +704,12 @@ LCEX:RegisterSelfTest("ui", "bgOpacity paints loot/poll backdrops only", functio
     t:Eq(loot._surface and loot._surface._lcexAlpha, 0.5, "loot shell surface alpha")
     t:Eq(loot.rail._surface and loot.rail._surface._lcexAlpha, 0.5, "loot rail surface alpha")
     t:Eq(loot.pane._surface and loot.pane._surface._lcexAlpha, 0.5, "loot pane surface alpha")
-    t:Eq(poll._surface and poll._surface._lcexAlpha, 0.5, "poll shell surface alpha")
+    -- The poll shell is BARE (chromeless + mouse-transparent): it must paint no surface of its
+    -- own; bgOpacity instead lands on its header bar and registered sub-surfaces (timer bar).
+    t:Ok(poll._surface == nil, "poll shell must stay bare (no backdrop surface)")
+    t:Ok(not poll:IsMouseEnabled(), "poll shell margins must not eat mouse events")
+    t:Eq(poll.bar._surface and poll.bar._surface._lcexAlpha, 0.5, "poll header surface alpha")
+    t:Eq(poll.timerBar._surface and poll.timerBar._surface._lcexAlpha, 0.5, "poll timer-bar surface alpha")
     t:Ok(math.abs(loot:GetAlpha() - 1) < 0.001, "loot window alpha (content) must stay 1")
     t:Ok(math.abs(poll:GetAlpha() - 1) < 0.001, "poll window alpha (content) must stay 1")
 end, { cleanup = function(self)
