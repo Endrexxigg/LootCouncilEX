@@ -31,11 +31,17 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.53.5 – v0.55.4 — Pre-raid window pass (opacity, resize, layout, alt-cache)
+### v0.53.5 – v0.55.5 — Pre-raid window pass (opacity, resize, layout, alt-cache)
 `/lcex selftest` covers the mechanics (own-report loopback, bgOpacity lands on the surfaces only,
-the bare poll shell, loot/poll grips exist, pill not truncated); these are the genuinely-visual /
-cross-character checks.
+the bare poll shell, the flat note-box skin, loot/poll grips exist, pill not truncated); these are
+the genuinely-visual / cross-character checks.
 
+- [ ] **Loot Drop tightened + flat inputs (v0.55.5)**: the dead space is gone — header, timer bar
+  and cards stack on a 4px rhythm (8px between cards) and all share the same left/right edges; the
+  header's gold tick, the card icons, the note boxes and the "+ N more" line sit on **one vertical
+  line**. Note boxes (and every text input addon-wide: staging add box, roster filter/notes,
+  history filter, D/E box, confirm dialog) are **flat dark boxes with a hairline border** — no more
+  stock Blizzard input art — and the border turns **gold while focused**.
 - [ ] **Loot Drop bare shell (v0.55.4)**: on a loot-drop poll there is **no big panel** anymore —
   just a slim "Loot Drop" header strip, the timer bar (when armed), and the floating item cards.
   Clicks in the empty margins between them **pass through** to the world/raid frames behind; the

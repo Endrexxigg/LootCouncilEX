@@ -10,8 +10,9 @@
 -- expiry the poll closes silently (no response sent — the ML's table simply shows no response).
 -- When the usable queue is longer than the visible cards, a "+N more" footer shows the overflow.
 --
--- Layout uses one uniform PAD everywhere (window edge ↔ content, and the gap between cards):
--- LAYOUT.grid, the bare-window content line. Card INTERIORS pad by LAYOUT.pad (cards are panels).
+-- Layout (bare shell — the window paints nothing, so spacing is deliberately tight): cards and
+-- the timer bar share the header strip's edges (INSET), stacked on a slim vertical rhythm (VGAP,
+-- CARD_GAP). Card INTERIORS pad by LAYOUT.pad (cards are panels).
 --
 -- Data flow: Candidate.lua EnterSession → ShowPoll(items, responses, secondsLeft); a button
 -- click → OnResponseChosen(itemIndex, resp, note) → cResp to the ML. LeaveSession → HidePoll.
@@ -26,7 +27,9 @@ local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemIn
 
 local FRAME_NAME = "LCEX_PollWindow"
 local MAX_CARDS  = 3
-local PAD        = LAY.grid -- the ONE margin: window edge ↔ content, and the gap between cards
+local INSET      = LAY.edge     -- left/right content inset: cards/timer align to the header's edges
+local VGAP       = LAY.gapTight -- the tight vertical rhythm: header → timer → cards → "+N more"
+local CARD_GAP   = LAY.gap      -- between stacked cards — a hair wider so cards read as units
 local CARD_W     = 380
 local CARD_H     = 78
 local ICON_SZ    = 40 -- item icon; its 40px height spans the name row + the response-button row,
@@ -61,7 +64,7 @@ end
 function LCEX:EnsurePoll()
     if self.pollFrame then return self.pollFrame end
     local f = self:CreateWindowV2(FRAME_NAME, {
-        width = CARD_W + 2 * PAD, height = 200,
+        width = CARD_W + 2 * INSET, height = 200,
         title = self.L["Loot Drop"],
         savedKey = "poll",
         defaultPos = { x = 0, y = 220 },
@@ -72,7 +75,7 @@ function LCEX:EnsurePoll()
         -- Width-only resize (height stays content-computed, like the trade-timer window): the
         -- cards/name/note gain room so a wide item name reads without truncation; buttons keep
         -- their left cluster. minW = the tight width that still fits the 5-button response row.
-        resizable = true, resizeWOnly = true, minW = CARD_W + 2 * PAD,
+        resizable = true, resizeWOnly = true, minW = CARD_W + 2 * INSET,
     })
     f._bgSurfaces = {} -- deadline bar + lazily-built cards register here (useBgOpacity)
 
@@ -102,7 +105,7 @@ function LCEX:EnsurePoll()
     f.empty = f:CreateFontString(nil, "OVERLAY")
     self:ThemeText(f.empty, "body", "dim")
     self:SetThemedFont(f.empty, self.Theme.fontSize.body, "OUTLINE")
-    f.empty:SetPoint("TOP", 0, -(TITLE_H + PAD))
+    f.empty:SetPoint("TOP", 0, -(TITLE_H + VGAP))
     f.empty:SetText(self.L["Nothing for you this round."])
     f.empty:Hide()
 
@@ -154,7 +157,8 @@ function LCEX:BuildPollCard(parent)
     card.buttons = {}
 
     -- Full-width note under the icon/buttons: TOPLEFT + RIGHT anchors override CreateEditBox's
-    -- default width so it fills the card; editPad lands the box ART on the card's pad line.
+    -- default width so it fills the card. The flat edit box's frame edge IS its visible edge
+    -- (editPad = 0), so it sits flush on the icon column line — aligned with the icon above.
     -- Its top rides the interior stack: pad(10) + icon/button-row 40 + gapTight(4) = 54.
     card.note = self:CreateEditBox(card, {})
     card.note:SetPoint("TOPLEFT", card, "TOPLEFT", LAY.pad + LAY.editPad, -54)
@@ -220,18 +224,18 @@ function LCEX:RenderPollCards()
 
     -- Width is user-resizable (grip); cards/bar fill it. Stamp the width we render at so the
     -- OnSizeChanged guard treats the SetHeight below (which also fires OnSizeChanged) as a no-op.
-    local cardW = f:GetWidth() - 2 * PAD
+    local cardW = f:GetWidth() - 2 * INSET
     f._lastRenderW = f:GetWidth()
 
-    -- Deadline bar below the title bar (when armed); it shifts everything below it down.
-    local top = TITLE_H + PAD
+    -- Deadline bar directly under the header (when armed); it shifts everything below it down.
+    local top = TITLE_H + VGAP
     if f.deadline then
         f.timerBar:ClearAllPoints()
-        f.timerBar:SetPoint("TOPLEFT", PAD, -top)
+        f.timerBar:SetPoint("TOPLEFT", INSET, -top)
         f.timerBar:SetWidth(cardW)
         f.timerBar:Show()
         self:UpdatePollCountdown()
-        top = top + TIMER_H + PAD
+        top = top + TIMER_H + VGAP
     else
         f.timerBar:Hide()
     end
@@ -244,7 +248,7 @@ function LCEX:RenderPollCards()
         if item then
             if not card then card = self:BuildPollCard(f); f.cards[slot] = card end
             card:ClearAllPoints()
-            card:SetPoint("TOPLEFT", PAD, -(top + (slot - 1) * (CARD_H + PAD)))
+            card:SetPoint("TOPLEFT", INSET, -(top + (slot - 1) * (CARD_H + CARD_GAP)))
             card:SetWidth(cardW)
             self:FillPollCard(card, itemIndex, item, responses)
             shown = shown + 1
@@ -254,17 +258,17 @@ function LCEX:RenderPollCards()
         end
     end
 
-    local bottom = top + math.max(1, shown) * CARD_H + math.max(0, shown - 1) * PAD
+    local bottom = top + math.max(1, shown) * CARD_H + math.max(0, shown - 1) * CARD_GAP
 
     local extra = #queue - shown
     if extra > 0 then
-        -- Left-justified on the card edge line, vertically centered in a MORE_H band a PAD below
-        -- the last card ("LEFT" puts the text's vertical centre on the y, so it reads centered).
+        -- On the icon column line (INSET + card pad), vertically centered in a MORE_H band a VGAP
+        -- below the last card ("LEFT" puts the text's vertical centre on the y, so it reads centered).
         f.more:ClearAllPoints()
-        f.more:SetPoint("LEFT", f, "TOPLEFT", PAD, -(bottom + PAD + MORE_H / 2))
+        f.more:SetPoint("LEFT", f, "TOPLEFT", INSET + LAY.pad, -(bottom + VGAP + MORE_H / 2))
         f.more:SetText(string.format(self.L["+ %d more"], extra))
         f.more:Show()
-        bottom = bottom + PAD + MORE_H
+        bottom = bottom + VGAP + MORE_H
     else
         f.more:Hide()
     end
@@ -281,7 +285,7 @@ function LCEX:RenderPollCards()
     -- anchor, which resizes around the middle — so shrinking as you answer would slide the cards
     -- (and their buttons) up, out from under the cursor. Re-anchoring TOPLEFT keeps the top fixed.
     local winTop, winLeft = f:GetTop(), f:GetLeft()
-    f:SetHeight(bottom + PAD)
+    f:SetHeight(bottom + VGAP)
     if type(winTop) == "number" and type(winLeft) == "number" then
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", winLeft, winTop)

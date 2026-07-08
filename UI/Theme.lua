@@ -93,8 +93,10 @@ LCEX.LAYOUT = {
     btnHSlim = 20,    -- in-row / tab-strip flat-button height
     btnGap   = 6,     -- gap between grouped action buttons (footer pairs)
     tabGap   = 4,     -- gap between tab-strip buttons
-    editH    = 20,    -- InputBoxTemplate's intrinsic height
-    editPad  = 4,     -- InputBoxTemplate left-art compensation: frame x = content line + editPad
+    editH    = 20,    -- flat edit-box height (matches btnHSlim's row rhythm)
+    editPad  = 0,     -- flat edit boxes have no art overhang: the frame edge IS the content line
+                      -- (was 4 for InputBoxTemplate's left-art compensation; call sites keep
+                      -- their `+ editPad` algebra so the contract stays the single source)
 
     -- Lists
     gutter = 14,      -- scrollbar gutter reserved at a list's right edge (both list helpers)

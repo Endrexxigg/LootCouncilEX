@@ -672,6 +672,8 @@ LCEX:RegisterSelfTest("ui", "poll renders usable-item cards + queue advance", fu
         local card = f.cards[slot]
         if t:Ok(card and card:IsShown(), "card " .. slot .. " not shown") then
             t:Ok(card.icon.tex:GetTexture() ~= nil, "card " .. slot .. " icon texture not set")
+            -- Flat themed note box (not InputBoxTemplate): carries its own surface paint.
+            t:Ok(card.note and card.note._surface ~= nil, "card " .. slot .. " note box missing the flat skin")
             for ri, resp in ipairs(self.RESPONSES) do
                 local b = card.buttons[ri]
                 if t:Ok(b and b:IsShown(), "card " .. slot .. " missing response button " .. ri) then

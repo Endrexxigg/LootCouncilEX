@@ -380,7 +380,9 @@ surfaces so the panels can sit over the raid UI while text/buttons/icons stay cr
 shell is **bare** (`CreateWindowV2 { bare }`): the window paints no surface/border and takes no
 mouse — mid-fight it reads as a slim header strip + timer bar + floating item cards, clicks in the
 margins fall through to the raid UI, and the "+N more" overflow line floats success-green with an
-outline instead of sitting on a panel.
+outline instead of sitting on a panel. The stack is tight: header/timer/cards share the header's
+edge lines (INSET = edge) on a 4px vertical rhythm (8px between cards), and the header tick, card
+icons, note boxes and "+N more" all sit on one column line.
 
 **Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (min 220×26, **grows to
 fit its text** up to 360 so the status never clips — a minimized frame isn't user-resizable; HIGH
@@ -636,7 +638,10 @@ auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-en
   layer under `CreateScrollList` (`opts.zebra`), a `SetFlatEnabled` disabled state on flat
   buttons, and one reused native context-menu widget (`ShowContextMenu`) shared by the browser
   note flow, award correction, and future consumers. Per the handoff's "do not duplicate
-  row-striping logic" rule.
+  row-striping logic" rule. Extended (pre-raid pass): `CreateEditBox` dropped `InputBoxTemplate`
+  for a flat themed input (base fill, hairline border, accent focus ring) — every text input
+  addon-wide reskins at once — and `LAYOUT.editPad` collapsed to 0 (the flat frame edge IS the
+  content line; call sites keep their `+ editPad` algebra).
 
 ---
 

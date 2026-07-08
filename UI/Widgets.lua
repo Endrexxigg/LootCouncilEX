@@ -362,13 +362,34 @@ function LCEX:CreatePixelScrollList(parent, opts)
 end
 
 -- ── Edit box ─────────────────────────────────────────────────────────────────
--- A single-line input (generalizes LootFrame's note box). `opts = { width, onCommit(text) }`.
--- Enter commits (then unfocuses); Escape unfocuses. Commits should route through SetRecord.
+-- A single-line input (generalizes LootFrame's note box), flat-themed to match the button
+-- grammar — NOT InputBoxTemplate (whose stock art clashes with the theme and overhangs its
+-- frame, which is why LAYOUT.editPad existed): a recessed `base` fill + 1px hairline that
+-- warms to accent while focused. The frame edge IS the visible box (editPad = 0).
+-- `opts = { width, onCommit(text) }`. Enter commits (then unfocuses); Escape unfocuses.
+-- Commits should route through SetRecord.
 function LCEX:CreateEditBox(parent, opts)
     opts = opts or {}
-    local eb = CreateFrame("EditBox", nil, parent, "InputBoxTemplate")
+    local eb = CreateFrame("EditBox", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     eb:SetSize(opts.width or 200, LAY.editH)
     eb:SetAutoFocus(false)
+    self:Surface(eb, "base")
+    if eb.SetBackdrop then
+        eb:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 1 })
+        eb:SetBackdropBorderColor(1, 1, 1, 0.10)
+    end
+    self:SetThemedFont(eb, self.Theme.fontSize.body, "")
+    eb:SetTextColor(self.Theme.text.ink[1], self.Theme.text.ink[2], self.Theme.text.ink[3])
+    eb:SetTextInsets(LAY.gapTight + 2, LAY.gapTight + 2, 0, 0)
+    eb:SetScript("OnEditFocusGained", function(self2)
+        if self2.SetBackdropBorderColor then
+            local a = LCEX.Theme.accent
+            self2:SetBackdropBorderColor(a[1], a[2], a[3], 0.7)
+        end
+    end)
+    eb:SetScript("OnEditFocusLost", function(self2)
+        if self2.SetBackdropBorderColor then self2:SetBackdropBorderColor(1, 1, 1, 0.10) end
+    end)
     eb:SetScript("OnEscapePressed", function(self2) self2:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self2)
         if opts.onCommit then opts.onCommit(self2:GetText()) end
