@@ -77,22 +77,64 @@ local function deltaSince(ds, since)
     return out
 end
 
--- Merge incoming records into the store; returns how many keys actually changed.
+-- Merge incoming records into the store; returns how many keys actually changed AND a
+-- {key→record} map of just those that landed (nil if none) — the second value drives the gbank
+-- sync-notification prints. Existing callers read only the count (`> 0`), so it's additive.
 local function mergeRecords(ds, records)
     local store = ds.store()
-    local changed = 0
+    local changed, changedRecs = 0, nil
     for k, inc in pairs(records) do
         local cur = store[k]
+        local take
         if ds.mode == "union" then
-            if cur == nil then store[k] = inc; changed = changed + 1 end
+            take = (cur == nil)
         else
             local im, cm = inc.mod or 0, (cur and cur.mod) or 0
-            if not cur or im > cm or (im == cm and tostring(inc.by) < tostring(cur and cur.by)) then
-                store[k] = inc; changed = changed + 1
-            end
+            take = (not cur) or im > cm or (im == cm and tostring(inc.by) < tostring(cur and cur.by))
+        end
+        if take then
+            store[k] = inc
+            changed = changed + 1
+            changedRecs = changedRecs or {}
+            changedRecs[k] = inc
         end
     end
-    return changed
+    return changed, changedRecs
+end
+
+-- Copper → a coin string (client coin icons in-game, plain g/s/c under the headless harness).
+local function coinText(copper)
+    copper = copper or 0
+    if GetCoinTextureString then return GetCoinTextureString(copper) end
+    return string.format("%dg %ds %dc",
+        math.floor(copper / 10000), math.floor((copper % 10000) / 100), copper % 100)
+end
+
+-- Chat-surface the officer-relevant events a gbank sync just delivered (B1, §6.12): GOLD
+-- withdrawals from gbankLog and new annotations from gbankNotes. Item withdrawals (raiders pulling
+-- mats) and deposits/moves/repairs stay silent — only gold moves and notes warrant a line. Capped
+-- so a big first-sync can't spam the frame. `changedRecs` is mergeRecords' second return.
+local GBANK_PRINT_CAP = 3
+local function announceGbankSync(self, dataset, changedRecs, sender)
+    if not changedRecs then return end
+    local lines = {}
+    if dataset == "gbankLog" then
+        for _, rec in pairs(changedRecs) do
+            if rec.kind == "withdraw" and rec.gold and rec.gold > 0 then
+                lines[#lines + 1] = string.format(self.L["Gbank: %s withdrew %s (synced from %s)."],
+                    rec.player or "?", coinText(rec.gold), sender)
+            end
+        end
+    elseif dataset == "gbankNotes" then
+        for _, rec in pairs(changedRecs) do
+            lines[#lines + 1] = string.format(self.L["Gbank: %s annotated a transaction."],
+                rec.by or sender)
+        end
+    end
+    for i = 1, math.min(#lines, GBANK_PRINT_CAP) do self:Msg(lines[i]) end
+    if #lines > GBANK_PRINT_CAP then
+        self:Msg(string.format(self.L["  …and %d more."], #lines - GBANK_PRINT_CAP))
+    end
 end
 
 -- ── Local write API ──────────────────────────────────────────────────────────
@@ -226,9 +268,10 @@ LCEX.dispatch.pSyncData = function(self, msg, sender)
             if not self:GateConfigInherit(k, rec, sender) then records[k] = rec end
         end
     end
-    local changed = mergeRecords(ds, records)
+    local changed, changedRecs = mergeRecords(ds, records)
     if changed > 0 then
         self:Msg(string.format(self.L["Synced %d %s record(s) from %s."], changed, msg.dataset, sender))
+        announceGbankSync(self, msg.dataset, changedRecs, sender)
     end
 end
 
@@ -239,8 +282,10 @@ LCEX.dispatch.pSet = function(self, msg, sender)
     local ds = self.datasets[msg.dataset]
     if not ds or msg.key == nil or type(msg.record) ~= "table" then return end
     if msg.dataset == "config" and self:GateConfigInherit(msg.key, msg.record, sender) then return end
-    if mergeRecords(ds, { [msg.key] = msg.record }) > 0 then
+    local n, changedRecs = mergeRecords(ds, { [msg.key] = msg.record })
+    if n > 0 then
         self:Msg(string.format(self.L["%s updated %s[%s]."], sender, msg.dataset, tostring(msg.key)))
+        announceGbankSync(self, msg.dataset, changedRecs, sender)
     end
 end
 

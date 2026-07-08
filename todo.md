@@ -351,8 +351,7 @@ icon-count-overlay widget exists; TBC logs are ephemeral/indexed/ID-less and rep
 
 **Decisions (locked):**
 - **B1.** **Replicate** (Plane B), real-time: officer A withdraws → officer B sees the change.
-  *(DEFERRED: a chat print when a gbank sync arrives carrying a gold withdrawal or a new annotation
-  — see Deferred list.)*
+  *(Chat print on receiving a gold-withdrawal / annotation sync — **shipped v0.57.0**, `Sync.lua`.)*
 - **B2.** **Single guild / single server** covers the vast majority — build for that first. Multi-
   guild edge case (a player who's an officer in >1 guild) → allow **switching** between guilds,
   **defaulting to the guild associated with the current character**. (Unified `guildKey`, X4.)
@@ -406,8 +405,8 @@ overlay, etc. remain.)
 - **Enchant-material request helper.** Integrate mat lists for common enchants: a guildie hits
   "request withdrawal" on enchanting mats → LCEX asks which enchant → autocomplete suggestions →
   the generated request asks for all required mats.
-- **Guild-bank sync notification prints (B1).** Print to chat when a gbank sync arrives carrying a
-  gold withdrawal or a newly-added annotation.
+- ~~**Guild-bank sync notification prints (B1).**~~ **SHIPPED v0.57.0** — `Sync.lua announceGbankSync`
+  prints a chat line when a sync delivers a gold withdrawal or a new annotation (capped at 3/sync).
 - **Automatic transaction-note prompt (B7).** The close-prompt-on-gbank-close + chat-reminder flow.
   v1 scope is transaction notes themselves, not the automatic prompt.
 - **Enchant-name display via tooltip scan (Gd4).** Showing arbitrary (non-tabled) enchant names.

@@ -467,6 +467,42 @@ test("pHello: pull when peer ahead, hello-back when we're ahead", function()
     ok(sawHello, "we're ahead -> hello back so they pull")
 end)
 
+-- ── Gbank sync-notification prints (B1) ──────────────────────────────────────
+test("gbank sync prints gold withdrawals + annotations, stays silent otherwise", function()
+    L.db.profile.council = { byRank = false, extra = { "Tester", "Officer" } }
+    L._councilSet = nil
+    local HR = 3600
+    local function has(sub)
+        for _, m in ipairs(H.msgs) do if m:find(sub, 1, true) then return true end end
+        return false
+    end
+
+    -- A gbankLog delta: a gold withdrawal (announce), a gold deposit (silent), an item
+    -- withdrawal (silent — raiders pulling mats must not spam).
+    L.dispatch.pSyncData(L, { dataset = "gbankLog", records = {
+        ["w1"] = { kind = "withdraw", player = "Bob",   gold = 500000,   ts = 1000 * HR, by = "Officer" },
+        ["d1"] = { kind = "deposit",  player = "Carol", gold = 200000,   ts = 1000 * HR, by = "Officer" },
+        ["i1"] = { kind = "withdraw", player = "Dave",  itemLink = "[T]", count = 5, ts = 1000 * HR, by = "Officer" },
+    } }, "Officer")
+    ok(has("Bob withdrew"), "gold withdrawal is announced")
+    ok(not has("Carol"), "a deposit is NOT announced")
+    ok(not has("Dave"), "an item withdrawal is NOT announced")
+
+    -- A single annotation via pSet -> the friendly note line (author-named).
+    H.msgs = {}
+    L.dispatch.pSet(L, { dataset = "gbankNotes", key = "grp1",
+        record = { text = "guild repairs", mod = 2000, by = "Officer" } }, "Officer")
+    ok(has("annotated a transaction"), "annotation is announced")
+
+    -- A non-gbank dataset (notes) never triggers the gbank line.
+    H.msgs = {}
+    L.dispatch.pSet(L, { dataset = "notes", key = "Bob",
+        record = { text = "hi", mod = 3000, by = "Officer" } }, "Officer")
+    ok(not has("Gbank:"), "a normal notes edit prints no gbank line")
+
+    L.db.global.gbankLog, L.db.global.gbankNotes, L.db.global.notes, L.db.global.config = {}, {}, {}, {}
+end)
+
 -- ── PlayerDetail builders (Phase 6) ──────────────────────────────────────────
 test("HistoryForPlayer filter + sort", function()
     L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
