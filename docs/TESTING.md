@@ -31,6 +31,18 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.61.0 – v0.61.2 — Custom award reasons (§6.20, DL-26)
+Headless covers the wire (resp=CUSTOM + respText); selftest covers the editor render. Manual:
+
+- [ ] **Award for…**: in a live session, **right-click** a candidate's **Award** button → a menu of
+  the configured reasons (default **Banking / Free**) + **Custom…**. Pick one → confirm → the item
+  awards, and raid chat + History show "… for Banking" (or the custom text). Left-click still awards
+  normally.
+- [ ] **Reason editor**: Session Config (lower-left, under the council roster) → **Award reasons** —
+  add a reason (type + Enter), × removes; it replicates to a second officer and appears in the menu.
+- [ ] *(Layout note — flag if wrong)*: on a **short** council window the award-reasons list may be
+  tight; grow the window if it's clipped.
+
 ### v0.60.0 – v0.60.3 — Loot-history export + RCLC CSV import (§6.19)
 Headless covers the builders (CSV quoting, JSON escaping, Discord shape) and the import
 (row→record mapping, idempotence, malformed-row skip); selftest covers the export frame render.

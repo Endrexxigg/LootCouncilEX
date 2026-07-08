@@ -538,6 +538,7 @@ function LCEX:BuildLootCandRow(parent)
 
     row.award = self:CreateFlatButton(row, self.L["Award"], 56, LAY.btnHSlim, "accent")
     row.award:SetPoint("RIGHT", -LAY.gapTight, 0)
+    row.award:RegisterForClicks("LeftButtonUp", "RightButtonUp") -- right = "Award for…" (§6.20)
     -- Vote cluster reads [−][n][+] left→right (handoff item 2): downvote left, upvote right.
     -- Cluster-internal gaps are gapTight; the cluster stands a full gap off the Award button.
     row.plus = self:CreateFlatButton(row, "+", 22, LAY.btnHSlim)
@@ -662,9 +663,12 @@ function LCEX:FillLootCandRow(row, entry)
         else
             row.award:SetText(self.L["Award"])
             row.award:SetFlatEnabled(true)
-            -- AwardGroup hands out the next unawarded physical copy (§6.14).
-            row.award:SetScript("OnClick", function()
-                if self:AwardGroup(itemIndex, data.name or candKey) then
+            -- Left-click awards the next unawarded physical copy (§6.14); right-click opens the
+            -- "Award for…" reason menu (§6.20). Both hand out through AwardGroup.
+            row.award:SetScript("OnClick", function(_, button)
+                if button == "RightButtonUp" then
+                    self:AwardReasonMenu(itemIndex, data.name or candKey)
+                elseif self:AwardGroup(itemIndex, data.name or candKey) then
                     self:RefreshLootWindow()
                 end
             end)
@@ -948,6 +952,43 @@ function LCEX:LootDisenchantSelected()
             onAccept = award,
         })
     end
+end
+
+-- Right-click "Award for…" (§6.20, ML-only): the configured award reasons (config.awardReasons)
+-- plus a free-form "Custom…" entry. Each awards with STATUS.CUSTOM + the reason text after a
+-- confirm; AwardGroup consumes the next physical copy of a duplicate stack (§6.14).
+function LCEX:AwardReasonMenu(itemIndex, name)
+    local a = self.activeSession
+    if not (a and self:IsSelf(a.ml)) then return end
+    name = strtrim(name or "")
+    if name == "" then return end
+    local entry = self.sessionItems and self.sessionItems[itemIndex]
+    local link = (entry and entry.link) or ("item #" .. tostring(itemIndex))
+
+    local function commit(reason)
+        reason = strtrim(reason or "")
+        if reason ~= "" and self:AwardGroup(itemIndex, name, self.STATUS.CUSTOM, reason) then
+            self:RefreshLootWindow()
+        end
+    end
+
+    local items = {}
+    for _, reason in ipairs(self:GetConfig().awardReasons or {}) do
+        items[#items + 1] = { text = reason, onClick = function()
+            self:ShowConfirm({
+                text = string.format(self.L["Award %s to %s for \"%s\"?"], link, name, reason),
+                onAccept = function() commit(reason) end,
+            })
+        end }
+    end
+    items[#items + 1] = { text = self.L["Custom…"], onClick = function()
+        self:ShowConfirm({
+            text = string.format(self.L["Award %s to %s for:"], link, name),
+            input = "",
+            onAccept = commit, -- the input box IS the confirm; no second popup
+        })
+    end }
+    self:ShowContextMenu({ title = self.L["Award for…"], items = items })
 end
 
 -- ── Award correction (§6.15, ML-only) ────────────────────────────────────────

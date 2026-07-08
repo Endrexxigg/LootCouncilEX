@@ -60,6 +60,19 @@ local function GlyphButton(parent, glyph)
     return b
 end
 
+-- ── Custom award reasons (DL-26; quick-pick, right-click the Award button) ───
+local function RefreshAwardReasons(panel)
+    panel.reasonList:SetData(LCEX:GetConfig().awardReasons or {})
+end
+
+local function EditAwardReasons(panel, fn)
+    local cur, list = LCEX:GetConfig().awardReasons or {}, {}
+    for i, n in ipairs(cur) do list[i] = n end
+    fn(list)
+    LCEX:SetConfigField("awardReasons", list)
+    RefreshAwardReasons(panel)
+end
+
 -- ── Response buttons (DL-8, ranked; PASS pinned last) ────────────────────────
 -- The editor shows the NORMALIZED set (ResponseSet, so PASS always appears pinned) and writes back
 -- the minimal stored form {text, pass}. The CANONICAL stored list is customs-in-order + a single
@@ -260,9 +273,52 @@ LCEX:RegisterCouncilModule({
             end,
         })
         panel.rosterList:SetPoint("TOPLEFT", LAY.bleed, -212) -- a full gap under the extra-add box
-        -- Confined to the LEFT column now (was full-bleed) so the response editor can take the lower
-        -- right column. Right edge lands just before COL2.
-        panel.rosterList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMLEFT", COL2 - LAY.gap, 64)
+        -- Left column, FIXED height (the award-reasons editor sits below it). Right edge before COL2.
+        panel.rosterList:SetPoint("BOTTOMRIGHT", panel, "TOPLEFT", COL2 - LAY.gap, -360)
+
+        -- Custom award reasons (DL-26) — quick-pick labels for the right-click "Award for…" menu.
+        -- Left column, below the roster; add by name, × removes (no ranking — order is cosmetic).
+        panel.reasonLabel = panel:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(panel.reasonLabel, "caption", "dim")
+        panel.reasonLabel:SetPoint("TOPLEFT", LAY.grid, -368)
+        panel.reasonLabel:SetText(LCEX.L["Award reasons (right-click Award):"])
+
+        panel.reasonAddBox = LCEX:CreateEditBox(panel, {
+            width = 150,
+            onCommit = function(text)
+                text = strtrim(text or "")
+                if text == "" then return end
+                EditAwardReasons(panel, function(l)
+                    for _, n in ipairs(l) do if n:lower() == text:lower() then return end end -- dedupe
+                    l[#l + 1] = text
+                end)
+                panel.reasonAddBox:SetText("")
+            end,
+        })
+        panel.reasonAddBox:SetPoint("TOPLEFT", LAY.grid + LAY.editPad, -386)
+
+        panel.reasonList = LCEX:CreateScrollList(panel, {
+            rowHeight = 20, fillHeight = true, zebra = true,
+            buildRow = function(parent)
+                local row = CreateFrame("Frame", nil, parent)
+                row.fs = row:CreateFontString(nil, "OVERLAY")
+                LCEX:ThemeText(row.fs, "body", "ink")
+                row.fs:SetPoint("LEFT", LAY.rowPad, 0)
+                row.remove = GlyphButton(row, "×")
+                row.remove:SetPoint("RIGHT", -LAY.gapTight, 0)
+                row.fs:SetPoint("RIGHT", row.remove, "LEFT", -LAY.inlineGap, 0)
+                row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
+                return row
+            end,
+            fillRow = function(row, reason, index)
+                row.fs:SetText(reason)
+                row.remove:SetScript("OnClick", function()
+                    EditAwardReasons(panel, function(l) table.remove(l, index) end)
+                end)
+            end,
+        })
+        panel.reasonList:SetPoint("TOPLEFT", LAY.bleed, -408)
+        panel.reasonList:SetPoint("BOTTOMRIGHT", panel, "BOTTOMLEFT", COL2 - LAY.gap, 46)
 
         -- Loot-window visibility — a SHARED-config toggle, repurposed by Phase 12 (DL-18). Off:
         -- raiders get the rail-only list view (items/award state/winners). On: raiders get the
@@ -395,5 +451,6 @@ LCEX:RegisterCouncilModule({
         RefreshRoster(panel)
         RefreshDisenchanters(panel)
         RefreshResponses(panel)
+        RefreshAwardReasons(panel)
     end,
 })

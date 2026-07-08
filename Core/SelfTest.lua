@@ -933,6 +933,11 @@ LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(
             t:Ok(sp.respAddBox ~= nil and sp.respList ~= nil, "DL-8 response editor missing")
             t:Ok(type(sp.respList.items) == "table" and #sp.respList.items == #self:ResponseSet(),
                 "response editor rows mismatch the live set")
+            -- DL-26 award-reasons editor.
+            t:Ok(sp.reasonAddBox ~= nil and sp.reasonList ~= nil, "award-reasons editor missing")
+            t:Ok(type(sp.reasonList.items) == "table"
+                and #sp.reasonList.items == #(self:GetConfig().awardReasons or {}),
+                "award-reasons rows mismatch config")
         end
     else
         t:Ok(f.panels.sessioncfg == nil, "non-council: Session Config correctly hidden from the rail")
