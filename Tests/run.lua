@@ -585,6 +585,46 @@ test("Export builders: CSV quoting, JSON escaping, Discord shape, filter, respTe
     L.db.global.history = {}
 end)
 
+test("RCLC CSV import: maps rows to native records, idempotent, skips malformed", function()
+    L.db.global.history = {}
+    L.db.profile.council = { byRank = false, extra = { "Tester" } }
+    L._councilSet = nil
+    local csv = table.concat({
+        "player,date,time,id,item,itemID,response,instance,boss,note",
+        "Bob,06/07/24,20:30:15,111,\"[Big Axe]\",30,BiS,\"Gruul's Lair\",\"Gruul, the Dragonkiller\",nice",
+        "Amy,06/07/24,21:00:00,112,[Wand],40,Offspec,SSC,Vashj,",
+        "Nobody,06/07/24,21:05:00,113,[X],notanumber,BiS,SSC,Vashj,", -- malformed itemID → skipped
+    }, "\n")
+
+    local added, skipped = L:ImportRCLCHistory(csv)
+    eq(added, 2, "two valid rows imported")
+    eq(skipped, 1, "one malformed row skipped")
+
+    -- Records are native-shaped with CUSTOM resp + verbatim respText, keyed imp:<hash>.
+    local bob
+    for uid, rec in pairs(L.db.global.history) do
+        ok(uid:find("^imp:"), "imported uid is imp:-prefixed")
+        if rec.player == L:NormalizeName("Bob") then bob = rec end
+    end
+    ok(bob ~= nil, "Bob's record imported")
+    eq(bob.itemID, 30, "itemID parsed")
+    eq(bob.resp, L.STATUS.CUSTOM, "resp = CUSTOM")
+    eq(bob.respText, "BiS", "verbatim RCLC response text")
+    eq(bob.by, "import", "by = import")
+    eq(L:HistoryReasonText(bob), "BiS", "renders via respText")
+    ok(bob.boss:find("Gruul", 1, true), "comma-bearing boss field parsed through quotes")
+
+    -- Re-import is idempotent (same uids).
+    local added2 = L:ImportRCLCHistory(csv)
+    eq(added2, 0, "re-import adds nothing (idempotent)")
+
+    -- Non-RCLC text → nothing.
+    local a3 = L:ImportRCLCHistory("just,some,random\ntext,here,now")
+    eq(a3, 0, "a non-RCLC CSV imports nothing")
+
+    L.db.global.history = {}
+end)
+
 test("HistoryForPlayer filter + sort", function()
     L.db.global.history["s:1"] = { player = "Bob",   ts = 100 }
     L.db.global.history["s:2"] = { player = "Bob",   ts = 300 }

@@ -31,6 +31,20 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.60.0 – v0.60.3 — Loot-history export + RCLC CSV import (§6.19)
+Headless covers the builders (CSV quoting, JSON escaping, Discord shape) and the import
+(row→record mapping, idempotence, malformed-row skip); selftest covers the export frame render.
+Genuinely-manual:
+
+- [ ] **Export**: council window → **History** → **Export** → pick CSV / JSON / Discord. The
+  frame opens with the text pre-selected; ctrl-C copies it. Set a **winner filter** first → the
+  export contains only that winner.
+- [ ] **Paste check**: paste the CSV into a spreadsheet (columns line up) and the Discord text into
+  a Discord message (bold items, struck-through retracted lines render).
+- [ ] **Import**: **Import** → paste a real **RCLootCouncil** history CSV export → the rows appear
+  in the log (reason text preserved), a chat line reports "Imported N (M skipped)". Re-importing
+  the same CSV adds nothing. *(2 officers: the imports replicate to the other officer after sync.)*
+
 ### v0.59.0 – v0.59.2 — DL-8 configurable response buttons
 `/lcex selftest` covers the plumbing (the live `ResponseSet()` is well-formed — contiguous ids,
 one pinned PASS, cap, STATUS floor — and the Session-Config **response editor renders** with rows

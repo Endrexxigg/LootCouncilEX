@@ -44,6 +44,16 @@ LCEX:RegisterCouncilModule({
             } })
         end)
 
+        -- Import an RCLootCouncil history CSV (paste-in), for guilds migrating from RCLC.
+        panel.importBtn = LCEX:CreateFlatButton(panel, LCEX.L["Import"], 80, LAY.btnH)
+        panel.importBtn:SetPoint("LEFT", panel.exportBtn, "RIGHT", LAY.gap, 0)
+        panel.importBtn:SetScript("OnClick", function()
+            LCEX:ShowExportFrame(LCEX.L["Import RCLC CSV"], "", { onImport = function(text)
+                LCEX:ImportRCLCHistory(text)
+                panel.list:SetData(LCEX:BuildHistoryLog(panel.filterBox:GetText()))
+            end })
+        end)
+
         panel.list = LCEX:CreateScrollList(panel, {
             rowHeight = 24, fillHeight = true, zebra = true,
             buildRow = function(parent)

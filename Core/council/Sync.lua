@@ -60,11 +60,18 @@ end
 -- < 2^38 (p < 2^31, *131 < 2^38), safe in a double. Summed commutatively across the dataset so
 -- `pairs` order is irrelevant and two peers derive the SAME digest hash from the SAME records.
 local HASH_M = 2147483647 -- 2^31 - 1
-local function pairHash(key, mod)
+local function strHash(s)
+    s = tostring(s or "")
     local p = 0
-    for i = 1, #key do p = (p * 131 + key:byte(i)) % HASH_M end
-    return (p * 31 + (mod % HASH_M)) % HASH_M
+    for i = 1, #s do p = (p * 131 + s:byte(i)) % HASH_M end
+    return p
 end
+local function pairHash(key, mod)
+    return (strHash(key) * 31 + (mod % HASH_M)) % HASH_M
+end
+
+-- Exposed for other modules that need a stable string hash (e.g. the RCLC-import uid, §6.19).
+function LCEX:HashString(s) return strHash(s) end
 
 -- {n, maxMod, h}. `h` is the content hash (DL-10): it distinguishes two stores with the same count
 -- and same newest-mod but DIFFERENT records (disjoint keys, or a stale LWW loss in the middle) —

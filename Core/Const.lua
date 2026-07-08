@@ -50,6 +50,7 @@ LCEX.STATUS = {
     TIMEOUT    = 91,
     NOADDON    = 92,
     DISENCHANT = 93, -- Feature V: a D/E award; renders "D/E" as the award reason (§6.10)
+    CUSTOM     = 94, -- reason lives in respText, not a response id (imports §6.19; custom awards §6.20)
 }
 
 -- Locale. AceLocale is intentionally not embedded; this is a plain table whose
@@ -258,6 +259,8 @@ L["JSON"]                                  = "JSON"
 L["Discord"]                               = "Discord"
 L["Close"]                                 = "Close"
 L["Import"]                                = "Import"
+L["Import RCLC CSV"]                        = "Import RCLC CSV"
+L["Imported %d record(s) (%d skipped)."]   = "Imported %d record(s) (%d skipped)."
 L["Response buttons — apply to the next session:"] =
     "Response buttons — apply to the next session:"
 L["Rename response \"%s\" to:"]             = "Rename response \"%s\" to:"
