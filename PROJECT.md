@@ -79,6 +79,7 @@ LootCouncilEX/
 │   ├── Access.lua             # Feature C: role + visibility predicates (AmCouncil / CanSee) — headless-tested
 │   ├── Minimap.lua            # LDB launcher: left=loot, right=council, ctrl=config
 │   ├── Display.lua            # pure display-array builders (headless-tested; UI renders them)
+│   ├── Export.lua            # Phase 15: pure CSV/JSON/Discord history exporters + RCLC CSV import parse
 │   ├── Usable.lua             # poll class filter: token lines + TBC proficiency matrix
 │   ├── GearIssues.lua         # Feature G: parse gear links → enchant/gem issue tags (pure, headless-tested)
 │   ├── TradeTimers.lua        # Phase 12 (DL-22): bag-scan tradeable loot → the trade-timer data layer
@@ -217,7 +218,7 @@ RESPONSES = {  -- BUILT-IN DEFAULTS (Const.lua); a guild may override via config
   [4]={id=4,key="GREED",text="Greed", color={0.70,0.70,0.70}},
   [5]={id=5,key="PASS", text="Pass",  color={0.60,0.20,0.20}},  -- built-in: always present + last
 }
-STATUS = { ANNOUNCED=90, TIMEOUT=91, NOADDON=92, DISENCHANT=93 }
+STATUS = { ANNOUNCED=90, TIMEOUT=91, NOADDON=92, DISENCHANT=93, CUSTOM=94 }  -- CUSTOM: reason is in respText
 MAX_RESPONSES = 8    -- editor cap; keeps ids well clear of the STATUS floor (90)
 ```
 `PASS` is a built-in response (a candidate must always be able to decline; timeouts resolve to a non-response). The rest are **defaults a guild may reconfigure** (DL-8, Phase 14).
@@ -579,6 +580,33 @@ the same row key (last write wins). No ACK on our sends — RCLC's own `reconnec
 retries heal a missed broadcast. No `PROTOCOL_VERSION` bump: the LCEX wire is unchanged; the RCLC
 dialect rides a separate prefix.
 
+### 6.19 Loot-history export + import (Phase 15, DL-25)
+
+Officers post loot logs to spreadsheets/Discord and migrate history from RCLootCouncil. Both are
+**local, viewer-side** — no comms, no wire change.
+
+**Export.** Pure builders in `Core/Export.lua` over `BuildHistoryLog(filter)` (Display.lua) so the
+export always matches the History module's current winner filter, newest-first. Three formats v1:
+`ExportCSV` (RFC-4180 quoting; header
+`winner,date,time,itemID,itemName,response,boss,instance,by,retracted`; item name from the link
+text; reason from `respText or ResponseText(resp)`, DL-8), `ExportJSON` (a hand-rolled Lua-5.1
+encoder for the flat record shape), `ExportDiscord` (`**[Item]** → Winner (*reason*) — Boss, MM/DD`;
+retracted lines struck through). BBCode/EQdkp are out of v1.
+
+**The widget.** `LCEX:ShowExportFrame(title, text)` in `UI/Widgets.lua` — one reused window with a
+plain `ScrollFrame` (`UIPanelScrollFrameTemplate`, TBC-safe) over a `SetMultiLine(true)` EditBox;
+on show it selects all (`HighlightText`) so ctrl-C copies the lot. The History module gets an
+**Export** button → a `ShowContextMenu` (CSV / JSON / Discord) honoring the active filter.
+
+**Import (RCLC CSV).** The same frame in a paste-in mode (Import button). Parses RCLootCouncil's
+CSV columns (player, date, time, item, itemID, response, …, instance, boss) into history records:
+`uid = "imp:"..<hash of the row>` (the DL-10 `pairHash`), `mod` = the row's own parsed epoch (so an
+old import never out-ranks a real recent award under LWW), `by = "import"`, `resp = STATUS.CUSTOM`
+with `respText` = RCLC's response text verbatim (no response-id mapping needed thanks to DL-8),
+winner normalized via `NormalizeName`. Records flow through `MergeRecord` + a digest re-advertise,
+so they replicate to council; re-importing the same CSV is idempotent (same uid). Malformed rows
+are skipped and counted.
+
 ---
 
 ## 7. Build map
@@ -656,6 +684,16 @@ and the loot window render the custom buttons, an RCLC raider gets them via MLdb
 already in flight keeps its original buttons, and a history record's reason still renders after
 the set changes. Headless covers the normalizer invariants + snapshot; selftest validates the
 live configured set is well-formed.
+
+**Phase 15 — Council toolkit parity.** Four independently-shippable sub-features closing the
+RCLootCouncil feature gaps found in the audit: **(a)** loot-history export (CSV/JSON/Discord) +
+RCLC CSV import (`Core/Export.lua`, §6.19, DL-25); **(b)** custom award reasons beyond D/E
+(`config.awardReasons`, `STATUS.CUSTOM`, §6.20, DL-26); **(c)** aggregate per-player loot stats
+surfaced in Roster + at vote time (§6.21, DL-27); **(d)** announcement customization — channel,
+placeholder message text, items-under-consideration (§6.22, DL-28). *Exit (per sub-feature):* an
+officer exports the log and pastes it into a spreadsheet / imports an RCLC CSV; a right-click
+"Award for Banking" reads correctly in chat and history; the council sees a candidate's award
+history on hover at vote time; a custom announce message posts to the chosen channel.
 
 ---
 
@@ -758,6 +796,14 @@ live configured set is well-formed.
   LCEX wire is untouched; the RCLC dialect is a separate prefix. Deferred: un-award + mid-session
   adds to RCLC clients (no RCLC message for either); no send-ACK (RCLC's own reconnect retry
   heals drops).
+- **DL-25 (accepted — Phase 15a, history export/import):** loot history exports to CSV / JSON /
+  Discord-markdown and imports from an RCLootCouncil CSV. Both are **local/viewer-side, no comms
+  change**: pure builders + parse in `Core/Export.lua` over `BuildHistoryLog(filter)`; a reused
+  multi-line copy/paste `ShowExportFrame`; the History module's Export button offers the formats
+  honoring its winner filter. Import maps RCLC rows to native records keyed `imp:<hash>` with the
+  row's own epoch as `mod` (never out-ranks real awards), `resp = STATUS.CUSTOM` + `respText` = the
+  RCLC response text verbatim (DL-8 makes id-mapping unnecessary), replicating via the normal
+  digest. BBCode/EQdkp export deferred. §6.19.
 
 ---
 

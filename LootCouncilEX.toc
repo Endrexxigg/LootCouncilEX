@@ -2,7 +2,7 @@
 ## Title: LootCouncil EX
 ## Notes: TBC-native loot council — broadcast, vote, award via trade.
 ## Author: Endrexxigg
-## Version: 0.59.2
+## Version: 0.60.0
 ## SavedVariables: LootCouncilEXDB
 ## X-Category: Raid
 
@@ -35,6 +35,8 @@ Core\Data\GearRules.lua
 
 # Pure display-array builders over the datasets (no frames) — the UI renders these.
 Core\Display.lua
+# Phase 15: pure loot-history exporters (CSV/JSON/Discord) + RCLC CSV import parse (no comms).
+Core\Export.lua
 # Class-usability filter for the poll (tier-token lines + armor/weapon proficiency).
 Core\Usable.lua
 # Gear-issue detector (Feature G): enchant/gem analysis over gearCache links.
