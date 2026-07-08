@@ -31,6 +31,34 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.56.0 – v0.56.3 — RCLC interop bridge (§6.18, DL-24)
+`/lcex selftest` covers the codec (real AceSerializer + LibDeflate round-trip, single-table +
+multi-arg) and the receive path robustness; the wire transforms + inbound cResp injection are
+headless-tested. What's left is genuinely cross-addon — a second client running **stock
+RCLootCouncil Classic v1.4.x** — so the harness can't reach it. **Config:** `/lcex config` →
+**RCLC compatibility** (default on).
+
+**Solo (this client):**
+- [ ] `/lcex selftest` after `/reload` shows the two new **comm** checks passing ("RCLC codec
+  round-trips", "RCLC receive path is robust"). If they **skip** with "LibDeflate not loaded",
+  the embed didn't load — tell me.
+
+**2-client (A = LCEX ML **and raid leader**, B = a stock RCLootCouncil Classic install):**
+- [ ] **Leader guard**: as A, start a session while **not** raid leader → you get the chat warning
+  that RCLC raiders won't see it. Become leader, start again → no warning.
+- [ ] **Frame pops with LCEX buttons**: A `/lcex start` a session → B's RCLootCouncil loot frame
+  opens showing the item(s) and the **BiS / Major / Minor / Greed** buttons (LCEX's set), plus
+  RCLC's own Pass. (If B's frame never appears, confirm A is raid leader and B is on RCLC ≥ 1.4.)
+- [ ] **Response lands in the LCEX table**: B clicks a button (and optionally types a note) → the
+  candidate appears in A's Loot Session table with that response, the note, and B's competing-gear
+  icons. B clicks **Pass** → shows as Pass.
+- [ ] **Award closes it**: A awards the item → B's frame advances/closes; if B held the item, their
+  RCLC TradeUI arms to trade it. A `/lcex end` → any leftover RCLC frame on B closes.
+- [ ] **Reconnect**: with a session live, B `/reload`s → B's loot frame comes back on its own
+  (RCLC auto-sends `reconnect`; A resends the loot table). Answers already given still stand on A.
+- [ ] **Toggle off**: A turns **RCLC compatibility** off and starts a session → B (RCLC) sees
+  nothing; an LCEX-equipped raider still does.
+
 ### v0.53.5 – v0.55.6 — Pre-raid window pass (opacity, resize, layout, alt-cache)
 `/lcex selftest` covers the mechanics (own-report loopback, bgOpacity lands on the surfaces only,
 the bare poll shell, the flat note-box skin, combat clearing edit focus, loot/poll grips exist,

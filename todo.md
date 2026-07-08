@@ -19,8 +19,12 @@ C introduces the guild-scoping + shared-config that **B depends on**; B is large
 
 ## Feature R — RCLC compatibility bridge (Phase 13)
 
-**Status:** **in progress** — specced (PROJECT.md §6.18, DL-24, Phase 13). Amends the §1 non-goal:
-RCLootCouncil-installed raiders are now in scope (the no-addon whisper fallback stays out).
+**Status:** **shipped v0.56.0–v0.56.3** (Phase 13) — codec + pure transforms, outbound (session
+start/award/end, request/reconnect answers, leader warning), inbound response/lootAck → native
+cResp injection, config toggle, selftests + headless tests. **Pending 2-client in-game validation**
+against a stock RCLootCouncil Classic client (`docs/TESTING.md` ▶ Test next). Specced in PROJECT.md
+§6.18, DL-24, Phase 13; amends the §1 non-goal (RCLC-installed raiders now in scope; the no-addon
+whisper fallback stays out).
 
 **The ask (user's words):** "have LCEX interface with RCLC directly, in the event that a raider
 (or an entire raid) has rclc installed but the master looter has LCEX, everyone can still
