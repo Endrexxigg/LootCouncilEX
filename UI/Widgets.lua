@@ -362,6 +362,36 @@ function LCEX:CreatePixelScrollList(parent, opts)
 end
 
 -- ── Edit box ─────────────────────────────────────────────────────────────────
+-- Focus hygiene for every flat edit box: mid-raid, a note box silently holding keyboard focus
+-- eats movement keys. Focus drops the moment combat starts, and on any mouse press that lands
+-- outside the focused box's own window (its top-level ancestor). A RAW frame handles the combat
+-- event — LCEX's AceEvent PLAYER_REGEN_DISABLED registration belongs to SelfReport and must not
+-- be replaced. The OnUpdate press edge-detector only runs while a box is focused.
+local focusWatcher = CreateFrame("Frame")
+focusWatcher:Hide()
+focusWatcher:RegisterEvent("PLAYER_REGEN_DISABLED")
+focusWatcher:SetScript("OnEvent", function()
+    if LCEX._focusedEdit then LCEX._focusedEdit:ClearFocus() end
+end)
+focusWatcher:SetScript("OnUpdate", function(w)
+    local eb = LCEX._focusedEdit
+    if not eb then w:Hide(); return end
+    local down = IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+    if down and not w._mouseWasDown then
+        local root = eb._focusRoot
+        if not (root and root:IsMouseOver()) then eb:ClearFocus() end
+    end
+    w._mouseWasDown = down
+end)
+LCEX._editFocusWatcher = focusWatcher -- exposed so the selftest can drive the combat path
+
+-- The box's top-level ancestor (the window it lives in): clicks inside it keep focus.
+local function FocusRoot(f)
+    local node, parent = f, f:GetParent()
+    while parent and parent ~= UIParent do node = parent; parent = node:GetParent() end
+    return node
+end
+
 -- A single-line input (generalizes LootFrame's note box), flat-themed to match the button
 -- grammar — NOT InputBoxTemplate (whose stock art clashes with the theme and overhangs its
 -- frame, which is why LAYOUT.editPad existed): a recessed `base` fill + 1px hairline that
@@ -386,9 +416,19 @@ function LCEX:CreateEditBox(parent, opts)
             local a = LCEX.Theme.accent
             self2:SetBackdropBorderColor(a[1], a[2], a[3], 0.7)
         end
+        -- Arm the focus watcher: remember the box + its window, and seed the press edge-detector
+        -- with the current button state (the click that focused us is still down — skip it).
+        self2._focusRoot = self2._focusRoot or FocusRoot(self2)
+        LCEX._focusedEdit = self2
+        focusWatcher._mouseWasDown = IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+        focusWatcher:Show()
     end)
     eb:SetScript("OnEditFocusLost", function(self2)
         if self2.SetBackdropBorderColor then self2:SetBackdropBorderColor(1, 1, 1, 0.10) end
+        if LCEX._focusedEdit == self2 then
+            LCEX._focusedEdit = nil
+            focusWatcher:Hide()
+        end
     end)
     eb:SetScript("OnEscapePressed", function(self2) self2:ClearFocus() end)
     eb:SetScript("OnEnterPressed", function(self2)

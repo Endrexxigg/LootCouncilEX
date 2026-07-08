@@ -380,9 +380,9 @@ surfaces so the panels can sit over the raid UI while text/buttons/icons stay cr
 shell is **bare** (`CreateWindowV2 { bare }`): the window paints no surface/border and takes no
 mouse — mid-fight it reads as a slim header strip + timer bar + floating item cards, clicks in the
 margins fall through to the raid UI, and the "+N more" overflow line floats success-green with an
-outline instead of sitting on a panel. The stack is tight: header/timer/cards share the header's
-edge lines (INSET = edge) on a 4px vertical rhythm (8px between cards), and the header tick, card
-icons, note boxes and "+N more" all sit on one column line.
+outline instead of sitting on a panel. The stack is tight: header/timer/cards sit flush with the
+window rect (no side margins — INSET 0 + chromeInset 0) on a 4px vertical rhythm (8px between
+cards), and the header tick, card icons, note boxes and "+N more" all sit on one column line.
 
 **Mini session pill (item 5).** `UI/MiniFrame.lua`: a small draggable pill (min 220×26, **grows to
 fit its text** up to 360 so the status never clips — a minimized frame isn't user-resizable; HIGH
@@ -641,7 +641,9 @@ auto-rejoins on the next heartbeat; trade timers track a real BoP drop end-to-en
   row-striping logic" rule. Extended (pre-raid pass): `CreateEditBox` dropped `InputBoxTemplate`
   for a flat themed input (base fill, hairline border, accent focus ring) — every text input
   addon-wide reskins at once — and `LAYOUT.editPad` collapsed to 0 (the flat frame edge IS the
-  content line; call sites keep their `+ editPad` algebra).
+  content line; call sites keep their `+ editPad` algebra). Focus hygiene rides the same widget:
+  a raw-event watcher in Widgets.lua clears edit focus when combat starts or a mouse press lands
+  outside the focused box's own window, so a note box can never silently eat movement keys.
 
 ---
 

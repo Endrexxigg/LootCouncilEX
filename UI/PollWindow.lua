@@ -27,7 +27,7 @@ local GetItemInfoInstant = _G.GetItemInfoInstant or (C_Item and C_Item.GetItemIn
 
 local FRAME_NAME = "LCEX_PollWindow"
 local MAX_CARDS  = 3
-local INSET      = LAY.edge     -- left/right content inset: cards/timer align to the header's edges
+local INSET      = 0            -- NO side margins: header/timer/cards are flush with the window rect
 local VGAP       = LAY.gapTight -- the tight vertical rhythm: header → timer → cards → "+N more"
 local CARD_GAP   = LAY.gap      -- between stacked cards — a hair wider so cards read as units
 local CARD_W     = 380
@@ -36,7 +36,8 @@ local ICON_SZ    = 40 -- item icon; its 40px height spans the name row + the res
                       -- so the icon bottom meets the button-row bottom (aligned, item 3)
 local HEADER_H   = 20 -- slim header strip: the poll shell is BARE (chromeless), so the header is
                       -- deliberately small — just a drag handle with the title + close
-local TITLE_H    = LAY.edge + HEADER_H -- the header's bottom edge — content stacks below
+local TITLE_H    = HEADER_H -- the header's bottom edge (chromeInset 0: the bar sits at the very
+                            -- top, flush with the window rect) — content stacks below
 local TIMER_H    = 12   -- deadline depleting bar (present only when a deadline is armed)
 local MORE_H     = 16   -- "+N more" line under the last card (only when the queue overflows)
 
@@ -70,7 +71,8 @@ function LCEX:EnsurePoll()
         defaultPos = { x = 0, y = 220 },
         -- Bare shell: no window backdrop/border and no mouse on the margins — mid-fight the poll
         -- reads as floating item cards + a slim header, not a big panel over the raid UI.
-        bare = true, titleH = HEADER_H, titleSizeKey = "caption",
+        -- chromeInset 0 pins the header flush with the window rect, matching INSET = 0 content.
+        bare = true, titleH = HEADER_H, titleSizeKey = "caption", chromeInset = 0,
         useBgOpacity = true, -- profile.appearance.bgOpacity: header/timer/cards translucent, content crisp
         -- Width-only resize (height stays content-computed, like the trade-timer window): the
         -- cards/name/note gain room so a wide item name reads without truncation; buttons keep

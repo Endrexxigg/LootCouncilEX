@@ -31,11 +31,16 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
-### v0.53.5 – v0.55.5 — Pre-raid window pass (opacity, resize, layout, alt-cache)
+### v0.53.5 – v0.55.6 — Pre-raid window pass (opacity, resize, layout, alt-cache)
 `/lcex selftest` covers the mechanics (own-report loopback, bgOpacity lands on the surfaces only,
-the bare poll shell, the flat note-box skin, loot/poll grips exist, pill not truncated); these are
-the genuinely-visual / cross-character checks.
+the bare poll shell, the flat note-box skin, combat clearing edit focus, loot/poll grips exist,
+pill not truncated); these are the genuinely-visual / cross-character checks.
 
+- [ ] **Flush margins + focus hygiene (v0.55.6)**: the poll's header/timer/cards now sit **flush**
+  with each other (zero side margins). Click into a note box, then click the world / a raid frame /
+  any other window — the box **releases the keyboard** (border drops back from gold); entering
+  combat while typing releases it too, so movement keys never get eaten mid-pull. Clicks *inside*
+  the poll (buttons, header, another card) keep focus.
 - [ ] **Loot Drop tightened + flat inputs (v0.55.5)**: the dead space is gone — header, timer bar
   and cards stack on a 4px rhythm (8px between cards) and all share the same left/right edges; the
   header's gold tick, the card icons, the note boxes and the "+ N more" line sit on **one vertical

@@ -720,6 +720,25 @@ end, { cleanup = function(self)
     prevBgOpacity = nil
 end })
 
+-- Focus hygiene (flat edit boxes): a focused input must release the keyboard when combat starts
+-- (the click-away path needs a live mouse, so only the combat event is driven here).
+LCEX:RegisterSelfTest("ui", "edit box drops focus when combat starts", function(self, t)
+    local lw = self:EnsureLootWindow()
+    local eb = lw.addBox
+    if not t:Ok(eb ~= nil, "no edit box available") then return end
+    eb:SetFocus()
+    t:Ok(self._focusedEdit == eb, "focus gained did not arm the watcher")
+    t:Ok(eb._focusRoot == lw, "focus root should be the owning window")
+    local w = self._editFocusWatcher
+    if t:Ok(w ~= nil, "focus watcher frame missing") then
+        w:GetScript("OnEvent")(w, "PLAYER_REGEN_DISABLED")
+    end
+    t:Ok(not (eb.HasFocus and eb:HasFocus()), "combat start must clear edit focus")
+    t:Ok(self._focusedEdit == nil, "watcher not disarmed after focus loss")
+end, { cleanup = function(self)
+    if self._focusedEdit then self._focusedEdit:ClearFocus() end
+end })
+
 LCEX:RegisterSelfTest("ui", "loot + poll windows carry a user resize grip", function(self, t)
     local loot, poll = self:EnsureLootWindow(), self:EnsurePoll()
     t:Ok(loot.resizeGrip ~= nil, "loot window has a resize grip")
