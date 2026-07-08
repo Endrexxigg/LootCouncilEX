@@ -831,7 +831,13 @@ end)
 
 -- ── Static data accessors (Phase 6) ──────────────────────────────────────────
 test("DataAPI: loot accessors", function()
-    eq(table.concat(L:GetLootPhases(), ","), "P1,P2", "P1 + P2 have data, in PHASES order")
+    eq(table.concat(L:GetLootPhases(), ","), "P1,P2,P3", "P1–P3 have data, in PHASES order")
+    -- P3 (Phase 16 AtlasLoot import): Hyjal Summit kill order + a Black Temple boss.
+    eq(table.concat(L:GetRaidsForPhase("P3"), "|"), "Black Temple|Hyjal Summit", "P3 raids alphabetical")
+    eq(L:GetBossesForRaid("P3", "Hyjal Summit")[1], "Rage Winterchill", "Hyjal starts at Rage Winterchill")
+    eq(#L:GetBossesForRaid("P3", "Hyjal Summit"), 5, "Hyjal = 5 bosses")
+    eq(#L:GetBossesForRaid("P3", "Black Temple"), 9, "Black Temple = 9 bosses")
+    ok(#L:GetItemsForBoss("P3", "Hyjal Summit", "Archimonde") > 0, "Archimonde drops parsed")
     eq(table.concat(L:GetRaidsForPhase("P1"), "|"),
         "Gruul's Lair|Karazhan|Magtheridon's Lair|World Bosses", "P1 raids alphabetical")
     eq(L:GetBossesForRaid("P1", "Karazhan")[1], "Attumen the Huntsman", "Kara kill order starts at Attumen")
