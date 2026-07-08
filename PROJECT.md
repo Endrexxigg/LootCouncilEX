@@ -292,6 +292,7 @@ config[guildKey] = {
                                      --   ResponseSet() derives ids/keys/colors via the normalizer. Absent ⇒ built-ins.
   anonVoting    = false,             -- hide who-voted (V7)                                                          [V]
   disenchanters = { name, ... },     -- ordered; top = highest rank (V5)                                             [V]
+  awardReasons  = { "Banking", ... },-- quick-pick custom award reasons (DL-26); reason = its text                   [15b]
   visibility    = { gbankLog=false, gbankNotes=false, lootWindow=false, ... },  -- per-guild view rules (B5, C7)     [C/B]
   mod, by,
 }
@@ -607,6 +608,19 @@ winner normalized via `NormalizeName`. Records flow through `MergeRecord` + a di
 so they replicate to council; re-importing the same CSV is idempotent (same uid). Malformed rows
 are skipped and counted.
 
+### 6.20 Custom award reasons (Phase 15, DL-26)
+
+Beyond the single D/E path, the ML can award "for" an arbitrary reason (Banking, Free, a one-off).
+**No numeric ids for reasons** — a reason is just its TEXT: an award carries `resp = STATUS.CUSTOM`
++ the `respText` field (§6.1, DL-8), so codes never collide and two guilds/edits can't clash. The
+common labels live in the shared config as `config.awardReasons` (a plain string array; DEFAULT
+`{"Banking","Free"}`, replicated LWW, editable in Session Config). **Trigger:** right-click a
+candidate's **Award** button → a `ShowContextMenu` of the configured reasons plus a **Custom…**
+free-form entry (`ShowConfirm` input) → confirm → `AwardGroup(leader, name, STATUS.CUSTOM, reason)`.
+Left-click is the normal award, unchanged. History + announcement render the reason via `respText`.
+An un-upgraded client shows the raw `94` for such awards (accepted, same-version fleet, DL-20
+precedent). No per-reason "record in history?" flag — the retract path (§6.15) is the correction.
+
 ---
 
 ## 7. Build map
@@ -804,6 +818,13 @@ history on hover at vote time; a custom announce message posts to the chosen cha
   row's own epoch as `mod` (never out-ranks real awards), `resp = STATUS.CUSTOM` + `respText` = the
   RCLC response text verbatim (DL-8 makes id-mapping unnecessary), replicating via the normal
   digest. BBCode/EQdkp export deferred. §6.19.
+- **DL-26 (accepted — Phase 15b, custom award reasons):** the ML can award "for" an arbitrary
+  reason beyond D/E. A reason is TEXT, never an id: an award carries `resp = STATUS.CUSTOM` +
+  `respText` (§6.1). Quick-pick labels live in `config.awardReasons` (default `{Banking, Free}`,
+  replicated, editable in Session Config) + a free-form **Custom…** entry. Right-click the Award
+  button → reason menu → confirm → `AwardGroup(..., STATUS.CUSTOM, reason)`. History/announce
+  render via `respText`; old clients show the raw `94` (accepted). No per-reason log-suppress flag.
+  §6.20.
 
 ---
 
