@@ -1418,6 +1418,26 @@ test("AwardItem forcedResp tags a D/E award (reason renders D/E)", function()
     L:EndSession()
 end)
 
+test("AwardItem custom reason: resp=CUSTOM + verbatim respText (DL-26)", function()
+    H.inRaid, H.group = true, { "Amy", "Tester" }
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 1 }
+    L.sessionItems = { { link = "item:100", itemID = 100, quality = 4,
+        roster = { { name = "Amy", class = "MAGE" } } } }
+    L:StartSession({ { link = "item:100", quality = 4 } })
+    ok(L:AwardGroup(1, "Amy", L.STATUS.CUSTOM, "Banking"), "custom-reason award recorded")
+    local uid = L.session.sid .. ":1"
+    local rec = L.db.global.history[uid]
+    eq(rec.resp, L.STATUS.CUSTOM, "history resp = CUSTOM")
+    eq(rec.respText, "Banking", "history carries the verbatim reason text")
+    eq(L:HistoryReasonText(rec), "Banking", "renders via respText")
+    local awardMsg
+    for _, s in ipairs(H.sent) do if s.msg.cmd == "award" then awardMsg = s.msg end end
+    ok(awardMsg and awardMsg.resp == L.STATUS.CUSTOM and awardMsg.respText == "Banking",
+        "award msg carries CUSTOM + respText")
+    ok(L.STATUS.CUSTOM > #L:ResponseSet(), "CUSTOM clears the response id range")
+    L:EndSession()
+end)
+
 -- ── Duplicate grouping (§6.14, DL-19) ────────────────────────────────────────
 test("Duplicate grouping: shared responses + per-copy awards", function()
     H.inRaid, H.group = true, { "Amy", "Bob", "Tester" }

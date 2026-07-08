@@ -24,6 +24,7 @@ LCEX:RegisterDataset("config", "lww", function() return LCEX.db.global.config en
 -- (C7 — raiders see just the poll + award chat), and the guild-bank LOG + annotations are council-only
 -- (B5 — raiders still see the bank's contents + gold). Each is a per-guild opt-in.
 local DEFAULTS = { anonVoting = false, disenchanters = {}, announceAwards = true,
+                   awardReasons = { "Banking", "Free" }, -- quick-pick custom award reasons (DL-26)
                    visibility = { lootWindow = false, gbankLog = false } }
 
 -- Record key for the current guild's config, or a local sentinel when guildless (solo testing).

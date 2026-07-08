@@ -328,7 +328,7 @@ end
 -- opening a trade with them auto-loads the item), broadcast `award`, and arm the 2h ticker.
 -- Shared by the /lcex award command and the VotingFrame's Award button. Returns true on
 -- success. The award carries the winner's own response where we have it (else ANNOUNCED).
-function LCEX:AwardItem(itemIndex, name, forcedResp)
+function LCEX:AwardItem(itemIndex, name, forcedResp, reasonText)
     name = strtrim(name or "")
     local entry = self.sessionItems and self.sessionItems[itemIndex]
     if not entry then
@@ -375,9 +375,10 @@ function LCEX:AwardItem(itemIndex, name, forcedResp)
     self:EnsureTradeTicker()
     self:SaveOwedTrades() -- persist the new debt immediately (DL-6)
 
-    -- Resolve the reason TEXT once against the session's own response set (DL-8) and carry it on the
-    -- award + history record, so the reason renders correctly even after the guild changes its set.
-    local respText = self:AwardReasonText(resp)
+    -- Resolve the reason TEXT once and carry it on the award + history record, so the reason renders
+    -- correctly even after the guild changes its set. A custom award (STATUS.CUSTOM, §6.20) carries
+    -- its explicit reason text; otherwise resolve against the session's own response set (DL-8).
+    local respText = reasonText or self:AwardReasonText(resp)
     -- Strictly-increasing per-uid ts so a re-award after a same-second retraction still wins (§6.15).
     local ts = self:NextHistoryTs(uid)
     local channel = self:GroupChannel()
@@ -436,13 +437,13 @@ end
 
 -- Award `name` the next available copy of a group (§6.14). The UI awards through this so a
 -- duplicate stack hands out distinct physical indices (uid = sid:physIdx) across copies.
-function LCEX:AwardGroup(leader, name, forcedResp)
+function LCEX:AwardGroup(leader, name, forcedResp, reasonText)
     local idx = self:NextAwardableIndex(leader)
     if not idx then
         self:Msg(self.L["Every copy of that item is already awarded."])
         return false
     end
-    return self:AwardItem(idx, name, forcedResp)
+    return self:AwardItem(idx, name, forcedResp, reasonText)
 end
 
 -- A history timestamp for `uid` strictly greater than any record already stored under it, so a
