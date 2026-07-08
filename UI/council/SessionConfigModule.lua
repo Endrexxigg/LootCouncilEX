@@ -194,9 +194,12 @@ LCEX:RegisterCouncilModule({
                 row.fs = row:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.fs, "body", "ink")
                 row.fs:SetPoint("LEFT", LAY.rowPad, 0)
+                -- Pin the × to the row's RIGHT edge first, then right-bind the name to it so a long
+                -- extra-member name truncates instead of shoving the × off the row (mirrors the
+                -- disenchanter row above; the v0.52.3 layout follow-up).
                 row.remove = CreateFrame("Button", nil, row)
                 row.remove:SetSize(16, 16)
-                row.remove:SetPoint("LEFT", row.fs, "RIGHT", LAY.inlineGap, 0)
+                row.remove:SetPoint("RIGHT", -LAY.gapTight, 0)
                 row.remove.fs = row.remove:CreateFontString(nil, "OVERLAY")
                 LCEX:ThemeText(row.remove.fs, "body", "faint")
                 row.remove.fs:SetPoint("CENTER", 0, 0)
@@ -205,6 +208,8 @@ LCEX:RegisterCouncilModule({
                     LCEX:CmdCouncil("remove " .. (row.playerKey or ""))
                     RefreshRoster(panel)
                 end)
+                row.fs:SetPoint("RIGHT", row.remove, "LEFT", -LAY.inlineGap, 0)
+                row.fs:SetJustifyH("LEFT"); row.fs:SetWordWrap(false)
                 return row
             end,
             fillRow = function(row, name)
