@@ -31,6 +31,20 @@
 ## ▶ Test next  (newest first)
 Changed since the last in-game pass — verify on your next `/reload`, then tell me which passed.
 
+### v0.63.0 – v0.63.2 — Announcement customization (§6.22, DL-28)
+Headless covers the channel matrix / template / items post; selftest covers the controls render. Manual:
+
+- [ ] **Channel**: Session Config (top-right) → **Announce channel** button cycles
+  auto → RAID → PARTY → GUILD → NONE. Award something → it posts to the chosen channel; **NONE** →
+  only your own chat frame gets it.
+- [ ] **Custom message**: set **Custom award message** to e.g. `&p won &i (&r)!` → an award posts
+  that with the placeholders filled. Clear it → the built-in "X was awarded to Y for Z" returns.
+  Setting the channel to NONE greys/hides the message box + items toggle.
+- [ ] **Items at start**: enable **Announce items at session start** → starting a session posts
+  "Items under consideration:" + one line per item.
+- [ ] *(Density note — flag if wrong)*: the Session Config right column now stacks announce +
+  disenchanters + responses; on a **short** council window the lists may be tight — grow it if so.
+
 ### v0.62.0 – v0.62.1 — Aggregate loot stats at vote time (§6.21, DL-27)
 Headless + selftest cover the builder. Manual:
 

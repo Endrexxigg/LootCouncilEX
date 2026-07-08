@@ -60,6 +60,23 @@ local function GlyphButton(parent, glyph)
     return b
 end
 
+-- ── Announcement customization (DL-28) ───────────────────────────────────────
+local ANNOUNCE_CHANNELS = { "auto", "RAID", "PARTY", "GUILD", "NONE" }
+local function RefreshAnnounce(panel)
+    local cfg = LCEX:GetConfig()
+    local chan = cfg.announceChannel or "auto"
+    panel.announceChan:SetText(string.format(LCEX.L["Announce channel: %s"], chan))
+    local off = (chan == "NONE") -- NONE ⇒ no announce, so the message + items controls are moot (Cd3)
+    panel.announceItems:SetFlatEnabled(not off)
+    panel.announceItems:Refresh()
+    if off then
+        panel.awardTextLabel:Hide(); panel.awardTextBox:Hide()
+    else
+        panel.awardTextLabel:Show(); panel.awardTextBox:Show()
+        panel.awardTextBox:SetText(cfg.awardText or "")
+    end
+end
+
 -- ── Custom award reasons (DL-26; quick-pick, right-click the Award button) ───
 local function RefreshAwardReasons(panel)
     panel.reasonList:SetData(LCEX:GetConfig().awardReasons or {})
@@ -137,11 +154,38 @@ LCEX:RegisterCouncilModule({
             function(v) LCEX:SetConfigField("anonVoting", v) end)
         panel.anon:SetPoint("TOPLEFT", COL2, -16) -- column tops align with the deadline slider
 
+        -- Announcement customization (DL-28): channel cycler + items toggle + a custom message
+        -- template. The message box + items toggle grey/hide when the channel is NONE (Cd3).
+        panel.announceChan = LCEX:CreateFlatButton(panel, "", 150, LAY.btnH)
+        panel.announceChan:SetPoint("TOPLEFT", COL2, -42)
+        panel.announceChan:SetScript("OnClick", function()
+            local cur = LCEX:GetConfig().announceChannel or "auto"
+            local idx = 1
+            for i, c in ipairs(ANNOUNCE_CHANNELS) do if c == cur then idx = i; break end end
+            LCEX:SetConfigField("announceChannel", ANNOUNCE_CHANNELS[(idx % #ANNOUNCE_CHANNELS) + 1])
+            RefreshAnnounce(panel)
+        end)
+
+        panel.announceItems = LCEX:CreateCheckbox(panel, LCEX.L["Announce items at session start"],
+            function() return LCEX:GetConfig().announceItems end,
+            function(v) LCEX:SetConfigField("announceItems", v) end)
+        panel.announceItems:SetPoint("TOPLEFT", COL2, -70)
+
+        panel.awardTextLabel = panel:CreateFontString(nil, "OVERLAY")
+        LCEX:ThemeText(panel.awardTextLabel, "caption", "dim")
+        panel.awardTextLabel:SetPoint("TOPLEFT", COL2, -94)
+        panel.awardTextLabel:SetText(LCEX.L["Custom award message (&p &i &r):"])
+        panel.awardTextBox = LCEX:CreateEditBox(panel, {
+            width = 200,
+            onCommit = function(text) LCEX:SetConfigField("awardText", strtrim(text or "")) end,
+        })
+        panel.awardTextBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -112)
+
         -- Preferred disenchanters (V5) — a ranked SHARED-config list (top = highest priority; the
         -- highest present is auto-picked for a D/E award). Add by name; ▲/▼ reorder; × removes.
         panel.deLabel = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.deLabel, "caption", "dim")
-        panel.deLabel:SetPoint("TOPLEFT", COL2, -56)
+        panel.deLabel:SetPoint("TOPLEFT", COL2, -140)
         panel.deLabel:SetText(LCEX.L["Disenchanters (D/E), ranked:"])
 
         panel.deAddBox = LCEX:CreateEditBox(panel, {
@@ -158,7 +202,7 @@ LCEX:RegisterCouncilModule({
                 panel.deAddBox:SetText("")
             end,
         })
-        panel.deAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -74)
+        panel.deAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -158)
 
         panel.deList = LCEX:CreateScrollList(panel, {
             rowHeight = 20, fillHeight = true, zebra = true,
@@ -186,8 +230,8 @@ LCEX:RegisterCouncilModule({
                 end)
             end,
         })
-        panel.deList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -100) -- bleed: row text back on COL2
-        panel.deList:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -LAY.bleed, -204)
+        panel.deList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -184) -- bleed: row text back on COL2
+        panel.deList:SetPoint("BOTTOMRIGHT", panel, "TOPRIGHT", -LAY.bleed, -276) -- fixed ~92px
 
         -- Council roster (Feature C: the officer-authored SHARED config, replicated — CouncilConfig
         -- reads it, SetCouncilConfig writes+broadcasts it; profile.council is the pre-config default).
@@ -353,7 +397,7 @@ LCEX:RegisterCouncilModule({
         -- session keeps its snapshot, §6.5), which the label states.
         panel.respLabel = panel:CreateFontString(nil, "OVERLAY")
         LCEX:ThemeText(panel.respLabel, "caption", "dim")
-        panel.respLabel:SetPoint("TOPLEFT", COL2, -212)
+        panel.respLabel:SetPoint("TOPLEFT", COL2, -288)
         panel.respLabel:SetText(LCEX.L["Response buttons — apply to the next session:"])
 
         panel.respAddBox = LCEX:CreateEditBox(panel, {
@@ -374,7 +418,7 @@ LCEX:RegisterCouncilModule({
                 panel.respAddBox:SetText("")
             end,
         })
-        panel.respAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -230)
+        panel.respAddBox:SetPoint("TOPLEFT", COL2 + LAY.editPad, -306)
 
         panel.respList = LCEX:CreateScrollList(panel, {
             rowHeight = 20, fillHeight = true, zebra = true,
@@ -437,7 +481,7 @@ LCEX:RegisterCouncilModule({
                 end)
             end,
         })
-        panel.respList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -256)
+        panel.respList:SetPoint("TOPLEFT", COL2 - LAY.rowPad, -332)
         panel.respList:SetPoint("BOTTOMRIGHT", -LAY.bleed, 64)
     end,
 
@@ -452,5 +496,6 @@ LCEX:RegisterCouncilModule({
         RefreshDisenchanters(panel)
         RefreshResponses(panel)
         RefreshAwardReasons(panel)
+        RefreshAnnounce(panel)
     end,
 })

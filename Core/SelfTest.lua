@@ -945,6 +945,9 @@ LCEX:RegisterSelfTest("ui", "history + session-config modules render", function(
             t:Ok(type(sp.reasonList.items) == "table"
                 and #sp.reasonList.items == #(self:GetConfig().awardReasons or {}),
                 "award-reasons rows mismatch config")
+            -- DL-28 announce controls.
+            t:Ok(sp.announceChan ~= nil and sp.announceItems ~= nil and sp.awardTextBox ~= nil,
+                "announce controls missing")
         end
     else
         t:Ok(f.panels.sessioncfg == nil, "non-council: Session Config correctly hidden from the rail")
