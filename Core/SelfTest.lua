@@ -1318,6 +1318,18 @@ LCEX:RegisterSelfTest("comm", "RCLC codec round-trips (AceSerializer + LibDeflat
     t:Ok((self:RCLCDecode("!!!not-a-valid-blob!!!")) == nil, "garbage decodes to nil, not an error")
 end)
 
+-- The RCLC receive path end-to-end (real decode + dispatch routing + per-handler pcall isolation).
+-- No open session, so the response handler gates itself out — we're proving the wiring never
+-- errors on valid, garbage, self-echo, or wrong-prefix input (untrusted network).
+LCEX:RegisterSelfTest("comm", "RCLC receive path is robust", function(self, t)
+    if not self:RCLCReady() then return t:Skip("LibDeflate not loaded — RCLC bridge inert") end
+    local wire = self:RCLCEncode("response", 1, { response = 1, note = "" })
+    t:Ok(pcall(self.OnRCLCReceived, self, "RCLC", wire, "RAID", "Rclcprobe"), "valid message errored the receive path")
+    t:Ok(pcall(self.OnRCLCReceived, self, "RCLC", "not-a-real-blob", "RAID", "Rclcprobe"), "garbage errored the receive path")
+    t:Ok(pcall(self.OnRCLCReceived, self, "RCLC", wire, "RAID", UnitName("player")), "self-echo errored the receive path")
+    t:Ok(pcall(self.OnRCLCReceived, self, "LCEX", wire, "RAID", "Rclcprobe"), "wrong prefix errored the receive path")
+end)
+
 LCEX:RegisterSelfTest("comm", "live wire loopback (GUILD echo)", function(self, t)
     if not IsInGuild() then return t:Skip("not in a guild — no addon channel to echo over") end
     local nonce = UnitName("player") .. ":" .. tostring(GetTime())

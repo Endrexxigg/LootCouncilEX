@@ -78,8 +78,10 @@ function LCEX:BridgeAward(itemIndex, winner)
     self:RCLCBroadcast("awarded", itemIndex, winner, UnitName("player"))
 end
 
--- Session ended: close any still-open RCLC loot frames.
+-- Session ended: close any still-open RCLC loot frames. Drop the lootAck gear cache always (even
+-- if the bridge is off now) so it never leaks across sessions.
 function LCEX:BridgeSessionEnd()
+    self._rclcGear = nil
     if not self:RCLCActive() then return end
     self:RCLCBroadcast("session_end")
 end
@@ -134,4 +136,58 @@ LCEX.rclcDispatch.reconnect = function(self, _, sender)
     self:RCLCWhisper(sender, "council", self:RCLCCouncilSet())
     self:RCLCWhisper(sender, "lootTable",
         self:RCLC_BuildLootTable(self.session.items, UnitName("player"), self.sessionItems))
+end
+
+-- ── Inbound candidate responses → the native session table ───────────────────
+-- Turn one RCLC response into a native row by calling the SAME entry point the ML uses for its
+-- own poll answer (dispatch.cResp): rows, cUpdate fan-out, readiness and awards then need no
+-- RCLC-specific code. `ses` is the RCLC session == the LCEX item index; an unmappable response
+-- (TIMEOUT/DISABLED/…) leaves the row untouched. Competing-gear links come from the response
+-- itself, else the candidate's cached lootAck gear for that item.
+function LCEX:RCLCIngestResponse(ses, sender, rclcResp, note, gear1, gear2)
+    local s = self.session
+    if not s or type(ses) ~= "number" or not s.items[ses] then return end
+    local respId = self:RCLC_MapResponse(rclcResp, self:ResponseSet())
+    if not respId then return end
+    local gear
+    if gear1 or gear2 then
+        gear = self:RCLC_GearLinks(gear1, gear2)
+    else
+        local cached = self._rclcGear and self._rclcGear[self:NormalizeName(sender)]
+        if cached then
+            gear = self:RCLC_GearLinks(cached.gear1 and cached.gear1[ses],
+                                       cached.gear2 and cached.gear2[ses])
+        end
+    end
+    self.dispatch.cResp(self, { sid = s.sid, item = ses, resp = respId, note = note or "", gear = gear },
+        sender)
+end
+
+-- RCLC `response {session, {response, note, gear1, gear2, …}}` — a candidate picked a button (or
+-- passed). `response` is a 1-based numbered-button index, or "PASS". Gated on an open session +
+-- real group member (dispatch.cResp re-checks group membership too).
+LCEX.rclcDispatch.response = function(self, args, sender)
+    if not self.session or not self:InGroupWith(sender) then return end
+    local ses, tbl = args[1], args[2]
+    if type(tbl) ~= "table" then return end
+    self:RCLCIngestResponse(ses, sender, tbl.response, tbl.note, tbl.gear1, tbl.gear2)
+end
+
+-- RCLC `lootAck {specID, ilvl, sessionData}` — sent once when the candidate first sees the loot;
+-- carries per-session equipped gear (so a later gear-less `response` can still show icons) and
+-- flags auto-passed items. Cache the gear tables per player; record any autopass as a PASS.
+LCEX.rclcDispatch.lootAck = function(self, args, sender)
+    if not self.session or not self:InGroupWith(sender) then return end
+    local sessionData = args[3]
+    if type(sessionData) ~= "table" then return end
+    local key = self:NormalizeName(sender)
+    if key then
+        self._rclcGear = self._rclcGear or {}
+        self._rclcGear[key] = { gear1 = sessionData.gear1, gear2 = sessionData.gear2 }
+    end
+    if type(sessionData.response) == "table" then
+        for ses, autopass in pairs(sessionData.response) do
+            if autopass == true then self:RCLCIngestResponse(ses, sender, true, nil) end
+        end
+    end
 end

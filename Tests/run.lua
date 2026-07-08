@@ -1576,6 +1576,61 @@ test("RCLCWire: LibDeflate round-trips a channel-encoded blob (vendored, Lua 5.1
     eq(ld:DecompressDeflate(ld:DecodeForWoWAddonChannel(enc)), blob, "round-trip restores bytes")
 end)
 
+-- ── RCLC interop bridge — inbound RCLC responses feed the native table ───────
+-- Open a session with an RCLC-only raider ("Rcguy") in the group, then drive the RCLC dispatch
+-- directly (the decode path is a selftest; here we test the translation → native cResp injection).
+local function rclcSession()
+    H.inRaid, H.group = true, { "Rcguy", "Tester" }
+    H.instant = { 100, "t", "st", "INVTYPE_CHEST", 135, 4, 1 } -- cloth chest
+    L.sessionItems = { { link = "item:100",
+        roster = { { name = "Rcguy", class = "WARRIOR" }, { name = "Tester", class = "MAGE" } } } }
+    L:StartSession({ { link = "item:100", quality = 4 } })
+end
+
+test("RCLC inbound: a response becomes a native row via cResp", function()
+    rclcSession()
+    L.rclcDispatch.response(L, { 1, { response = 1, note = "need it", gear1 = "555:0:0" } }, "Rcguy")
+    local row = L.session.rows[1] and L.session.rows[1]["rcguy"]
+    ok(row ~= nil, "row created for the RCLC responder")
+    eq(row and row.resp, 1, "button 1 -> BiS id")
+    eq(row and row.reason, nil, "reason cleared on response")
+    eq(row and row.note, "need it", "note carried")
+    eq(row and row.name, "Rcguy", "name preserved with case")
+    ok(row and row.gear and row.gear[1] == "item:555:0:0", "gear1 from the response attached")
+end)
+
+test("RCLC inbound: PASS maps, unmappable code leaves the row", function()
+    rclcSession()
+    L.rclcDispatch.response(L, { 1, { response = "PASS" } }, "Rcguy")
+    eq(L.session.rows[1]["rcguy"].resp, 5, "PASS -> PASS id")
+    L.rclcDispatch.response(L, { 1, { response = "TIMEOUT" } }, "Rcguy")
+    eq(L.session.rows[1]["rcguy"].resp, 5, "unmappable TIMEOUT leaves the prior response")
+end)
+
+test("RCLC inbound: lootAck caches gear for a later gear-less response", function()
+    rclcSession()
+    L.rclcDispatch.lootAck(L, { 3, 130, { gear1 = { [1] = "777:0:0" }, gear2 = { [1] = "888" } } }, "Rcguy")
+    L.rclcDispatch.response(L, { 1, { response = 2 } }, "Rcguy") -- response omits gear
+    local row = L.session.rows[1]["rcguy"]
+    eq(row.resp, 2, "button 2 -> Major id")
+    eq(row.gear[1], "item:777:0:0", "gear1 from the cached lootAck")
+    eq(row.gear[2], "item:888", "gear2 from the cached lootAck")
+end)
+
+test("RCLC inbound: lootAck autopass records a PASS", function()
+    rclcSession()
+    L.rclcDispatch.lootAck(L, { nil, 130, { response = { [1] = true } } }, "Rcguy")
+    eq(L.session.rows[1]["rcguy"].resp, 5, "autopassed item -> PASS row")
+end)
+
+test("RCLC inbound: gated on an open session + group membership", function()
+    rclcSession()
+    L.rclcDispatch.response(L, { 1, { response = 1 } }, "Stranger") -- not in the group
+    ok(not (L.session.rows[1] and L.session.rows[1]["stranger"]), "non-group sender dropped")
+    L.session = nil
+    ok(pcall(L.rclcDispatch.response, L, { 1, { response = 1 } }, "Rcguy"), "no session -> no error, no row")
+end)
+
 -- ── Summary ──────────────────────────────────────────────────────────────────
 print(("\n%d passed, %d failed"):format(pass, fail))
 os.exit(fail == 0 and 0 or 1)
