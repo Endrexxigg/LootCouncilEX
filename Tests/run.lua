@@ -829,6 +829,23 @@ test("WithItemID", function()
     eq(u, "Test Item", "uncached -> resolves via ContinueOnItemLoad")
 end)
 
+-- ── Loot priority (§6.23, DL-29) ─────────────────────────────────────────────
+test("DataAPI: prio accessors + PrioLine rendering", function()
+    -- Seed a synthetic prio entry (content ships empty; this exercises the accessors).
+    L.Prio[32837] = {
+        { label = "Main Raid", chain = { { "Warrior (MT)" }, { "Fury", "Rogue" }, { "Hunter" } } },
+        { label = "Split 1", chain = { { "Rogue" } } },
+    }
+    local p = L:GetPrioForItem(32837)
+    ok(p ~= nil and #p == 2, "two labeled chains")
+    eq(p[1].label, "Main Raid", "first chain label")
+    eq(L:PrioLine(p[1].chain), "Warrior (MT) > Fury = Rogue > Hunter", "rank-groups render with > and =")
+    eq(L:PrioLine(p[2].chain), "Rogue", "single-entry chain")
+    eq(L:PrioLine({}), "", "empty chain → empty string")
+    ok(L:GetPrioForItem(99999) == nil, "unknown item → nil")
+    L.Prio[32837] = nil
+end)
+
 -- Guards the bis.csv → BiS.lua migration (Phase 16): the generated table matches the old stub.
 test("DataAPI: BiS generated from bis.csv matches the seed content", function()
     eq(L:GetBiSItems("MAGE", "Fire", "P2", "head")[1], 28830, "MAGE Fire P2 head")

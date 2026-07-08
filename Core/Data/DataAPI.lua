@@ -127,3 +127,21 @@ end
 function LCEX:FindTokenForItem(itemID)
     return self.TierTokens[itemID]
 end
+
+-- ── Loot priority (§6.23) ──────────────────────────────────────────────────────
+-- The guild's priority for an item, or nil: an array of { label, chain = { {text,...}, ... } }
+-- (one entry per labeled chain, e.g. "Main Raid" / "Split 1"). Content is user-sourced.
+function LCEX:GetPrioForItem(itemID)
+    return self.Prio and self.Prio[itemID]
+end
+
+-- Render ONE chain's rank-groups as a readable priority line: equal-rank entries join with " = ",
+-- successive rank-groups with " > "  →  "Enhancement = Elemental > Prot Paladin". "" for an empty chain.
+function LCEX:PrioLine(chain)
+    if type(chain) ~= "table" then return "" end
+    local groups = {}
+    for _, group in ipairs(chain) do
+        groups[#groups + 1] = table.concat(group, " = ")
+    end
+    return table.concat(groups, " > ")
+end
